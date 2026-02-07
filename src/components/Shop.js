@@ -172,7 +172,7 @@ export default function Shop() {
     setLoadingDevices(true);
     try {
       // Use main API for the shop devices endpoint
-      const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
+      const API_BASE = process.env.REACT_APP_API_BASE_URL || "https://api-staging-cms.wizioners.com";
       const res = await fetch(
         `${API_BASE}/shop/${encodeURIComponent(shopName)}/devices`
       );

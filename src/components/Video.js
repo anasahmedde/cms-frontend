@@ -5,11 +5,11 @@ import axios from "axios";
 
 // Video API runs on port 8003 (local), or unified API gateway in staging/prod
 const VIDEO_BASE = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_VIDEO_API_URL || 
-  `${window.location.protocol}//${window.location.hostname}:8003`;
+  "https://api-staging-cms.wizioners.com";
 
 // DVSG API runs on port 8005 (for rotation/fit_mode updates)
 const DVSG_BASE = process.env.REACT_APP_API_BASE_URL || 
-  `${window.location.protocol}//${window.location.hostname}:8005`;
+  "https://api-staging-cms.wizioners.com";
 
 const videoApi = axios.create({
   baseURL: VIDEO_BASE,
