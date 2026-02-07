@@ -17,12 +17,12 @@ jobs:
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "environment=production" >> $GITHUB_OUTPUT
-            echo "api_url=${{ secrets.PROD_API_URL }}" >> $GITHUB_OUTPUT
+            echo "api_url=https://api-cms.wizioners.com" >> $GITHUB_OUTPUT
             echo "s3_bucket=${{ secrets.PROD_S3_BUCKET }}" >> $GITHUB_OUTPUT
             echo "cf_dist=${{ secrets.PROD_CF_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
           else
             echo "environment=staging" >> $GITHUB_OUTPUT
-            echo "api_url=${{ secrets.STAGING_API_URL }}" >> $GITHUB_OUTPUT
+            echo "api_url=https://api-staging-cms.wizioners.com" >> $GITHUB_OUTPUT
             echo "s3_bucket=${{ secrets.STAGING_S3_BUCKET }}" >> $GITHUB_OUTPUT
             echo "cf_dist=${{ secrets.STAGING_CF_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
           fi
@@ -33,7 +33,20 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install & build
         env:
-          REACT_APP_API_URL: ${{ steps.env.outputs.api_url }}
+          CI: false
+          # All API services now run on a single container — same URL for all
+          REACT_APP_API_BASE_URL: ${{ steps.env.outputs.api_url }}
+          REACT_APP_DEVICE_API_URL: ${{ steps.env.outputs.api_url }}
+          REACT_APP_GROUP_API_URL: ${{ steps.env.outputs.api_url }}
+          REACT_APP_SHOP_API_URL: ${{ steps.env.outputs.api_url }}
+          REACT_APP_VIDEO_API_URL: ${{ steps.env.outputs.api_url }}
+          REACT_APP_DEVICE_API: ${{ steps.env.outputs.api_url }}
+          REACT_APP_GROUP_API: ${{ steps.env.outputs.api_url }}
+          REACT_APP_SHOP_API: ${{ steps.env.outputs.api_url }}
+          REACT_APP_VIDEO_API: ${{ steps.env.outputs.api_url }}
+          REACT_APP_LINK_API: ${{ steps.env.outputs.api_url }}
+          REACT_APP_DVSG_API: ${{ steps.env.outputs.api_url }}
+          REACT_APP_API_HOST: ${{ steps.env.outputs.api_url }}
           REACT_APP_ENVIRONMENT: ${{ steps.env.outputs.environment }}
         run: |
           npm ci
