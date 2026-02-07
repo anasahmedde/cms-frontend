@@ -5,7 +5,7 @@ import axios from "axios";
 
 // DVSG API runs on port 8005
 const DVSG_BASE = process.env.REACT_APP_API_BASE_URL || 
-  "https://api-staging-cms.wizioners.com";
+  `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const dvsgApi = axios.create({
   baseURL: DVSG_BASE,

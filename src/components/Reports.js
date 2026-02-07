@@ -4,11 +4,11 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import axios from "axios";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 
-  "https://api-staging-cms.wizioners.com";
+  `${window.location.protocol}//${window.location.hostname}:8005`;
 
 // Device API is on port 8000
-const DEVICE_BASE = process.env.REACT_APP_DEVICE_API_URL || 
-  "https://api-staging-cms.wizioners.com";
+const DEVICE_BASE = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_DEVICE_API_URL || 
+  `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const api = axios.create({ baseURL: API_BASE, timeout: 30000 });
 const deviceApi = axios.create({ baseURL: DEVICE_BASE, timeout: 30000 });

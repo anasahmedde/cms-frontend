@@ -5,7 +5,7 @@ import { listGroupNames } from "../api/group";
 import { setGroupVideosByNames, listGroupVideoNames } from "../api/dvsg";
 import axios from "axios";
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || "https://api-staging-cms.wizioners.com";
+const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const NO_GROUP_LABEL = "— No group —";
 const NO_GROUP_VALUE = "_none";

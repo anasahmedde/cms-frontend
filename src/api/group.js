@@ -3,8 +3,9 @@ import axios from "axios";
 
 // Group API runs on port 8001
 const BASE_URL =
+  process.env.REACT_APP_API_BASE_URL ||
   process.env.REACT_APP_GROUP_API_URL ||
-  "https://api-staging-cms.wizioners.com";
+  `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -114,7 +115,7 @@ export async function getGroupAttachments(gname) {
     const encodedName = encodeURIComponent(gname);
     // Use main API for attachments endpoint
     const dvsgApi = axios.create({
-      baseURL: process.env.REACT_APP_API_BASE_URL || "https://api-staging-cms.wizioners.com",
+      baseURL: process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`,
       timeout: 30000,
       headers: { "Content-Type": "application/json" },
     });

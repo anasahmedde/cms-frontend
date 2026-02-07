@@ -3,8 +3,9 @@ import axios from "axios";
 
 // Shop API runs on port 8002
 const BASE_URL =
+  process.env.REACT_APP_API_BASE_URL ||
   process.env.REACT_APP_SHOP_API_URL ||
-  "https://api-staging-cms.wizioners.com";
+  `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const api = axios.create({
   baseURL: BASE_URL,

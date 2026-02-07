@@ -5,7 +5,7 @@ import axios from "axios";
  */
 const DEFAULT_BASE =
   process.env.REACT_APP_API_BASE_URL ||
-  "https://api-staging-cms.wizioners.com";
+  `${window.location.protocol}//${window.location.hostname}:8005`;
 
 export const api = axios.create({
   baseURL: DEFAULT_BASE,
