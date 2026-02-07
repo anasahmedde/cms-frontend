@@ -1,4 +1,4 @@
-const HOST = process.env.REACT_APP_API_HOST || window.location.hostname;
+//const HOST = process.env.REACT_APP_API_HOST || window.location.hostname;
 const UNIFIED_API = process.env.REACT_APP_API_BASE_URL; // single gateway in staging/prod
 
 // Update these if your ports differ
