@@ -524,8 +524,8 @@ export default function Device() {
   const [assignDevice, setAssignDevice] = useState(null);
   const [assignGroup, setAssignGroup] = useState("");
   const [assignShop, setAssignShop] = useState("");
-  const [assignVideos, setAssignVideos] = useState([]);
-  const [availableVideos, setAvailableVideos] = useState([]);
+  const [, setAssignVideos] = useState([]); // eslint-disable-line no-unused-vars
+  const [, setAvailableVideos] = useState([]);
   const [assigning, setAssigning] = useState(false);
   const [changeGroupMode, setChangeGroupMode] = useState(false); // true = unlink existing first
 

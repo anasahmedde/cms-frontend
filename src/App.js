@@ -200,7 +200,7 @@ function UserManagement({ onUserDeactivated }) {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => { loadUsers(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -458,10 +458,10 @@ function Dashboard({ user, onLogout }) {
   useEffect(() => { const timer = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(timer); }, []);
 
   // Calculate permissions based on role
-  const userPermissions = ROLE_PERMISSIONS[user?.role] || [];
   const hasPermission = useCallback((perm) => {
-    return user?.role === "admin" || userPermissions.includes(perm);
-  }, [user?.role, userPermissions]);
+    const perms = ROLE_PERMISSIONS[user?.role] || [];
+    return user?.role === "admin" || perms.includes(perm);
+  }, [user?.role]);
 
   // Session validation - check every 30 seconds
   useEffect(() => {

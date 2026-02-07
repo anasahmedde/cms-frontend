@@ -162,7 +162,6 @@ export default function GroupLinkedVideo({ onDone }) {
         const res = await setGroupVideosByNames(gvalue, selectedVideos);
         const data = res?.data || res || {};
         const okInserted = data.inserted_count ?? 0;
-        const okUpdated = data.updated_count ?? 0;
         const okDeleted = data.deleted_count ?? 0;
         videoMsg = `Linked ${selectedVideos.length} video(s) (+${okInserted} new, -${okDeleted} removed)`;
       }

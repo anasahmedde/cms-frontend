@@ -22,6 +22,7 @@ const ROTATIONS = [
   { value: 270, label: "270°" },
 ];
 
+// eslint-disable-next-line no-unused-vars
 const CONTENT_TYPES = [
   { value: "video", label: "🎬 Video", color: "#3b82f6" },
   { value: "image", label: "🖼️ Image", color: "#10b981" },
@@ -190,7 +191,7 @@ function GridLayoutEditor({ open, onClose, deviceId, videos = [], advertisements
       }
     }
     setSlots(newSlots);
-  }, [open, loadingState]); // Only depend on open and loadingState
+  }, [open, loadingState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-initialize slots when layout mode changes
   useEffect(() => {
@@ -223,7 +224,7 @@ function GridLayoutEditor({ open, onClose, deviceId, videos = [], advertisements
       }
       setSlots(newSlots);
     }
-  }, [layoutMode]); // Only re-run when layout mode changes
+  }, [layoutMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDragStart = (e, video) => {
     setDraggedVideo(video);
@@ -963,7 +964,6 @@ function GridLayoutEditor({ open, onClose, deviceId, videos = [], advertisements
   );
 
   function renderGridPreview() {
-    const preset = LAYOUT_PRESETS[layoutMode] || LAYOUT_PRESETS.single;
     
     switch (layoutMode) {
       case "single":
