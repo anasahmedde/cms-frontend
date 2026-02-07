@@ -4,9 +4,8 @@ import { safeGet, normalizeList } from "./httpFactory";
 
 // Device CRUD API runs on port 8000 (device.py)
 const DEVICE_BASE_URL =
-  process.env.REACT_APP_API_BASE_URL ||
   process.env.REACT_APP_DEVICE_API_URL ||
-  `${window.location.protocol}//${window.location.hostname}:8005`;
+  "https://api-staging-cms.wizioners.com";
 
 const deviceApi = axios.create({
   baseURL: DEVICE_BASE_URL,

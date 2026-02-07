@@ -10,7 +10,7 @@ import axios from "axios";
 // DVSG API for device creation with linking
 const DVSG_BASE =
   process.env.REACT_APP_API_BASE_URL ||
-  `${window.location.protocol}//${window.location.hostname}:8005`;
+  "https://api-staging-cms.wizioners.com";
 
 const dvsgApi = axios.create({
   baseURL: DVSG_BASE,
@@ -829,7 +829,7 @@ export default function Device() {
     const loadVideos = async () => {
       try {
         // Video API
-        const VIDEO_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
+        const VIDEO_BASE = process.env.REACT_APP_API_BASE_URL || "https://api-staging-cms.wizioners.com";
         const res = await axios.get(`${VIDEO_BASE}/videos`, { params: { limit: 500 } });
         const data = res.data;
         // Handle both array and {items: [...]} or {data: [...]} response formats

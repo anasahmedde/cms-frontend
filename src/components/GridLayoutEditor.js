@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import axios from "axios";
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
+const API_BASE = process.env.REACT_APP_API_BASE_URL || "https://api-staging-cms.wizioners.com";
 
 const LAYOUT_PRESETS = {
   single: { name: "Single", slots: 1, icon: "▢", grid: [[100]] },
