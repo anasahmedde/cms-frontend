@@ -828,8 +828,8 @@ export default function Device() {
     if (!assignDevice) return;
     const loadVideos = async () => {
       try {
-        // Video API is on port 8003
-        const VIDEO_BASE = `${window.location.protocol}//${window.location.hostname}:8003`;
+        // Video API
+        const VIDEO_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8003`;
         const res = await axios.get(`${VIDEO_BASE}/videos`, { params: { limit: 500 } });
         const data = res.data;
         // Handle both array and {items: [...]} or {data: [...]} response formats

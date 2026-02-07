@@ -10,6 +10,7 @@ import GroupLinkedVideo from "./components/GroupLinkedVideo";
 import Reports from "./components/Reports";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
+// In production/staging, set REACT_APP_API_BASE_URL to your API gateway (e.g. https://api-staging-cms.wizioners.com)
 
 // Role-based permissions mapping
 const ROLE_PERMISSIONS = {

@@ -112,9 +112,9 @@ export async function deleteGroup(gname, force = false) {
 export async function getGroupAttachments(gname) {
   try {
     const encodedName = encodeURIComponent(gname);
-    // Use port 8005 (main API) for attachments endpoint
+    // Use main API for attachments endpoint
     const dvsgApi = axios.create({
-      baseURL: `${window.location.protocol}//${window.location.hostname}:8005`,
+      baseURL: process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`,
       timeout: 30000,
       headers: { "Content-Type": "application/json" },
     });

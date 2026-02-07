@@ -2114,7 +2114,7 @@ export default function RecentLinks({ refreshKey }) {
       try {
         const progressResults = await Promise.all(
           devices.map((mobileId) =>
-            fetch(`${window.location.protocol}//${window.location.hostname}:8005/device/${encodeURIComponent(mobileId)}/download_progress`)
+            fetch(`${DVSG_BASE}/device/${encodeURIComponent(mobileId)}/download_progress`)
               .then(r => r.ok ? r.json() : null)
               .catch(() => null)
           )
@@ -2176,7 +2176,7 @@ export default function RecentLinks({ refreshKey }) {
         // Load layout info for each device
         const layoutResults = await Promise.all(
           devices.map((mobileId) =>
-            fetch(`${window.location.protocol}//${window.location.hostname}:8005/device/${encodeURIComponent(mobileId)}/layout`)
+            fetch(`${DVSG_BASE}/device/${encodeURIComponent(mobileId)}/layout`)
               .then(r => r.ok ? r.json() : null)
               .then(data => ({ 
                 mobileId, 

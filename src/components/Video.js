@@ -3,8 +3,8 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import axios from "axios";
 
-// Video API runs on port 8003
-const VIDEO_BASE = process.env.REACT_APP_VIDEO_API_URL || 
+// Video API runs on port 8003 (local), or unified API gateway in staging/prod
+const VIDEO_BASE = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_VIDEO_API_URL || 
   `${window.location.protocol}//${window.location.hostname}:8003`;
 
 // DVSG API runs on port 8005 (for rotation/fit_mode updates)
