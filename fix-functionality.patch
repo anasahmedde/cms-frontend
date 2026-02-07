@@ -1,0 +1,262 @@
+diff --git a/.env b/.env copy
+similarity index 100%
+rename from .env
+rename to .env copy
+diff --git a/src/api/.device.js.swn b/src/api/.device.js.swn
+deleted file mode 100644
+index 9bfb1b29..00000000
+Binary files a/src/api/.device.js.swn and /dev/null differ
+diff --git a/src/api/.device.js.swo b/src/api/.device.js.swo
+deleted file mode 100644
+index d09c846f..00000000
+Binary files a/src/api/.device.js.swo and /dev/null differ
+diff --git a/src/api/.device.js.swp b/src/api/.device.js.swp
+deleted file mode 100644
+index b3c2038d..00000000
+Binary files a/src/api/.device.js.swp and /dev/null differ
+diff --git a/src/components/.GroupLinkedVideo.js.swp b/src/components/.GroupLinkedVideo.js.swp
+deleted file mode 100644
+index 34d06440..00000000
+Binary files a/src/components/.GroupLinkedVideo.js.swp and /dev/null differ
+diff --git a/src/components/RecentLinks.js b/src/components/RecentLinks.js
+index 5c2603a2..c600ead8 100644
+--- a/src/components/RecentLinks.js
++++ b/src/components/RecentLinks.js
+@@ -986,6 +986,7 @@ function UptimeReportModal({ open, onClose, deviceId }) {
+ 
+   // Format duration in human-readable format
+   const formatDuration = (seconds) => {
++    if (seconds == null || isNaN(seconds)) return "0s";
+     if (seconds < 60) return `${Math.round(seconds)}s`;
+     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+     if (seconds < 86400) {
+@@ -1004,6 +1005,37 @@ function UptimeReportModal({ open, onClose, deviceId }) {
+     return d.toLocaleString();
+   };
+ 
++  // Export to CSV
++  const exportToCSV = () => {
++    if (!data || !data.sessions?.length) return;
++    
++    const headers = ["Status", "Start", "End", "Duration (seconds)", "Duration (formatted)"];
++    const rows = data.sessions.map(s => [
++      s.type,
++      s.start,
++      s.end || "Ongoing",
++      Math.round(s.duration_seconds),
++      formatDuration(s.duration_seconds)
++    ]);
++    
++    const csvContent = [
++      `Uptime Report for ${deviceId}`,
++      `Generated: ${new Date().toLocaleString()}`,
++      `Total Online: ${formatDuration(data.total_online_seconds)}`,
++      `Total Offline: ${formatDuration(data.total_offline_seconds)}`,
++      `Uptime Percentage: ${data.online_percentage?.toFixed(2) || 0}%`,
++      "",
++      headers.join(","),
++      ...rows.map(r => r.map(c => `"${c}"`).join(","))
++    ].join("\n");
++    
++    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
++    const link = document.createElement("a");
++    link.href = URL.createObjectURL(blob);
++    link.download = `uptime_report_${deviceId}_${new Date().toISOString().split("T")[0]}.csv`;
++    link.click();
++  };
++
+   if (!open) return null;
+ 
+   return (
+@@ -1045,21 +1077,40 @@ function UptimeReportModal({ open, onClose, deviceId }) {
+           <div style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>
+             ⏱️ Uptime Report: {deviceId}
+           </div>
+-          <button
+-            onClick={onClose}
+-            style={{
+-              width: 32,
+-              height: 32,
+-              borderRadius: 8,
+-              border: "none",
+-              background: "rgba(255,255,255,0.2)",
+-              color: "#fff",
+-              cursor: "pointer",
+-              fontSize: 16,
+-            }}
+-          >
+-            ✕
+-          </button>
++          <div style={{ display: "flex", gap: 8 }}>
++            {data && data.sessions?.length > 0 && (
++              <button
++                onClick={exportToCSV}
++                style={{
++                  padding: "6px 12px",
++                  borderRadius: 8,
++                  border: "none",
++                  background: "rgba(255,255,255,0.2)",
++                  color: "#fff",
++                  cursor: "pointer",
++                  fontSize: 12,
++                  fontWeight: 600,
++                }}
++              >
++                📥 Export CSV
++              </button>
++            )}
++            <button
++              onClick={onClose}
++              style={{
++                width: 32,
++                height: 32,
++                borderRadius: 8,
++                border: "none",
++                background: "rgba(255,255,255,0.2)",
++                color: "#fff",
++                cursor: "pointer",
++                fontSize: 16,
++              }}
++            >
++              ✕
++            </button>
++          </div>
+         </div>
+ 
+         <div style={{ padding: 16, overflowY: "auto" }}>
+@@ -1130,7 +1181,7 @@ function UptimeReportModal({ open, onClose, deviceId }) {
+                 <div style={{ padding: "10px 16px", background: "#dbeafe", borderRadius: 8, minWidth: 100 }}>
+                   <div style={{ fontSize: 11, color: "#1e40af" }}>Uptime</div>
+                   <div style={{ fontSize: 18, fontWeight: 800, color: "#1e40af" }}>
+-                    {data.online_percentage.toFixed(1)}%
++                    {(data.online_percentage || 0).toFixed(1)}%
+                   </div>
+                 </div>
+                 <div style={{ padding: "10px 16px", background: "#f3e8ff", borderRadius: 8, minWidth: 80 }}>
+@@ -1161,22 +1212,22 @@ function UptimeReportModal({ open, onClose, deviceId }) {
+                 }}>
+                   <div 
+                     style={{ 
+-                      width: `${data.online_percentage}%`, 
++                      width: `${data.online_percentage || 0}%`, 
+                       background: "linear-gradient(90deg, #10b981 0%, #34d399 100%)",
+                       transition: "width 0.3s",
+                     }} 
+                   />
+                   <div 
+                     style={{ 
+-                      width: `${100 - data.online_percentage}%`, 
++                      width: `${100 - (data.online_percentage || 0)}%`, 
+                       background: "linear-gradient(90deg, #ef4444 0%, #f87171 100%)",
+                       transition: "width 0.3s",
+                     }} 
+                   />
+                 </div>
+                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 11, color: "#6b7280" }}>
+-                  <span>🟢 Online: {data.online_percentage.toFixed(1)}%</span>
+-                  <span>🔴 Offline: {(100 - data.online_percentage).toFixed(1)}%</span>
++                  <span>🟢 Online: {(data.online_percentage || 0).toFixed(1)}%</span>
++                  <span>🔴 Offline: {(100 - (data.online_percentage || 0)).toFixed(1)}%</span>
+                 </div>
+               </div>
+ 
+@@ -1591,20 +1642,6 @@ export default function RecentLinks({ refreshKey }) {
+       }
+     });
+ 
+-    // Temperature stats
+-    const temperatures = rowsGrouped
+-      .map((r) => r.temperature)
+-      .filter((t) => t != null && !isNaN(t));
+-    const avgTemp = temperatures.length > 0
+-      ? temperatures.reduce((a, b) => a + b, 0) / temperatures.length
+-      : null;
+-    const minTemp = temperatures.length > 0 ? Math.min(...temperatures) : null;
+-    const maxTemp = temperatures.length > 0 ? Math.max(...temperatures) : null;
+-
+-    // Daily and monthly counts
+-    const totalDailyCount = rowsGrouped.reduce((sum, r) => sum + (r.daily_count || 0), 0);
+-    const totalMonthlyCount = rowsGrouped.reduce((sum, r) => sum + (r.monthly_count || 0), 0);
+-
+     return {
+       totalDevices: uniqueDevices.size,
+       onlineDevices: onlineCount,
+@@ -1613,11 +1650,6 @@ export default function RecentLinks({ refreshKey }) {
+       totalShops: uniqueShops.size,
+       totalVideos: uniqueVideos.size,
+       totalLinks: rowsRaw.length,
+-      avgTemp,
+-      minTemp,
+-      maxTemp,
+-      totalDailyCount,
+-      totalMonthlyCount,
+     };
+   }, [rowsGrouped, rowsRaw, onlineStatus]);
+ 
+@@ -1793,66 +1825,6 @@ export default function RecentLinks({ refreshKey }) {
+             <div style={{ fontSize: 11, color: "#94a3b8" }}>assigned</div>
+           </div>
+ 
+-          {/* Average Temperature */}
+-          <div
+-            style={{
+-              background: "#fff",
+-              borderRadius: 12,
+-              padding: "14px 16px",
+-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+-              borderLeft: "4px solid #f97316",
+-            }}
+-          >
+-            <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginBottom: 4 }}>
+-              AVG TEMP
+-            </div>
+-            <div style={{ fontSize: 24, fontWeight: 800, color: "#f97316" }}>
+-              {summary.avgTemp != null ? `${summary.avgTemp.toFixed(1)}°` : "—"}
+-            </div>
+-            <div style={{ fontSize: 11, color: "#94a3b8" }}>
+-              {summary.minTemp != null && summary.maxTemp != null
+-                ? `${summary.minTemp.toFixed(1)}° - ${summary.maxTemp.toFixed(1)}°`
+-                : "no data"}
+-            </div>
+-          </div>
+-
+-          {/* Daily Count */}
+-          <div
+-            style={{
+-              background: "#fff",
+-              borderRadius: 12,
+-              padding: "14px 16px",
+-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+-              borderLeft: "4px solid #14b8a6",
+-            }}
+-          >
+-            <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginBottom: 4 }}>
+-              DAILY COUNT
+-            </div>
+-            <div style={{ fontSize: 24, fontWeight: 800, color: "#14b8a6" }}>
+-              {summary.totalDailyCount}
+-            </div>
+-            <div style={{ fontSize: 11, color: "#94a3b8" }}>today</div>
+-          </div>
+-
+-          {/* Monthly Count */}
+-          <div
+-            style={{
+-              background: "#fff",
+-              borderRadius: 12,
+-              padding: "14px 16px",
+-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+-              borderLeft: "4px solid #8b5cf6",
+-            }}
+-          >
+-            <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginBottom: 4 }}>
+-              MONTHLY COUNT
+-            </div>
+-            <div style={{ fontSize: 24, fontWeight: 800, color: "#8b5cf6" }}>
+-              {summary.totalMonthlyCount}
+-            </div>
+-            <div style={{ fontSize: 11, color: "#94a3b8" }}>this month</div>
+-          </div>
+         </div>
+       </div>
+ 

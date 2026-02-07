@@ -1,0 +1,437 @@
+/* ============================================
+   DIGIX - Futuristic UI Enhancement Styles
+   Professional hover effects & animations
+   ============================================ */
+
+/* === BASE STYLES === */
+.App {
+  text-align: center;
+}
+
+/* === GLOBAL TRANSITIONS === */
+* {
+  transition: all 0.2s ease;
+}
+
+/* === CUSTOM SCROLLBAR (Futuristic) === */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 22, 40, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+}
+
+/* === SELECTION HIGHLIGHT === */
+::selection {
+  background: rgba(245, 158, 11, 0.3);
+  color: #0a1628;
+}
+
+/* === BUTTONS - Professional Hover Effects === */
+button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Ripple effect on buttons */
+button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.6s ease, height 0.6s ease;
+}
+
+button:active::after {
+  width: 300px;
+  height: 300px;
+}
+
+/* === INPUTS - Glow Effect on Focus === */
+input, select, textarea {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15), 0 4px 12px rgba(245, 158, 11, 0.1) !important;
+}
+
+input:hover, select:hover, textarea:hover {
+  border-color: #fbbf24 !important;
+}
+
+/* === TABLES - Row Hover Effects === */
+table tbody tr {
+  transition: all 0.2s ease !important;
+}
+
+table tbody tr:hover {
+  background: rgba(245, 158, 11, 0.05) !important;
+  transform: scale(1.002);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+table tbody tr:hover td {
+  color: #0a1628;
+}
+
+/* === CARDS - Lift Effect === */
+div[style*="borderRadius"] {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* === LINKS - Underline Animation === */
+a {
+  position: relative;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  transition: width 0.3s ease;
+}
+
+a:hover::after {
+  width: 100%;
+}
+
+/* === LOADING SPINNER - Futuristic === */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.8), 0 0 30px rgba(245, 158, 11, 0.4); }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* === BADGES - Pulse Effect === */
+span[style*="borderRadius"][style*="padding"] {
+  transition: all 0.3s ease !important;
+}
+
+span[style*="borderRadius"][style*="padding"]:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* === MODAL BACKDROP - Blur Animation === */
+div[style*="backdrop-filter"] {
+  animation: fadeIn 0.3s ease;
+}
+
+/* === MODAL CONTENT - Scale Animation === */
+div[style*="backdrop-filter"] > div {
+  animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* === SIDEBAR NAV ITEMS - Slide Indicator === */
+nav button {
+  position: relative;
+  overflow: hidden;
+}
+
+nav button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 3px;
+  background: linear-gradient(180deg, #f59e0b, #fbbf24);
+  transform: scaleY(0);
+  transition: transform 0.3s ease;
+}
+
+nav button:hover::before {
+  transform: scaleY(1);
+}
+
+/* === TOOLTIP STYLE (for title attributes) === */
+[title] {
+  position: relative;
+  cursor: help;
+}
+
+/* === ICONS - Bounce on Hover === */
+span[style*="fontSize: 18"] {
+  transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important;
+  display: inline-block;
+}
+
+button:hover span[style*="fontSize: 18"] {
+  transform: scale(1.2);
+}
+
+/* === STATUS INDICATORS - Pulse Animation === */
+@keyframes statusPulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+}
+
+/* Online status green dot pulse */
+span[style*="background"][style*="#10b981"],
+span[style*="background"][style*="rgb(16, 185, 129)"],
+div[style*="background"][style*="#10b981"] {
+  animation: statusPulse 2s infinite;
+}
+
+/* === CARDS HOVER - Futuristic Glow === */
+div[style*="boxShadow"][style*="background: #fff"],
+div[style*="boxShadow"][style*="background: rgb(255, 255, 255)"] {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+div[style*="boxShadow"][style*="background: #fff"]:hover,
+div[style*="boxShadow"][style*="background: rgb(255, 255, 255)"]:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(10, 22, 40, 0.12), 0 0 0 1px rgba(245, 158, 11, 0.1) !important;
+}
+
+/* === HEADER - Subtle Shadow on Scroll === */
+header {
+  transition: box-shadow 0.3s ease !important;
+}
+
+/* === NUMBER COUNTERS - Scale Effect === */
+div[style*="fontSize: 28"],
+div[style*="fontSize: 32"],
+span[style*="fontWeight: 700"] {
+  transition: transform 0.3s ease, color 0.3s ease !important;
+}
+
+div[style*="fontSize: 28"]:hover,
+div[style*="fontSize: 32"]:hover {
+  transform: scale(1.05);
+  color: #f59e0b;
+}
+
+/* === IMAGE/VIDEO THUMBNAILS - Zoom Effect === */
+img, video {
+  transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+img:hover, video:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* === CHECKBOX/TOGGLE - Custom Styling === */
+input[type="checkbox"] {
+  cursor: pointer;
+  transition: all 0.2s ease !important;
+}
+
+input[type="checkbox"]:hover {
+  transform: scale(1.1);
+}
+
+input[type="checkbox"]:checked {
+  animation: pulse 0.3s ease;
+}
+
+/* === EXPANDABLE ROWS - Smooth Expand === */
+tr[style*="background: #f0f9ff"],
+tr[style*="background: rgb(240, 249, 255)"] {
+  animation: slideIn 0.3s ease;
+}
+
+/* === QUICK ACTION CARDS - Interactive Glow === */
+div[style*="cursor: pointer"][style*="borderRadius"] {
+  position: relative;
+  overflow: hidden;
+}
+
+div[style*="cursor: pointer"][style*="borderRadius"]::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent,
+    rgba(245, 158, 11, 0.03),
+    transparent
+  );
+  transform: rotate(45deg);
+  transition: all 0.6s ease;
+}
+
+div[style*="cursor: pointer"][style*="borderRadius"]:hover::before {
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%) rotate(45deg); }
+  100% { transform: translateX(100%) rotate(45deg); }
+}
+
+/* === DROPDOWN MENUS - Fade In === */
+select {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f59e0b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* === TOAST NOTIFICATIONS - Slide In === */
+div[style*="Toast"],
+div[style*="toast"] {
+  animation: slideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* === PROGRESS BARS - Animated Fill === */
+div[style*="height: 8px"][style*="borderRadius"],
+div[style*="height: 6px"][style*="borderRadius"] {
+  overflow: hidden;
+}
+
+div[style*="height: 8px"][style*="borderRadius"] > div,
+div[style*="height: 6px"][style*="borderRadius"] > div {
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* === FUTURISTIC TEXT GLOW ON HOVER === */
+h1, h2, h3 {
+  transition: text-shadow 0.3s ease !important;
+}
+
+h1:hover, h2:hover, h3:hover {
+  text-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+}
+
+/* === FLOATING ACTION EFFECT === */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+/* === SKELETON LOADING (if needed) === */
+@keyframes skeleton {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200px 100%;
+  animation: skeleton 1.5s infinite;
+}
+
+/* === FOCUS VISIBLE - Accessibility === */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+/* === DARK MODE ENHANCEMENTS === */
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  ::selection {
+    background: rgba(245, 158, 11, 0.4);
+    color: #fff;
+  }
+}
+
+/* === REDUCED MOTION - Accessibility === */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* === PRINT STYLES === */
+@media print {
+  button, nav, header {
+    display: none !important;
+  }
+}
