@@ -17,12 +17,12 @@ jobs:
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "environment=production" >> $GITHUB_OUTPUT
-            echo "api_url=https://api-cms.wizioners.com" >> $GITHUB_OUTPUT
+            echo "api_url=${{ secrets.PROD_API_URL }}" >> $GITHUB_OUTPUT
             echo "s3_bucket=${{ secrets.PROD_S3_BUCKET }}" >> $GITHUB_OUTPUT
             echo "cf_dist=${{ secrets.PROD_CF_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
           else
             echo "environment=staging" >> $GITHUB_OUTPUT
-            echo "api_url=https://api-staging-cms.wizioners.com" >> $GITHUB_OUTPUT
+            echo "api_url=${{ secrets.STAGING_API_URL }}" >> $GITHUB_OUTPUT
             echo "s3_bucket=${{ secrets.STAGING_S3_BUCKET }}" >> $GITHUB_OUTPUT
             echo "cf_dist=${{ secrets.STAGING_CF_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
           fi
