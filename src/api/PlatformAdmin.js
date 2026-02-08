@@ -136,7 +136,7 @@ export default function PlatformAdmin({ onImpersonate }) {
 
   const handleDelete = async (slug, name) => {
     const confirmText = prompt(
-      `\u26a0\ufe0f PERMANENT DELETE\n\nThis will permanently delete "${name}" (${slug}) and ALL its data including:\n\u2022 All devices, videos, advertisements\n\u2022 All users and roles\n\u2022 All groups, shops, and links\n\u2022 All S3 media files\n\nType the company slug "${slug}" to confirm:`
+      `⚠️ PERMANENT DELETE\n\nThis will permanently delete "${name}" (${slug}) and ALL its data including:\n• All devices, videos, advertisements\n• All users and roles\n• All groups, shops, and links\n• All S3 media files\n\nType the company slug "${slug}" to confirm:`
     );
     if (confirmText !== slug) {
       if (confirmText !== null) setError("Slug did not match. Deletion cancelled.");
@@ -217,16 +217,16 @@ export default function PlatformAdmin({ onImpersonate }) {
             <>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
                 <StatCard label="Companies" value={dashboard.total_companies}
-                  sub={`${dashboard.active_companies} active \u00b7 ${dashboard.suspended_companies} suspended`}
-                  color="#3b82f6" icon="\ud83c\udfe2" />
+                  sub={`${dashboard.active_companies} active · ${dashboard.suspended_companies} suspended`}
+                  color="#3b82f6" icon="🏢" />
                 <StatCard label="Total Devices" value={dashboard.total_devices}
-                  sub={`${dashboard.online_devices} online \u00b7 ${dashboard.offline_devices} offline`}
-                  color="#16a34a" icon="\ud83d\udcf1" />
-                <StatCard label="Videos" value={dashboard.total_videos} color="#8b5cf6" icon="\ud83c\udfac" />
-                <StatCard label="Advertisements" value={dashboard.total_advertisements} color="#f59e0b" icon="\ud83d\udce2" />
-                <StatCard label="Users" value={dashboard.total_users} color="#ec4899" icon="\ud83d\udc65" />
+                  sub={`${dashboard.online_devices} online · ${dashboard.offline_devices} offline`}
+                  color="#16a34a" icon="📱" />
+                <StatCard label="Videos" value={dashboard.total_videos} color="#8b5cf6" icon="🎬" />
+                <StatCard label="Advertisements" value={dashboard.total_advertisements} color="#f59e0b" icon="📢" />
+                <StatCard label="Users" value={dashboard.total_users} color="#ec4899" icon="👥" />
                 <StatCard label="Groups" value={dashboard.total_groups}
-                  sub={`${dashboard.total_shops} shops`} color="#06b6d4" icon="\ud83d\udcc2" />
+                  sub={`${dashboard.total_shops} shops`} color="#06b6d4" icon="📂" />
               </div>
 
               {dashboard.total_devices > 0 && (
@@ -330,12 +330,12 @@ export default function PlatformAdmin({ onImpersonate }) {
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                     <td style={{ padding: "12px" }}>
                       <div style={{ fontWeight: 600 }}>{c.name}</div>
-                      <div style={{ fontSize: 12, color: "#6b7280" }}>{c.email || "\u2014"}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>{c.email || "—"}</div>
                     </td>
                     <td style={{ padding: "12px", fontFamily: "monospace", fontSize: 13 }}>{c.slug}</td>
                     <td style={{ padding: "12px" }}><StatusBadge status={c.status} /></td>
                     <td style={{ padding: "12px", fontSize: 12, color: "#6b7280" }}>
-                      {c.max_devices} devices \u00b7 {c.max_users} users
+                      {c.max_devices} devices · {c.max_users} users
                     </td>
                     <td style={{ padding: "12px", fontSize: 12, color: "#6b7280" }}>
                       {new Date(c.created_at).toLocaleDateString()}
@@ -395,8 +395,8 @@ export default function PlatformAdmin({ onImpersonate }) {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 14 }}>
               <div><strong>Slug:</strong> <code style={{ background: "#f3f4f6", padding: "2px 6px", borderRadius: 4 }}>{selectedCompany.slug}</code></div>
-              <div><strong>Email:</strong> {selectedCompany.email || "\u2014"}</div>
-              <div><strong>Phone:</strong> {selectedCompany.phone || "\u2014"}</div>
+              <div><strong>Email:</strong> {selectedCompany.email || "—"}</div>
+              <div><strong>Phone:</strong> {selectedCompany.phone || "—"}</div>
               <div><strong>Max Devices:</strong> {selectedCompany.max_devices}</div>
               <div><strong>Max Users:</strong> {selectedCompany.max_users}</div>
               <div><strong>Storage:</strong> {selectedCompany.max_storage_mb} MB</div>
@@ -453,7 +453,7 @@ export default function PlatformAdmin({ onImpersonate }) {
                     <div><strong>Company:</strong> {createResult.company.name} ({createResult.company.slug})</div>
                     <div style={{ marginTop: 8 }}><strong>Admin Username:</strong> <code>{createResult.admin_user.username}</code></div>
                     <div><strong>Temporary Password:</strong> <code style={{ background: "#fef3c7", padding: "2px 6px", borderRadius: 4 }}>{createResult.admin_user.temp_password}</code></div>
-                    <div style={{ marginTop: 8, fontSize: 12, color: "#92400e" }}>\u26a0\ufe0f Save this password now \u2014 it will not be shown again.</div>
+                    <div style={{ marginTop: 8, fontSize: 12, color: "#92400e" }}>⚠️ Save this password now — it will not be shown again.</div>
                   </div>
                 </div>
                 <button onClick={() => { setShowCreate(false); setCreateResult(null); }}
