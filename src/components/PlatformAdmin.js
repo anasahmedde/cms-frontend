@@ -9,7 +9,7 @@ function authHeaders() {
   return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 }
 
-export default function PlatformAdmin() {
+export default function PlatformAdmin({ onImpersonate }) {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -175,7 +175,10 @@ export default function PlatformAdmin() {
                       style={{ padding: "4px 10px", fontSize: 12, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
                       Details
                     </button>
-                    <button onClick={() => handleImpersonate(c.slug)}
+                    <button onClick={() => {
+                        if (onImpersonate) { onImpersonate(c.slug, c.name); }
+                        else { handleImpersonate(c.slug); }
+                      }}
                       style={{ padding: "4px 10px", fontSize: 12, border: "1px solid #3b82f6", borderRadius: 6, background: "#eff6ff", color: "#2563eb", cursor: "pointer" }}>
                       Enter
                     </button>
