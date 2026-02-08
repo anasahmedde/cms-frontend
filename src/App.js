@@ -453,6 +453,7 @@ function Dashboard({ user, onLogout }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isDark, setIsDark] = useState(() => localStorage.getItem("digix_theme") === "dark");
+  const [impersonating, setImpersonating] = useState(null); // { slug, name }
 
   const toggleTheme = useCallback(() => {
     setIsDark(prev => {
@@ -478,6 +479,29 @@ function Dashboard({ user, onLogout }) {
     return user?.role === "admin" || effectivePermissions.includes(perm);
   }, [user?.role, effectivePermissions, isPlatformUser]);
 
+  // Impersonation handlers
+  const handleImpersonate = useCallback(async (slug, name) => {
+    try {
+      const token = localStorage.getItem("digix_token");
+      const res = await fetch(`${API_BASE}/platform/impersonate`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ company_slug: slug }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail); }
+      setImpersonating({ slug, name });
+    } catch (err) { alert("Impersonation failed: " + err.message); }
+  }, []);
+
+  const handleStopImpersonate = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("digix_token");
+      await fetch(`${API_BASE}/platform/stop-impersonate`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` },
+      });
+      setImpersonating(null);
+    } catch (err) { alert("Failed to stop impersonation: " + err.message); }
+  }, []);
+
   // Session validation - check every 30 seconds
   useEffect(() => {
     const checkSession = async () => {
@@ -501,6 +525,19 @@ function Dashboard({ user, onLogout }) {
       <div style={{ display: "flex", minHeight: "100vh", background: theme.bg }}>
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={onLogout} onChangePassword={() => setShowChangePassword(true)} hasPermission={hasPermission} isDark={isDark} toggleTheme={toggleTheme} />
         <div style={{ flex: 1, marginLeft: 260 }}>
+          {/* Impersonation Banner */}
+          {impersonating && (
+            <div style={{ background: "linear-gradient(90deg, #f59e0b, #d97706)", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "#0a1628", zIndex: 200 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 18 }}>👁️</span>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>Impersonating: {impersonating.name}</span>
+                <span style={{ fontSize: 12, opacity: 0.8 }}>({impersonating.slug})</span>
+              </div>
+              <button onClick={handleStopImpersonate} style={{ padding: "6px 16px", background: "#0a1628", color: "#f59e0b", border: "none", borderRadius: 6, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+                ✕ Exit Impersonation
+              </button>
+            </div>
+          )}
           <header style={{ background: theme.headerBg, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${theme.border}`, position: "sticky", top: 0, zIndex: 100 }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: theme.text }}>
               {currentPage === "dashboard" ? "Dashboard" : currentPage === "devices" ? "Devices" : currentPage === "videos" ? "Videos" : currentPage === "advertisements" ? "Advertisements" : currentPage === "groups" ? "Groups" : currentPage === "shops" ? "Shops" : currentPage === "links" ? "Link Content" : currentPage === "reports" ? "Reports" : currentPage === "users" ? "User Management" : currentPage === "platform" ? "Platform Administration" : "Dashboard"}
@@ -530,7 +567,7 @@ function Dashboard({ user, onLogout }) {
                 <div style={{ background: theme.card, borderRadius: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.1)", overflow: "hidden" }}><RecentLinks refreshKey={linksRefresh} isDark={isDark} /></div>
               </div>
             )}
-            {currentPage === "platform" && isPlatformUser && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><PlatformAdmin /></div>}
+            {currentPage === "platform" && isPlatformUser && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><PlatformAdmin onImpersonate={handleImpersonate} /></div>}
             {currentPage === "devices" && hasPermission("manage_devices") && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><Device onChanged={() => setLinksRefresh((x) => x + 1)} /></div>}
             {currentPage === "devices" && !hasPermission("manage_devices") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to manage devices.</div>}
             {currentPage === "videos" && (hasPermission("manage_videos") || hasPermission("upload_videos")) && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><Video /></div>}
