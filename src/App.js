@@ -8,6 +8,7 @@ import Advertisement from "./components/Advertisement";
 import RecentLinks from "./components/RecentLinks";
 import GroupLinkedVideo from "./components/GroupLinkedVideo";
 import Reports from "./components/Reports";
+import PlatformAdmin from "./components/PlatformAdmin";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
 
@@ -131,7 +132,9 @@ function LoginPage({ onLogin }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Login failed");
       localStorage.setItem("digix_token", data.token);
+      localStorage.setItem("token", data.token); // httpFactory uses "token"
       localStorage.setItem("digix_user", JSON.stringify(data));
+      if (data.company) localStorage.setItem("digix_tenant", JSON.stringify(data.company));
       onLogin(data);
     } catch (err) {
       setError(err.message);
@@ -367,6 +370,12 @@ function ChangePasswordModal({ open, onClose }) {
 /* ======================== Sidebar ======================== */
 function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword, hasPermission, isDark, toggleTheme }) {
   const menuItems = [];
+  const isPlatformUser = user?.user_type === "platform";
+  
+  // Platform admin menu (DIGIX staff only)
+  if (isPlatformUser) {
+    menuItems.push({ id: "platform", icon: "🏢", label: "Platform Admin" });
+  }
   
   // Always show dashboard
   menuItems.push({ id: "dashboard", icon: "📊", label: "Dashboard" });
@@ -412,7 +421,7 @@ function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword
           <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>{(user?.full_name || user?.username || "U")[0].toUpperCase()}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: "#fff", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.full_name || user?.username}</div>
-            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textTransform: "capitalize" }}>{user?.role}</div>
+            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textTransform: "capitalize" }}>{user?.role}{user?.company?.name ? ` · ${user.company.name}` : isPlatformUser ? " · Platform" : ""}</div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -457,11 +466,17 @@ function Dashboard({ user, onLogout }) {
 
   useEffect(() => { const timer = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(timer); }, []);
 
-  // Calculate permissions based on role
-  const userPermissions = ROLE_PERMISSIONS[user?.role] || [];
+  // Calculate permissions - use server-provided permissions (multi-tenant), fallback to legacy ROLE_PERMISSIONS
+  const serverPermissions = user?.permissions || [];
+  const legacyPermissions = ROLE_PERMISSIONS[user?.role] || [];
+  const effectivePermissions = serverPermissions.length > 0 ? serverPermissions : legacyPermissions;
+  const isPlatformUser = user?.user_type === "platform";
+
   const hasPermission = useCallback((perm) => {
-    return user?.role === "admin" || userPermissions.includes(perm);
-  }, [user?.role, userPermissions]);
+    // Platform super admins with company.full_access bypass all
+    if (isPlatformUser && effectivePermissions.includes("company.full_access")) return true;
+    return user?.role === "admin" || effectivePermissions.includes(perm);
+  }, [user?.role, effectivePermissions, isPlatformUser]);
 
   // Session validation - check every 30 seconds
   useEffect(() => {
@@ -488,7 +503,7 @@ function Dashboard({ user, onLogout }) {
         <div style={{ flex: 1, marginLeft: 260 }}>
           <header style={{ background: theme.headerBg, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${theme.border}`, position: "sticky", top: 0, zIndex: 100 }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: theme.text }}>
-              {currentPage === "dashboard" ? "Dashboard" : currentPage === "devices" ? "Devices" : currentPage === "videos" ? "Videos" : currentPage === "advertisements" ? "Advertisements" : currentPage === "groups" ? "Groups" : currentPage === "shops" ? "Shops" : currentPage === "links" ? "Link Content" : currentPage === "reports" ? "Reports" : currentPage === "users" ? "User Management" : "Dashboard"}
+              {currentPage === "dashboard" ? "Dashboard" : currentPage === "devices" ? "Devices" : currentPage === "videos" ? "Videos" : currentPage === "advertisements" ? "Advertisements" : currentPage === "groups" ? "Groups" : currentPage === "shops" ? "Shops" : currentPage === "links" ? "Link Content" : currentPage === "reports" ? "Reports" : currentPage === "users" ? "User Management" : currentPage === "platform" ? "Platform Administration" : "Dashboard"}
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <div style={{ textAlign: "right" }}><div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{currentTime.toLocaleTimeString()}</div><div style={{ fontSize: 12, color: theme.textSecondary }}>{currentTime.toLocaleDateString()}</div></div>
@@ -515,6 +530,7 @@ function Dashboard({ user, onLogout }) {
                 <div style={{ background: theme.card, borderRadius: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.1)", overflow: "hidden" }}><RecentLinks refreshKey={linksRefresh} isDark={isDark} /></div>
               </div>
             )}
+            {currentPage === "platform" && isPlatformUser && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><PlatformAdmin /></div>}
             {currentPage === "devices" && hasPermission("manage_devices") && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><Device onChanged={() => setLinksRefresh((x) => x + 1)} /></div>}
             {currentPage === "devices" && !hasPermission("manage_devices") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to manage devices.</div>}
             {currentPage === "videos" && (hasPermission("manage_videos") || hasPermission("upload_videos")) && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><Video /></div>}
@@ -573,6 +589,8 @@ export default function App() {
     if (token) fetch(`${API_BASE}/auth/logout`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
     localStorage.removeItem("digix_token");
     localStorage.removeItem("digix_user");
+    localStorage.removeItem("digix_tenant");
+    localStorage.removeItem("token");
     setUser(null);
   }, []);
 
