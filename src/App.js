@@ -185,9 +185,14 @@ function UserManagement({ onUserDeactivated }) {
   const [showCreate, setShowCreate] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [resetPasswordUser, setResetPasswordUser] = useState(null);
-  const [form, setForm] = useState({ username: "", password: "", email: "", full_name: "", role: "viewer" });
+  const [form, setForm] = useState({ username: "", password: "", email: "", full_name: "", role: "viewer", company_slug: "" });
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
+  const [companies, setCompanies] = useState([]);
+
+  // Detect if current user is platform admin
+  const currentUser = JSON.parse(localStorage.getItem("digix_user") || "{}");
+  const isPlatform = currentUser?.user_type === "platform";
 
   const loadUsers = async () => {
     try {
@@ -203,17 +208,33 @@ function UserManagement({ onUserDeactivated }) {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { loadUsers(); }, []);
+  const loadCompanies = async () => {
+    if (!isPlatform) return;
+    try {
+      const token = localStorage.getItem("digix_token");
+      const res = await fetch(`${API_BASE}/platform/companies?limit=200`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setCompanies(data.items || []);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => { loadUsers(); loadCompanies(); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setError("");
     try {
       const token = localStorage.getItem("digix_token");
-      const res = await fetch(`${API_BASE}/users`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(form) });
+      const payload = { username: form.username, password: form.password, email: form.email || undefined, full_name: form.full_name || undefined, role: form.role };
+      if (isPlatform && form.company_slug) {
+        payload.company_slug = form.company_slug;
+      }
+      const res = await fetch(`${API_BASE}/users`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.detail || "Failed"); }
       setShowCreate(false);
-      setForm({ username: "", password: "", email: "", full_name: "", role: "viewer" });
+      setForm({ username: "", password: "", email: "", full_name: "", role: "viewer", company_slug: "" });
       loadUsers();
     } catch (err) { setError(err.message); }
   };
@@ -263,12 +284,13 @@ function UserManagement({ onUserDeactivated }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <h3 style={{ margin: 0 }}>Users ({users.length})</h3>
-        <button onClick={() => setShowCreate(true)} style={{ padding: "10px 20px", background: BRAND.gradient, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>+ Add User</button>
+        <button onClick={() => { setShowCreate(true); setError(""); }} style={{ padding: "10px 20px", background: BRAND.gradient, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>+ Add User</button>
       </div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead><tr style={{ background: "#f8fafc" }}>
           <th style={{ padding: 12, textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>Username</th>
           <th style={{ padding: 12, textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>Name</th>
+          {isPlatform && <th style={{ padding: 12, textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>Company</th>}
           <th style={{ padding: 12, textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>Role</th>
           <th style={{ padding: 12, textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>Status</th>
           <th style={{ padding: 12, textAlign: "right", borderBottom: "2px solid #e5e7eb" }}>Actions</th>
@@ -277,12 +299,21 @@ function UserManagement({ onUserDeactivated }) {
           {users.map((u) => (
             <tr key={u.id}>
               <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}><strong>{u.username}</strong><br/><span style={{ color: "#64748b", fontSize: 12 }}>{u.email}</span></td>
-              <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}>{u.full_name || "—"}</td>
+              <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}>{u.full_name || "\u2014"}</td>
+              {isPlatform && <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}>
+                {u.company_name ? (
+                  <span style={{ padding: "4px 10px", borderRadius: 20, background: "#eff6ff", color: "#1e40af", fontSize: 12, fontWeight: 600 }}>{u.company_name}</span>
+                ) : u.user_type === "platform" ? (
+                  <span style={{ padding: "4px 10px", borderRadius: 20, background: "#fef3c7", color: "#92400e", fontSize: 12, fontWeight: 600 }}>Platform</span>
+                ) : (
+                  <span style={{ color: "#9ca3af", fontSize: 12 }}>\u2014</span>
+                )}
+              </td>}
               <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}><span style={{ padding: "4px 10px", borderRadius: 20, background: u.role === "admin" ? "#fef3c7" : u.role === "manager" ? "#dbeafe" : u.role === "editor" ? "#d1fae5" : "#f3f4f6", color: u.role === "admin" ? "#92400e" : u.role === "manager" ? "#1e40af" : u.role === "editor" ? "#065f46" : "#374151", fontSize: 12, fontWeight: 600 }}>{u.role}</span></td>
               <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}><span style={{ padding: "4px 10px", borderRadius: 20, background: u.is_active ? "#dcfce7" : "#fee2e2", color: u.is_active ? "#166534" : "#dc2626", fontSize: 12, fontWeight: 600 }}>{u.is_active ? "Active" : "Inactive"}</span></td>
               <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
                 <button onClick={() => { setEditUser(u); setForm({ email: u.email || "", full_name: u.full_name || "", role: u.role, is_active: u.is_active }); setError(""); }} style={{ padding: "6px 12px", background: "#f1f5f9", border: "none", borderRadius: 6, cursor: "pointer", marginRight: 8 }}>Edit</button>
-                <button onClick={() => { setResetPasswordUser(u); setNewPassword(""); setError(""); }} style={{ padding: "6px 12px", background: "#fef3c7", color: "#92400e", border: "none", borderRadius: 6, cursor: "pointer", marginRight: 8 }}>🔑 Reset</button>
+                <button onClick={() => { setResetPasswordUser(u); setNewPassword(""); setError(""); }} style={{ padding: "6px 12px", background: "#fef3c7", color: "#92400e", border: "none", borderRadius: 6, cursor: "pointer", marginRight: 8 }}>Reset</button>
                 {u.username !== "admin" && <button onClick={() => handleDelete(u.id)} style={{ padding: "6px 12px", background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, cursor: "pointer" }}>Delete</button>}
               </td>
             </tr>
@@ -291,6 +322,16 @@ function UserManagement({ onUserDeactivated }) {
       </table>
       <Modal open={showCreate} title="Create User" onClose={() => setShowCreate(false)} size="sm">
         <form onSubmit={handleCreate}>
+          {isPlatform && companies.length > 0 && (
+            <div style={{ marginBottom: 16, padding: 12, background: "#eff6ff", borderRadius: 8, border: "1px solid #bfdbfe" }}>
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 600, color: "#1e40af", fontSize: 13 }}>Assign to Company</label>
+              <select value={form.company_slug} onChange={(e) => setForm({ ...form, company_slug: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }}>
+                <option value="">Platform User (no company)</option>
+                {companies.map(c => <option key={c.slug} value={c.slug}>{c.name} ({c.slug})</option>)}
+              </select>
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Same username can exist in different companies</div>
+            </div>
+          )}
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Username *</label><input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} /></div>
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Password *</label><input required type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} /></div>
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Email</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} /></div>
@@ -302,6 +343,11 @@ function UserManagement({ onUserDeactivated }) {
       </Modal>
       <Modal open={!!editUser} title="Edit User" onClose={() => setEditUser(null)} size="sm">
         <form onSubmit={handleUpdate}>
+          {isPlatform && editUser && (
+            <div style={{ marginBottom: 16, padding: 10, background: "#f9fafb", borderRadius: 8, fontSize: 13 }}>
+              <strong>Company:</strong> {editUser.company_name ? <span style={{ color: "#1e40af" }}>{editUser.company_name}</span> : editUser.user_type === "platform" ? <span style={{ color: "#92400e" }}>Platform</span> : <span style={{ color: "#9ca3af" }}>None</span>}
+            </div>
+          )}
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Email</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} /></div>
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Full Name</label><input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} /></div>
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Role</label><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
