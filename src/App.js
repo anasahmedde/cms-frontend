@@ -8,6 +8,7 @@ import Advertisement from "./components/Advertisement";
 import RecentLinks from "./components/RecentLinks";
 import GroupLinkedVideo from "./components/GroupLinkedVideo";
 import Reports from "./components/Reports";
+import PlatformAdmin from "./components/PlatformAdmin";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
 
@@ -371,6 +372,11 @@ function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword
   // Always show dashboard
   menuItems.push({ id: "dashboard", icon: "📊", label: "Dashboard" });
   
+  // Platform Admin - super admins only
+  if (user?.is_super_admin) {
+    menuItems.push({ id: "platform", icon: "🏢", label: "Platform Admin" });
+  }
+  
   // Show based on permissions
   if (hasPermission("manage_devices")) {
     menuItems.push({ id: "devices", icon: "📱", label: "Devices" });
@@ -489,7 +495,7 @@ function Dashboard({ user, onLogout }) {
         <div style={{ flex: 1, marginLeft: 260 }}>
           <header style={{ background: theme.headerBg, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${theme.border}`, position: "sticky", top: 0, zIndex: 100 }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: theme.text }}>
-              {currentPage === "dashboard" ? "Dashboard" : currentPage === "devices" ? "Devices" : currentPage === "videos" ? "Videos" : currentPage === "advertisements" ? "Advertisements" : currentPage === "groups" ? "Groups" : currentPage === "shops" ? "Shops" : currentPage === "links" ? "Link Content" : currentPage === "reports" ? "Reports" : currentPage === "users" ? "User Management" : "Dashboard"}
+              {currentPage === "dashboard" ? "Dashboard" : currentPage === "platform" ? "Platform Admin" : currentPage === "devices" ? "Devices" : currentPage === "videos" ? "Videos" : currentPage === "advertisements" ? "Advertisements" : currentPage === "groups" ? "Groups" : currentPage === "shops" ? "Shops" : currentPage === "links" ? "Link Content" : currentPage === "reports" ? "Reports" : currentPage === "users" ? "User Management" : "Dashboard"}
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <div style={{ textAlign: "right" }}><div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{currentTime.toLocaleTimeString()}</div><div style={{ fontSize: 12, color: theme.textSecondary }}>{currentTime.toLocaleDateString()}</div></div>
@@ -532,6 +538,8 @@ function Dashboard({ user, onLogout }) {
             {currentPage === "reports" && !hasPermission("view_reports") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to view reports.</div>}
             {currentPage === "users" && hasPermission("manage_users") && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><UserManagement onUserDeactivated={onLogout} /></div>}
             {currentPage === "users" && !hasPermission("manage_users") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to manage users.</div>}
+            {currentPage === "platform" && user?.is_super_admin && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><PlatformAdmin /></div>}
+            {currentPage === "platform" && !user?.is_super_admin && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>Platform admin access required.</div>}
           </main>
         </div>
         {hasPermission("manage_devices") && <Modal open={openModal === "device"} title="📱 Device Management" onClose={() => setOpenModal(null)}><Device onChanged={() => setLinksRefresh((x) => x + 1)} /></Modal>}
