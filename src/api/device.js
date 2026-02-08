@@ -13,6 +13,13 @@ const deviceApi = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+// Auth interceptor
+deviceApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem("digix_token") || localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 function pickMessage(v) {
   if (!v) return null;
   if (typeof v === "string") return v;

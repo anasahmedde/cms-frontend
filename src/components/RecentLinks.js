@@ -19,6 +19,7 @@ const dvsgApi = axios.create({
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
+dvsgApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 
 /* ======================== Styles ======================== */
 const styles = {

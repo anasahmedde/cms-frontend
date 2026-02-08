@@ -12,6 +12,13 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+// Auth interceptor
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("digix_token") || localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 function normalizeList(payload) {
   const data = payload ?? {};
   const items = Array.isArray(data)

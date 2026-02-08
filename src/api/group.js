@@ -12,6 +12,13 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+// Auth interceptor
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("digix_token") || localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 function normalizeList(payload) {
   const data = payload ?? {};
   const items = Array.isArray(data) ? data : data.items || data.data || data.results || [];
@@ -118,6 +125,7 @@ export async function getGroupAttachments(gname) {
       timeout: 30000,
       headers: { "Content-Type": "application/json" },
     });
+    dvsgApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
     const res = await dvsgApi.get(`/group/${encodedName}/attachments`);
     return { ok: true, data: res.data };
   } catch (err) {
