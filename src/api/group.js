@@ -1,10 +1,11 @@
 // src/api/group.js
 import axios from "axios";
 
-// Group API runs on port 8001
+// Group API - consolidated backend on port 8005
 const BASE_URL =
+  process.env.REACT_APP_API_BASE_URL ||
   process.env.REACT_APP_GROUP_API_URL ||
-  `${window.location.protocol}//${window.location.hostname}:8001`;
+  `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -119,9 +120,9 @@ export async function deleteGroup(gname, force = false) {
 export async function getGroupAttachments(gname) {
   try {
     const encodedName = encodeURIComponent(gname);
-    // Use port 8005 (main API) for attachments endpoint
+    // Use main API for attachments endpoint
     const dvsgApi = axios.create({
-      baseURL: `${window.location.protocol}//${window.location.hostname}:8005`,
+      baseURL: BASE_URL,
       timeout: 30000,
       headers: { "Content-Type": "application/json" },
     });

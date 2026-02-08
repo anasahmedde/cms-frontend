@@ -1,8 +1,9 @@
 import axios from "axios";
 
-// Video API runs on port 8003
-const BASE_URL = process.env.REACT_APP_VIDEO_API_URL || 
-  `${window.location.protocol}//${window.location.hostname}:8003`;
+// Video API - consolidated backend on port 8005
+const BASE_URL = process.env.REACT_APP_API_BASE_URL ||
+  process.env.REACT_APP_VIDEO_API_URL || 
+  `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const api = axios.create({
   baseURL: BASE_URL,

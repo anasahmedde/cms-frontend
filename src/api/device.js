@@ -2,10 +2,11 @@
 import axios from "axios";
 import { safeGet, normalizeList } from "./httpFactory";
 
-// Device CRUD API runs on port 8000 (device.py)
+// Device CRUD API - consolidated backend on port 8005
 const DEVICE_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL ||
   process.env.REACT_APP_DEVICE_API_URL ||
-  `${window.location.protocol}//${window.location.hostname}:8000`;
+  `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const deviceApi = axios.create({
   baseURL: DEVICE_BASE_URL,

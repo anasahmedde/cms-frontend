@@ -1,10 +1,11 @@
 // src/api/shop.js
 import axios from "axios";
 
-// Shop API runs on port 8002
+// Shop API - consolidated backend on port 8005
 const BASE_URL =
+  process.env.REACT_APP_API_BASE_URL ||
   process.env.REACT_APP_SHOP_API_URL ||
-  `${window.location.protocol}//${window.location.hostname}:8002`;
+  `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const api = axios.create({
   baseURL: BASE_URL,
