@@ -6,12 +6,15 @@ import axios from "axios";
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 
   `${window.location.protocol}//${window.location.hostname}:8005`;
 
-// Device API - unified on port 8005
-const DEVICE_BASE = process.env.REACT_APP_API_BASE_URL || 
+// Device API - consolidated backend
+const DEVICE_BASE = process.env.REACT_APP_API_BASE_URL ||
+  process.env.REACT_APP_DEVICE_API_URL || 
   `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const api = axios.create({ baseURL: API_BASE, timeout: 30000 });
+api.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 const deviceApi = axios.create({ baseURL: DEVICE_BASE, timeout: 30000 });
+deviceApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 
 // ===== Chart Component =====
 function LineChart({ data, title, yLabel, color = "#3b82f6", height = 300 }) {

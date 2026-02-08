@@ -1,13 +1,14 @@
 const proto = window.location.protocol; // "http:" or "https:"
-const host = window.location.hostname;  // "34.248.112.237" (or whatever you open)
+const host = window.location.hostname;
+const defaultBase = process.env.REACT_APP_API_BASE_URL || `${proto}//${host}:8005`;
 
 export const BASE = {
-  GROUP: process.env.REACT_APP_GROUP_API || `${proto}//${host}:8005`,
-  SHOP: process.env.REACT_APP_SHOP_API || `${proto}//${host}:8005`,
-  VIDEO: process.env.REACT_APP_VIDEO_API || `${proto}//${host}:8005`,
-  DEVICE: process.env.REACT_APP_DEVICE_API || `${proto}//${host}:8005`,
-  LINK: process.env.REACT_APP_LINK_API || `${proto}//${host}:8005`,
-  DVSG: process.env.REACT_APP_DVSG_API || `${proto}//${host}:8005`,
+  GROUP: process.env.REACT_APP_GROUP_API || defaultBase,
+  SHOP: process.env.REACT_APP_SHOP_API || defaultBase,
+  VIDEO: process.env.REACT_APP_VIDEO_API || defaultBase,
+  DEVICE: process.env.REACT_APP_DEVICE_API || defaultBase,
+  LINK: process.env.REACT_APP_LINK_API || defaultBase,
+  DVSG: process.env.REACT_APP_DVSG_API || defaultBase,
 };
 
 // Backend limit is le=100 => always cap to 100 to avoid 422
