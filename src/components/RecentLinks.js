@@ -19,13 +19,7 @@ const dvsgApi = axios.create({
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
-
-// Auth interceptor
-dvsgApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem("digix_token") || localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
+dvsgApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 
 /* ======================== Styles ======================== */
 const styles = {
@@ -2121,7 +2115,7 @@ export default function RecentLinks({ refreshKey }) {
       try {
         const progressResults = await Promise.all(
           devices.map((mobileId) =>
-            fetch(`${window.location.protocol}//${window.location.hostname}:8005/device/${encodeURIComponent(mobileId)}/download_progress`)
+            fetch(`${DVSG_BASE}/device/${encodeURIComponent(mobileId)}/download_progress`)
               .then(r => r.ok ? r.json() : null)
               .catch(() => null)
           )
@@ -2183,7 +2177,7 @@ export default function RecentLinks({ refreshKey }) {
         // Load layout info for each device
         const layoutResults = await Promise.all(
           devices.map((mobileId) =>
-            fetch(`${window.location.protocol}//${window.location.hostname}:8005/device/${encodeURIComponent(mobileId)}/layout`)
+            fetch(`${DVSG_BASE}/device/${encodeURIComponent(mobileId)}/layout`)
               .then(r => r.ok ? r.json() : null)
               .then(data => ({ 
                 mobileId, 
