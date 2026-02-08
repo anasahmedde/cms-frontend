@@ -1,10 +1,9 @@
 // src/api/group.js
 import axios from "axios";
 
-// Group API - consolidated backend on port 8005
+// Group API - unified on port 8005
 const BASE_URL =
   process.env.REACT_APP_API_BASE_URL ||
-  process.env.REACT_APP_GROUP_API_URL ||
   `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const api = axios.create({
@@ -13,7 +12,7 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Auth interceptor
+// Auth interceptor for company users
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("digix_token") || localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -120,14 +119,7 @@ export async function deleteGroup(gname, force = false) {
 export async function getGroupAttachments(gname) {
   try {
     const encodedName = encodeURIComponent(gname);
-    // Use main API for attachments endpoint
-    const dvsgApi = axios.create({
-      baseURL: BASE_URL,
-      timeout: 30000,
-      headers: { "Content-Type": "application/json" },
-    });
-    dvsgApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
-    const res = await dvsgApi.get(`/group/${encodedName}/attachments`);
+    const res = await api.get(`/group/${encodedName}/attachments`);
     return { ok: true, data: res.data };
   } catch (err) {
     console.error("getGroupAttachments error:", err);
