@@ -1,8 +1,7 @@
 import axios from "axios";
 
-// Video API - consolidated backend on port 8005
-const BASE_URL = process.env.REACT_APP_API_BASE_URL ||
-  process.env.REACT_APP_VIDEO_API_URL || 
+// Video API - unified on port 8005
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || 
   `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const api = axios.create({
@@ -11,7 +10,7 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Auth interceptor
+// Auth interceptor for company users
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("digix_token") || localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;

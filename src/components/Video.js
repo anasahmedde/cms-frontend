@@ -3,28 +3,25 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import axios from "axios";
 
-// Video API - consolidated backend
-const VIDEO_BASE = process.env.REACT_APP_API_BASE_URL ||
-  process.env.REACT_APP_VIDEO_API_URL || 
-  `${window.location.protocol}//${window.location.hostname}:8005`;
-
-// DVSG API (same backend)
-const DVSG_BASE = process.env.REACT_APP_API_BASE_URL || 
+// All video APIs now run on port 8005 (unified monolith)
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 
   `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const videoApi = axios.create({
-  baseURL: VIDEO_BASE,
+  baseURL: API_BASE,
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
-videoApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 
-const dvsgApi = axios.create({
-  baseURL: DVSG_BASE,
-  timeout: 30000,
-  headers: { "Content-Type": "application/json" },
+// Add auth interceptor so company users can access
+videoApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem("digix_token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
 });
-dvsgApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
+
+// dvsgApi is same as videoApi now (unified backend)
+const dvsgApi = videoApi;
 
 function Modal({ open, title, onClose, children, footer, width = "720px" }) {
   useEffect(() => {

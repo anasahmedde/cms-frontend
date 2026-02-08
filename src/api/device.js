@@ -2,10 +2,9 @@
 import axios from "axios";
 import { safeGet, normalizeList } from "./httpFactory";
 
-// Device CRUD API - consolidated backend on port 8005
+// Device CRUD API - unified on port 8005
 const DEVICE_BASE_URL =
   process.env.REACT_APP_API_BASE_URL ||
-  process.env.REACT_APP_DEVICE_API_URL ||
   `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const deviceApi = axios.create({
@@ -14,7 +13,7 @@ const deviceApi = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Auth interceptor
+// Auth interceptor for company users
 deviceApi.interceptors.request.use((config) => {
   const token = localStorage.getItem("digix_token") || localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;

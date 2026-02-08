@@ -17,7 +17,6 @@ const dvsgApi = axios.create({
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
-dvsgApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 
 // Simple toast notification
 const toast = (message) => {
@@ -829,8 +828,8 @@ export default function Device() {
     if (!assignDevice) return;
     const loadVideos = async () => {
       try {
-        // Video API is on port 8003
-        const VIDEO_BASE = DVSG_BASE;
+        // Video API - unified on port 8005
+        const VIDEO_BASE = `${window.location.protocol}//${window.location.hostname}:8005`;
         const res = await axios.get(`${VIDEO_BASE}/videos`, { params: { limit: 500 } });
         const data = res.data;
         // Handle both array and {items: [...]} or {data: [...]} response formats
