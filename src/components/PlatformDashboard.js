@@ -200,9 +200,12 @@ function CompanyRow({ company, maxDevices, onNavigate }) {
 // ═══════════════════════════════════════════════════════
 export default function PlatformDashboard() {
   const [data, setData] = useState(null);
+  const [activity, setActivity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [companyFilter, setCompanyFilter] = useState("");
+  const [activeTab, setActiveTab] = useState("overview"); // overview | activity
+  const [activityDays, setActivityDays] = useState(7);
 
   const load = useCallback(async () => {
     try {
@@ -219,13 +222,26 @@ export default function PlatformDashboard() {
     }
   }, []);
 
+  const loadActivity = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/platform/user-activity?days=${activityDays}&limit=200`, { headers: authHeaders() });
+      if (!res.ok) return;
+      const d = await res.json();
+      setActivity(d);
+    } catch (err) { /* silent */ }
+  }, [activityDays]);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (activeTab === "activity") loadActivity(); }, [activeTab, loadActivity]);
 
   // Auto-refresh every 30s
   useEffect(() => {
-    const timer = setInterval(load, 30000);
+    const timer = setInterval(() => {
+      load();
+      if (activeTab === "activity") loadActivity();
+    }, 30000);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, loadActivity, activeTab]);
 
   if (loading && !data) {
     return (
@@ -275,7 +291,7 @@ export default function PlatformDashboard() {
             Real-time analytics across all companies
           </p>
         </div>
-        <button onClick={load} disabled={loading} style={{
+        <button onClick={() => { load(); if (activeTab === "activity") loadActivity(); }} disabled={loading} style={{
           padding: "8px 16px", background: loading ? "#e5e7eb" : "#f8fafc", border: "1px solid #e5e7eb",
           borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 500, color: "#64748b",
           display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s",
@@ -284,6 +300,21 @@ export default function PlatformDashboard() {
           {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
+
+      {/* ─── Tab Bar ─── */}
+      <div style={{ display: "flex", gap: 4, background: "#f1f5f9", borderRadius: 10, padding: 4, width: "fit-content" }}>
+        {[{ id: "overview", label: "📊 Overview" }, { id: "activity", label: "👤 User Activity" }].map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+            padding: "8px 20px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer",
+            background: activeTab === tab.id ? "#fff" : "transparent",
+            color: activeTab === tab.id ? "#0f172a" : "#64748b",
+            boxShadow: activeTab === tab.id ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            transition: "all 0.15s",
+          }}>{tab.label}</button>
+        ))}
+      </div>
+
+      {activeTab === "overview" && (<>
 
       {/* ─── Top Metric Cards ─── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
@@ -440,6 +471,255 @@ export default function PlatformDashboard() {
               ) : (
                 filteredCompanies.map(c => (
                   <CompanyRow key={c.id} company={c} maxDevices={maxDevicesInCompany} />
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      </>)}
+
+      {/* ═══ USER ACTIVITY TAB ═══ */}
+      {activeTab === "activity" && (
+        <UserActivityTab activity={activity} days={activityDays} setDays={setActivityDays} onRefresh={loadActivity} />
+      )}
+    </div>
+  );
+}
+
+// ─── Helper: format duration ───
+function fmtDuration(sec) {
+  if (!sec || sec <= 0) return "—";
+  if (sec < 60) return `${sec}s`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
+function fmtTimeAgo(isoStr) {
+  if (!isoStr) return "—";
+  const diff = (Date.now() - new Date(isoStr).getTime()) / 1000;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+// ═══════════════════════════════════════════════════════
+// USER ACTIVITY TAB
+// ═══════════════════════════════════════════════════════
+function UserActivityTab({ activity, days, setDays, onRefresh }) {
+  if (!activity) {
+    return (
+      <div style={{ padding: 60, textAlign: "center", color: "#94a3b8" }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
+        Loading user activity data...
+      </div>
+    );
+  }
+
+  const { active_users, user_summaries, page_stats, sessions, daily_logins } = activity;
+  const maxLogins = Math.max(...(daily_logins || []).map(d => d.logins), 1);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* Period selector */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <span style={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>Period:</span>
+        {[7, 14, 30].map(d => (
+          <button key={d} onClick={() => setDays(d)} style={{
+            padding: "5px 14px", borderRadius: 6, border: "1px solid #e5e7eb", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            background: days === d ? "#0f172a" : "#fff", color: days === d ? "#fff" : "#64748b", transition: "all 0.15s",
+          }}>{d}d</button>
+        ))}
+      </div>
+
+      {/* Active Now + Summary Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+        <MetricCard icon="🟢" label="Users Online Now" value={active_users?.length || 0} color="#22c55e" />
+        <MetricCard icon="🔑" label={`Sessions (${days}d)`} value={sessions?.length || 0} color="#3b82f6" />
+        <MetricCard icon="📄" label="Pages Tracked" value={page_stats?.length || 0} color="#8b5cf6" />
+      </div>
+
+      {/* Daily Login Chart */}
+      {daily_logins && daily_logins.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #e8ecf1" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>Daily Logins</div>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 120 }}>
+            {daily_logins.map((d, i) => {
+              const pct = (d.logins / maxLogins) * 100;
+              const dayLabel = new Date(d.date + "T00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
+              return (
+                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#0f172a" }}>{d.logins}</span>
+                  <div style={{
+                    width: "100%", maxWidth: 32, height: `${Math.max(pct, 4)}%`,
+                    background: "linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%)", borderRadius: "4px 4px 0 0",
+                    transition: "height 0.5s ease",
+                  }} title={`${d.date}: ${d.logins} logins, ${d.unique_users} unique`} />
+                  <span style={{ fontSize: 9, color: "#94a3b8", whiteSpace: "nowrap" }}>{dayLabel}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Currently Online */}
+      {active_users && active_users.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #e8ecf1" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>
+            🟢 Currently Online ({active_users.length})
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {active_users.map((u, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "8px 14px",
+                background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10,
+              }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{u.username}</div>
+                  <div style={{ fontSize: 10, color: "#64748b" }}>{u.company_name || "Platform"} · {fmtTimeAgo(u.login_at)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* User Summary Table */}
+      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf1", overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>User Activity Summary</div>
+          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Last {days} days</div>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb" }}>
+              {["User", "Company", "Sessions", "Total Time", "Last Login", "Status"].map(h => (
+                <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(!user_summaries || user_summaries.length === 0) ? (
+              <tr><td colSpan={6} style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>No activity recorded yet</td></tr>
+            ) : (
+              user_summaries.map((u, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  <td style={{ padding: "12px 16px", fontWeight: 600, color: "#0f172a" }}>{u.username}</td>
+                  <td style={{ padding: "12px 16px", color: "#64748b" }}>
+                    {u.company_name ? (
+                      <span style={{ background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{u.company_name}</span>
+                    ) : (
+                      <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600 }}>Platform</span>
+                    )}
+                  </td>
+                  <td style={{ padding: "12px 16px", fontWeight: 600 }}>{u.total_sessions}</td>
+                  <td style={{ padding: "12px 16px", color: "#0f172a" }}>{fmtDuration(u.total_duration_sec)}</td>
+                  <td style={{ padding: "12px 16px", color: "#64748b", fontSize: 12 }}>{fmtTimeAgo(u.last_login)}</td>
+                  <td style={{ padding: "12px 16px" }}>
+                    {u.is_online ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: "#dcfce7", color: "#15803d", fontSize: 11, fontWeight: 600 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />Online
+                      </span>
+                    ) : (
+                      <span style={{ color: "#94a3b8", fontSize: 12 }}>Offline</span>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Page Stats */}
+      {page_stats && page_stats.length > 0 && (
+        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf1", overflow: "hidden" }}>
+          <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9" }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Page Visits</div>
+            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Which sections users spend time in</div>
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb" }}>
+                {["Page", "Total Visits", "Unique Users", "Avg Time"].map(h => (
+                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {page_stats.map((p, i) => {
+                const maxVisits = page_stats[0]?.visits || 1;
+                return (
+                  <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 16 }}>
+                          {p.page === "dashboard" ? "📊" : p.page === "devices" ? "📱" : p.page === "videos" ? "🎬" : p.page === "groups" ? "👥" : p.page === "shops" ? "🏪" : p.page === "links" ? "🔗" : p.page === "reports" ? "📈" : p.page === "platform" ? "🏢" : p.page === "users" ? "👤" : p.page === "advertisements" ? "🖼️" : "📄"}
+                        </span>
+                        <span style={{ fontWeight: 600, color: "#0f172a", textTransform: "capitalize" }}>{p.page}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontWeight: 600 }}>{p.visits}</span>
+                        <MiniBar value={p.visits} max={maxVisits} color="#3b82f6" height={6} />
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 16px", fontWeight: 600 }}>{p.unique_users}</td>
+                    <td style={{ padding: "12px 16px", color: "#64748b" }}>{p.avg_duration_sec ? fmtDuration(Math.round(p.avg_duration_sec)) : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Recent Sessions Log */}
+      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf1", overflow: "hidden" }}>
+        <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Recent Sessions</div>
+          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Login/logout history</div>
+        </div>
+        <div style={{ maxHeight: 400, overflow: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb", position: "sticky", top: 0 }}>
+                {["User", "Company", "Login", "Logout", "Duration", "Status"].map(h => (
+                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", background: "#f8fafc" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(!sessions || sessions.length === 0) ? (
+                <tr><td colSpan={6} style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>No sessions recorded yet</td></tr>
+              ) : (
+                sessions.slice(0, 50).map((s, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td style={{ padding: "10px 16px", fontWeight: 600, color: "#0f172a" }}>{s.username}</td>
+                    <td style={{ padding: "10px 16px", color: "#64748b", fontSize: 12 }}>{s.company_name || "Platform"}</td>
+                    <td style={{ padding: "10px 16px", fontSize: 12, color: "#64748b" }}>
+                      {s.login_at ? new Date(s.login_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                    </td>
+                    <td style={{ padding: "10px 16px", fontSize: 12, color: "#64748b" }}>
+                      {s.logout_at ? new Date(s.logout_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                    </td>
+                    <td style={{ padding: "10px 16px", fontSize: 12 }}>{fmtDuration(s.duration_sec)}</td>
+                    <td style={{ padding: "10px 16px" }}>
+                      {s.is_active ? (
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "inline-block", boxShadow: "0 0 6px #22c55e" }} title="Active" />
+                      ) : (
+                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#d1d5db", display: "inline-block" }} title="Ended" />
+                      )}
+                    </td>
+                  </tr>
                 ))
               )}
             </tbody>
