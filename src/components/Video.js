@@ -3,25 +3,28 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import axios from "axios";
 
-// All video APIs now run on port 8005 (unified monolith)
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 
+// Video API - consolidated backend
+const VIDEO_BASE = process.env.REACT_APP_API_BASE_URL ||
+  process.env.REACT_APP_VIDEO_API_URL || 
+  `${window.location.protocol}//${window.location.hostname}:8005`;
+
+// DVSG API (same backend)
+const DVSG_BASE = process.env.REACT_APP_API_BASE_URL || 
   `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const videoApi = axios.create({
-  baseURL: API_BASE,
+  baseURL: VIDEO_BASE,
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
+videoApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 
-// Add auth interceptor so company users can access
-videoApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem("digix_token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+const dvsgApi = axios.create({
+  baseURL: DVSG_BASE,
+  timeout: 30000,
+  headers: { "Content-Type": "application/json" },
 });
-
-// dvsgApi is same as videoApi now (unified backend)
-const dvsgApi = videoApi;
+dvsgApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 
 function Modal({ open, title, onClose, children, footer, width = "720px" }) {
   useEffect(() => {
@@ -437,7 +440,21 @@ export default function Video() {
       await videoApi.delete(`/video/${encodeURIComponent(name)}`);
       load();
     } catch (e) {
-      alert(e?.response?.data?.detail || "Delete failed");
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+      if (status === 409 && detail?.linked) {
+        const parts = Object.entries(detail.linked).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`);
+        if (window.confirm(`Video "${name}" is linked to: ${parts.join(', ')}.\n\nUnlink everything and delete?`)) {
+          try {
+            await videoApi.delete(`/video/${encodeURIComponent(name)}?force=true`);
+            load();
+          } catch (e2) {
+            alert(e2?.response?.data?.detail || "Force delete failed");
+          }
+        }
+      } else {
+        alert(typeof detail === 'string' ? detail : detail?.message || "Delete failed");
+      }
     }
   };
 
