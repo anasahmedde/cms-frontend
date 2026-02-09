@@ -552,6 +552,24 @@ function Dashboard({ user, onLogout }) {
     return () => clearInterval(hb);
   }, []);
 
+  // ── Send logout beacon on tab close / navigate away ──
+  useEffect(() => {
+    const handleUnload = () => {
+      const token = localStorage.getItem("digix_token");
+      if (!token) return;
+      // navigator.sendBeacon can't set Authorization header, so use keepalive fetch
+      try {
+        fetch(`${API_BASE}/auth/logout`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          keepalive: true,
+        });
+      } catch (e) { /* best effort */ }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, []);
+
   // Calculate permissions - use server-provided permissions (multi-tenant), fallback to legacy ROLE_PERMISSIONS
   const serverPermissions = user?.permissions || [];
   const legacyPermissions = ROLE_PERMISSIONS[user?.role] || [];
