@@ -711,7 +711,10 @@ export default function Video() {
                       }}>▶</span>
                       <div>
                         <div style={{ fontWeight: 600 }}>{it.video_name}</div>
-                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>ID: {it.id}</div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                          ID: {it.id}
+                          {it.company_name && <span style={{ marginLeft: 8, background: "#dbeafe", color: "#1e40af", padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600 }}>{it.company_name}</span>}
+                        </div>
                       </div>
                     </div>
                   </td>
