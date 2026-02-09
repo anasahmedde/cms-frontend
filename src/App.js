@@ -135,6 +135,7 @@ function LoginPage({ onLogin }) {
       localStorage.setItem("digix_token", data.token);
       localStorage.setItem("token", data.token); // httpFactory uses "token"
       localStorage.setItem("digix_user", JSON.stringify(data));
+      if (data.session_id) localStorage.setItem("digix_session_id", data.session_id);
       if (data.company) localStorage.setItem("digix_tenant", JSON.stringify(data.company));
       onLogin(data);
     } catch (err) {
@@ -520,6 +521,36 @@ function Dashboard({ user, onLogout }) {
   const theme = isDark ? themes.dark : themes.light;
 
   useEffect(() => { const timer = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(timer); }, []);
+
+  // ── Activity tracking: page visits ──
+  const prevPageRef = React.useRef(null);
+  const pageEnteredRef = React.useRef(Date.now());
+  useEffect(() => {
+    const token = localStorage.getItem("digix_token");
+    if (!token) return;
+    const sessionId = localStorage.getItem("digix_session_id");
+    const prevPage = prevPageRef.current;
+    const prevDuration = prevPage ? Math.round((Date.now() - pageEnteredRef.current) / 1000) : null;
+    prevPageRef.current = currentPage;
+    pageEnteredRef.current = Date.now();
+    fetch(`${API_BASE}/track/page`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ page: currentPage, session_id: sessionId ? parseInt(sessionId) : null, prev_page: prevPage, prev_duration_sec: prevDuration }),
+    }).catch(() => {});
+  }, [currentPage]);
+
+  // ── Heartbeat every 60s ──
+  useEffect(() => {
+    const token = localStorage.getItem("digix_token");
+    if (!token) return;
+    const hb = setInterval(() => {
+      fetch(`${API_BASE}/track/heartbeat`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }, 60000);
+    return () => clearInterval(hb);
+  }, []);
 
   // Calculate permissions - use server-provided permissions (multi-tenant), fallback to legacy ROLE_PERMISSIONS
   const serverPermissions = user?.permissions || [];
