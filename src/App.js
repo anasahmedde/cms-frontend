@@ -9,6 +9,7 @@ import RecentLinks from "./components/RecentLinks";
 import GroupLinkedVideo from "./components/GroupLinkedVideo";
 import Reports from "./components/Reports";
 import PlatformAdmin from "./components/PlatformAdmin";
+import PlatformDashboard from "./components/PlatformDashboard";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
 
@@ -414,9 +415,10 @@ function ChangePasswordModal({ open, onClose }) {
 }
 
 /* ======================== Sidebar ======================== */
-function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword, hasPermission, isDark, toggleTheme }) {
+function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword, hasPermission, isDark, toggleTheme, impersonating }) {
   const menuItems = [];
   const isPlatformUser = user?.user_type === "platform";
+  const isImpersonating = !!impersonating;
   
   // Platform admin menu (DIGIX staff only)
   if (isPlatformUser) {
@@ -426,28 +428,34 @@ function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword
   // Always show dashboard
   menuItems.push({ id: "dashboard", icon: "📊", label: "Dashboard" });
   
-  // Show based on permissions
-  if (hasPermission("manage_devices")) {
-    menuItems.push({ id: "devices", icon: "📱", label: "Devices" });
+  // Company-specific tabs: only show for company users OR platform users who are impersonating
+  const showCompanyTabs = !isPlatformUser || isImpersonating;
+  
+  if (showCompanyTabs) {
+    // Show based on permissions
+    if (hasPermission("manage_devices")) {
+      menuItems.push({ id: "devices", icon: "📱", label: "Devices" });
+    }
+    if (hasPermission("manage_videos") || hasPermission("upload_videos")) {
+      menuItems.push({ id: "videos", icon: "🎬", label: "Videos" });
+    }
+    if (hasPermission("manage_videos") || hasPermission("upload_videos")) {
+      menuItems.push({ id: "advertisements", icon: "🖼️", label: "Advertisements" });
+    }
+    if (hasPermission("manage_groups")) {
+      menuItems.push({ id: "groups", icon: "👥", label: "Groups" });
+    }
+    if (hasPermission("manage_shops")) {
+      menuItems.push({ id: "shops", icon: "🏪", label: "Shops" });
+    }
+    if (hasPermission("manage_links")) {
+      menuItems.push({ id: "links", icon: "🔗", label: "Link Content" });
+    }
+    if (hasPermission("view_reports")) {
+      menuItems.push({ id: "reports", icon: "📈", label: "Reports" });
+    }
   }
-  if (hasPermission("manage_videos") || hasPermission("upload_videos")) {
-    menuItems.push({ id: "videos", icon: "🎬", label: "Videos" });
-  }
-  if (hasPermission("manage_videos") || hasPermission("upload_videos")) {
-    menuItems.push({ id: "advertisements", icon: "🖼️", label: "Advertisements" });
-  }
-  if (hasPermission("manage_groups")) {
-    menuItems.push({ id: "groups", icon: "👥", label: "Groups" });
-  }
-  if (hasPermission("manage_shops")) {
-    menuItems.push({ id: "shops", icon: "🏪", label: "Shops" });
-  }
-  if (hasPermission("manage_links")) {
-    menuItems.push({ id: "links", icon: "🔗", label: "Link Content" });
-  }
-  if (hasPermission("view_reports")) {
-    menuItems.push({ id: "reports", icon: "📈", label: "Reports" });
-  }
+  
   if (hasPermission("manage_users")) {
     menuItems.push({ id: "users", icon: "👤", label: "Users" });
   }
@@ -545,6 +553,7 @@ function Dashboard({ user, onLogout }) {
         method: "POST", headers: { Authorization: `Bearer ${token}` },
       });
       setImpersonating(null);
+      setCurrentPage("dashboard"); // Return to platform dashboard
     } catch (err) { alert("Failed to stop impersonation: " + err.message); }
   }, []);
 
@@ -569,7 +578,7 @@ function Dashboard({ user, onLogout }) {
     <AuthContext.Provider value={{ user, hasPermission }}>
       <ThemeContext.Provider value={{ isDark, toggle: toggleTheme, theme }}>
       <div style={{ display: "flex", minHeight: "100vh", background: theme.bg }}>
-        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={onLogout} onChangePassword={() => setShowChangePassword(true)} hasPermission={hasPermission} isDark={isDark} toggleTheme={toggleTheme} />
+        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={onLogout} onChangePassword={() => setShowChangePassword(true)} hasPermission={hasPermission} isDark={isDark} toggleTheme={toggleTheme} impersonating={impersonating} />
         <div style={{ flex: 1, marginLeft: 260 }}>
           {/* Impersonation Banner */}
           {impersonating && (
@@ -593,7 +602,12 @@ function Dashboard({ user, onLogout }) {
             </div>
           </header>
           <main style={{ padding: 24 }}>
-            {currentPage === "dashboard" && (
+            {currentPage === "dashboard" && isPlatformUser && !impersonating && (
+              <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                <PlatformDashboard />
+              </div>
+            )}
+            {currentPage === "dashboard" && (!isPlatformUser || impersonating) && (
               <div>
                 {/* Quick Action Cards - Only show based on permissions */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
