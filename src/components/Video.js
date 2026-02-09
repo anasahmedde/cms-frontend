@@ -440,7 +440,21 @@ export default function Video() {
       await videoApi.delete(`/video/${encodeURIComponent(name)}`);
       load();
     } catch (e) {
-      alert(e?.response?.data?.detail || "Delete failed");
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+      if (status === 409 && detail?.linked) {
+        const parts = Object.entries(detail.linked).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`);
+        if (window.confirm(`Video "${name}" is linked to: ${parts.join(', ')}.\n\nUnlink everything and delete?`)) {
+          try {
+            await videoApi.delete(`/video/${encodeURIComponent(name)}?force=true`);
+            load();
+          } catch (e2) {
+            alert(e2?.response?.data?.detail || "Force delete failed");
+          }
+        }
+      } else {
+        alert(typeof detail === 'string' ? detail : detail?.message || "Delete failed");
+      }
     }
   };
 

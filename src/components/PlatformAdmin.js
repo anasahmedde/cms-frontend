@@ -144,12 +144,33 @@ export default function PlatformAdmin({ onImpersonate }) {
     }
     setDeleting(slug);
     try {
-      const res = await fetch(`${API_BASE}/platform/companies/${slug}`, {
+      const res = await fetch(`${API_BASE}/platform/companies/${slug}?force=true`, {
         method: "DELETE", headers: authHeaders(),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Failed to delete company");
-      setSuccess(`Company "${name}" permanently deleted. ${data.s3_keys_deleted} media files cleaned up.`);
+      if (!res.ok) {
+        // Check if it's a linked resources error
+        const detail = data.detail;
+        if (res.status === 409 && detail?.linked) {
+          const parts = Object.entries(detail.linked).map(([k, v]) => `• ${v} ${k}`);
+          const forceConfirm = window.confirm(
+            `Company "${name}" has linked resources:\n${parts.join('\n')}\n\nForce delete everything?`
+          );
+          if (forceConfirm) {
+            const res2 = await fetch(`${API_BASE}/platform/companies/${slug}?force=true`, {
+              method: "DELETE", headers: authHeaders(),
+            });
+            const data2 = await res2.json();
+            if (!res2.ok) throw new Error(typeof data2.detail === 'string' ? data2.detail : data2.detail?.message || "Failed to delete company");
+            setSuccess(`Company "${name}" permanently deleted. ${data2.s3_keys_deleted || 0} media files cleaned up.`);
+            setSelectedCompany(null); setStats(null);
+            fetchCompanies(); fetchDashboard();
+          }
+          return;
+        }
+        throw new Error(typeof detail === 'string' ? detail : detail?.message || "Failed to delete company");
+      }
+      setSuccess(`Company "${name}" permanently deleted. ${data.s3_keys_deleted || 0} media files cleaned up.`);
       setSelectedCompany(null); setStats(null);
       fetchCompanies(); fetchDashboard();
     } catch (err) { setError(err.message); }
