@@ -250,7 +250,23 @@ export default function Group() {
     if (!window.confirm(`Delete group "${name}"?`)) return;
     const res = await deleteGroup(name);
     if (!res.ok) {
-      alert(`Failed to delete: ${res.error || res.message}`);
+      // Handle linked resources (new 409 format)
+      if (res.error === "has_linked_resources" && res.linked) {
+        const parts = Object.entries(res.linked).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`);
+        if (window.confirm(`Group "${name}" has linked resources:\n${parts.join('\n')}\n\nUnlink everything and force delete?`)) {
+          const res2 = await deleteGroup(name, true);
+          if (!res2.ok) alert(`Force delete failed: ${res2.error || res2.message}`);
+          load();
+          return;
+        }
+        return;
+      }
+      // Handle legacy devices_attached format
+      if (res.error === "devices_attached") {
+        setDeleteConfirm({ groupName: name });
+        return;
+      }
+      alert(`Failed to delete: ${res.message || res.error}`);
     }
     load();
   };

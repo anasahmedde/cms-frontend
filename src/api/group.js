@@ -97,9 +97,23 @@ export async function deleteGroup(gname, force = false) {
     return { ok: true, data: res.data };
   } catch (err) {
     console.error("deleteGroup error:", err);
+    const status = err.response?.status;
     const detail = err.response?.data?.detail;
     
-    // Handle devices_attached error specially
+    // Handle 409 with linked resources (new format)
+    if (status === 409 && detail?.linked) {
+      return {
+        ok: false,
+        status: 409,
+        error: "has_linked_resources",
+        message: detail.message,
+        linked: detail.linked,
+        gname: detail.gname,
+        raw: err?.response?.data,
+      };
+    }
+
+    // Handle devices_attached error (legacy format)
     if (detail?.error === "devices_attached") {
       return {
         ok: false,
@@ -112,7 +126,7 @@ export async function deleteGroup(gname, force = false) {
       };
     }
     
-    return { ok: false, error: typeof detail === "string" ? detail : err.message };
+    return { ok: false, error: typeof detail === "string" ? detail : err.message, raw: err?.response?.data };
   }
 }
 
