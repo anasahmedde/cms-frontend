@@ -508,6 +508,145 @@ function fmtTimeAgo(isoStr) {
 }
 
 // ═══════════════════════════════════════════════════════
+// PAGE VISITS DRILL-DOWN: Company → User → Pages
+// ═══════════════════════════════════════════════════════
+const PAGE_ICONS = { dashboard: "📊", devices: "📱", videos: "🎬", groups: "👥", shops: "🏪", links: "🔗", reports: "📈", platform: "🏢", users: "👤", advertisements: "🖼️" };
+
+function PageVisitsDrillDown({ pageStats }) {
+  const [expandedCompany, setExpandedCompany] = useState(null);
+  const [expandedUser, setExpandedUser] = useState(null);
+
+  const toggleCompany = (slug) => {
+    if (expandedCompany === slug) { setExpandedCompany(null); setExpandedUser(null); }
+    else { setExpandedCompany(slug); setExpandedUser(null); }
+  };
+  const toggleUser = (key) => {
+    setExpandedUser(expandedUser === key ? null : key);
+  };
+
+  const maxCompanyVisits = Math.max(...pageStats.map(c => c.total_visits), 1);
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf1", overflow: "hidden" }}>
+      <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9" }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Page Visits</div>
+        <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Click company → user → see page breakdown</div>
+      </div>
+
+      <div style={{ padding: 0 }}>
+        {pageStats.map((company) => {
+          const isCompanyOpen = expandedCompany === company.company_slug;
+          return (
+            <div key={company.company_slug}>
+              {/* Company Row */}
+              <div
+                onClick={() => toggleCompany(company.company_slug)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "14px 24px", cursor: "pointer", borderBottom: "1px solid #f1f5f9",
+                  background: isCompanyOpen ? "#f8fafc" : "transparent", transition: "background 0.15s",
+                }}
+                onMouseEnter={e => { if (!isCompanyOpen) e.currentTarget.style.background = "#fafbfd"; }}
+                onMouseLeave={e => { if (!isCompanyOpen) e.currentTarget.style.background = "transparent"; }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{
+                    display: "inline-block", fontSize: 11, transition: "transform 0.2s", transform: isCompanyOpen ? "rotate(90deg)" : "rotate(0deg)", color: "#94a3b8",
+                  }}>▶</span>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 8,
+                    background: company.company_slug === "_platform" ? "linear-gradient(135deg, #f59e0b, #d97706)" : "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                    display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 13, flexShrink: 0,
+                  }}>
+                    {company.company_name[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, color: "#0f172a", fontSize: 14 }}>{company.company_name}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>{company.users.length} user{company.users.length !== 1 ? "s" : ""}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <MiniBar value={company.total_visits} max={maxCompanyVisits} color={company.company_slug === "_platform" ? "#f59e0b" : "#3b82f6"} height={6} />
+                  <span style={{ fontWeight: 700, color: "#0f172a", fontSize: 14, minWidth: 36, textAlign: "right" }}>{company.total_visits}</span>
+                  <span style={{ fontSize: 11, color: "#94a3b8" }}>visits</span>
+                </div>
+              </div>
+
+              {/* Expanded: Users */}
+              {isCompanyOpen && company.users.map((user) => {
+                const userKey = `${company.company_slug}::${user.username}`;
+                const isUserOpen = expandedUser === userKey;
+                return (
+                  <div key={userKey}>
+                    {/* User Row */}
+                    <div
+                      onClick={() => toggleUser(userKey)}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "12px 24px 12px 64px", cursor: "pointer", borderBottom: "1px solid #f8fafc",
+                        background: isUserOpen ? "#f0f9ff" : "#f8fafc", transition: "background 0.15s",
+                      }}
+                      onMouseEnter={e => { if (!isUserOpen) e.currentTarget.style.background = "#f0f4f8"; }}
+                      onMouseLeave={e => { if (!isUserOpen) e.currentTarget.style.background = isUserOpen ? "#f0f9ff" : "#f8fafc"; }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{
+                          display: "inline-block", fontSize: 10, transition: "transform 0.2s", transform: isUserOpen ? "rotate(90deg)" : "rotate(0deg)", color: "#94a3b8",
+                        }}>▶</span>
+                        <div style={{
+                          width: 26, height: 26, borderRadius: 20, background: "#e2e8f0",
+                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#475569",
+                        }}>
+                          {user.username[0].toUpperCase()}
+                        </div>
+                        <span style={{ fontWeight: 600, color: "#1e293b", fontSize: 13 }}>{user.username}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontWeight: 600, color: "#0f172a", fontSize: 13 }}>{user.total_visits}</span>
+                        <span style={{ fontSize: 11, color: "#94a3b8" }}>visits</span>
+                      </div>
+                    </div>
+
+                    {/* Expanded: Page Details */}
+                    {isUserOpen && (
+                      <div style={{ background: "#f0f9ff", borderBottom: "1px solid #e0f2fe" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ borderBottom: "1px solid #bae6fd" }}>
+                              <th style={{ padding: "8px 24px 8px 96px", textAlign: "left", fontWeight: 600, color: "#0369a1", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Page</th>
+                              <th style={{ padding: "8px 16px", textAlign: "center", fontWeight: 600, color: "#0369a1", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Visits</th>
+                              <th style={{ padding: "8px 24px 8px 16px", textAlign: "center", fontWeight: 600, color: "#0369a1", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Avg Time</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {user.pages.map((pg, pi) => (
+                              <tr key={pi} style={{ borderBottom: "1px solid #e0f2fe" }}>
+                                <td style={{ padding: "8px 24px 8px 96px" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <span style={{ fontSize: 14 }}>{PAGE_ICONS[pg.page] || "📄"}</span>
+                                    <span style={{ fontWeight: 500, color: "#0f172a", textTransform: "capitalize" }}>{pg.page}</span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: "8px 16px", textAlign: "center", fontWeight: 600, color: "#0f172a" }}>{pg.visits}</td>
+                                <td style={{ padding: "8px 24px 8px 16px", textAlign: "center", color: "#64748b" }}>{pg.avg_duration_sec ? fmtDuration(Math.round(pg.avg_duration_sec)) : "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
 // USER ACTIVITY TAB
 // ═══════════════════════════════════════════════════════
 function UserActivityTab({ activity, days, setDays, onRefresh }) {
@@ -638,55 +777,9 @@ function UserActivityTab({ activity, days, setDays, onRefresh }) {
         </table>
       </div>
 
-      {/* Page Stats */}
+      {/* Page Stats Drill-Down */}
       {page_stats && page_stats.length > 0 && (
-        <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf1", overflow: "hidden" }}>
-          <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Page Visits</div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Which sections users spend time in, by company</div>
-          </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb" }}>
-                {["Page", "Company", "Total Visits", "Unique Users", "Avg Time"].map(h => (
-                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {page_stats.map((p, i) => {
-                const maxVisits = page_stats[0]?.visits || 1;
-                return (
-                  <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    <td style={{ padding: "12px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 16 }}>
-                          {p.page === "dashboard" ? "📊" : p.page === "devices" ? "📱" : p.page === "videos" ? "🎬" : p.page === "groups" ? "👥" : p.page === "shops" ? "🏪" : p.page === "links" ? "🔗" : p.page === "reports" ? "📈" : p.page === "platform" ? "🏢" : p.page === "users" ? "👤" : p.page === "advertisements" ? "🖼️" : "📄"}
-                        </span>
-                        <span style={{ fontWeight: 600, color: "#0f172a", textTransform: "capitalize" }}>{p.page}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding: "12px 16px" }}>
-                      {p.company_name ? (
-                        <span style={{ background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{p.company_name}</span>
-                      ) : (
-                        <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600 }}>Platform</span>
-                      )}
-                    </td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontWeight: 600 }}>{p.visits}</span>
-                        <MiniBar value={p.visits} max={maxVisits} color="#3b82f6" height={6} />
-                      </div>
-                    </td>
-                    <td style={{ padding: "12px 16px", fontWeight: 600 }}>{p.unique_users}</td>
-                    <td style={{ padding: "12px 16px", color: "#64748b" }}>{p.avg_duration_sec ? fmtDuration(Math.round(p.avg_duration_sec)) : "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <PageVisitsDrillDown pageStats={page_stats} />
       )}
 
       {/* Recent Sessions Log */}
