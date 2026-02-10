@@ -97,12 +97,12 @@ export async function insertDevice(payload) {
  * device.py has DELETE /device/{mobile_id}
  * If FK linked, backend returns 409 with detail object containing recent_links
  */
-export async function deleteDevice(mobileId) {
+export async function deleteDevice(mobileId, force = false) {
   try {
     const id = (mobileId ?? "").toString().trim();
     if (!id) return { ok: false, error: "mobile_id is required" };
 
-    const res = await deviceApi.delete(`/device/${enc(id)}`);
+    const res = await deviceApi.delete(`/device/${enc(id)}${force ? '?force=true' : ''}`);
     return { ok: true, data: res.data };
   } catch (err) {
     const data = err?.response?.data;
@@ -112,8 +112,8 @@ export async function deleteDevice(mobileId) {
     return {
       ok: false,
       status: err?.response?.status,
-      error: errMsg(err),        // always string
-      detailObj,                 // object with recent_links (if 409)
+      error: errMsg(err),
+      detailObj,
       raw: data,
     };
   }
