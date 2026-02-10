@@ -17,6 +17,7 @@ const dvsgApi = axios.create({
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
+dvsgApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 
 // Simple toast notification
 const toast = (message) => {
@@ -828,8 +829,8 @@ export default function Device() {
     if (!assignDevice) return;
     const loadVideos = async () => {
       try {
-        // Video API - unified on port 8005
-        const VIDEO_BASE = `${window.location.protocol}//${window.location.hostname}:8005`;
+        // Video API is on port 8003
+        const VIDEO_BASE = DVSG_BASE;
         const res = await axios.get(`${VIDEO_BASE}/videos`, { params: { limit: 500 } });
         const data = res.data;
         // Handle both array and {items: [...]} or {data: [...]} response formats
@@ -885,18 +886,21 @@ export default function Device() {
     await loadPage(page, pageSize, qApplied);
   };
 
-  const onDelete = async (row) => {
+  const onDelete = async (row, forceDelete = false) => {
     const mid = row?.mobile_id;
     if (!mid) return;
 
-    const ok = window.confirm(`Delete device "${mid}"?`);
-    if (!ok) return;
+    if (!forceDelete) {
+      const ok = window.confirm(`Delete device "${mid}"?`);
+      if (!ok) return;
+    }
 
     setErrText("");
     setFkDetail(null);
 
-    const r = await deleteDevice(mid);
+    const r = await deleteDevice(mid, forceDelete);
     if (r.ok) {
+      toast(`Device "${mid}" deleted${r.data?.unlinked ? " (unlinked " + Object.values(r.data.unlinked).reduce((a, b) => a + b, 0) + " records)" : ""}`);
       const offset = (page - 1) * pageSize;
       const rr = await listDevices(pageSize, offset, qApplied);
       if (rr.ok) {
@@ -914,7 +918,7 @@ export default function Device() {
 
     if (r.status === 409 && r.detailObj) {
       setErrText(r.detailObj.message || "Device is linked with other records.");
-      setFkDetail(r.detailObj);
+      setFkDetail({ ...r.detailObj, _row: row });
       return;
     }
 
@@ -1255,7 +1259,61 @@ export default function Device() {
         </div>
       ) : null}
 
-      {fkDetail?.recent_links?.length ? (
+      {fkDetail?.linked ? (
+        <div style={{ marginBottom: 14, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontWeight: 800, color: "#991b1b" }}>⚠️ Device "{fkDetail.mobile_id}" has linked resources</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                style={{
+                  padding: "8px 16px",
+                  background: "#dc2626",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+                onClick={async () => {
+                  const totalLinked = Object.values(fkDetail.linked).reduce((a, b) => a + b, 0);
+                  const ok = window.confirm(`Force delete device "${fkDetail.mobile_id}"?\n\nThis will unlink and delete ${totalLinked} linked record(s):\n${Object.entries(fkDetail.linked).map(([k, v]) => `  • ${k}: ${v}`).join("\n")}`);
+                  if (!ok) return;
+                  await onDelete(fkDetail._row || { mobile_id: fkDetail.mobile_id }, true);
+                }}
+              >
+                🗑️ Force Delete
+              </button>
+              <button
+                style={{
+                  padding: "8px 16px",
+                  background: "#6b7280",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+                onClick={() => {
+                  setFkDetail(null);
+                  setErrText("");
+                }}
+              >
+                ✕ Dismiss
+              </button>
+            </div>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+            {Object.entries(fkDetail.linked).map(([key, count]) => (
+              <div key={key} style={{ padding: "6px 12px", background: "#fff", border: "1px solid #fecaca", borderRadius: 8, fontSize: 13 }}>
+                <span style={{ fontWeight: 700, color: "#991b1b" }}>{count}</span>
+                <span style={{ color: "#6b7280", marginLeft: 4 }}>{key.replace(/_/g, " ")}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : fkDetail?.recent_links?.length ? (
         <div style={{ marginBottom: 14, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <div style={{ fontWeight: 800, color: "#991b1b" }}>⚠️ Device has {fkDetail.linked_count || fkDetail.recent_links.length} linked record(s)</div>
