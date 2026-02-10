@@ -540,26 +540,27 @@ function Dashboard({ user, onLogout }) {
     }).catch(() => {});
   }, [currentPage]);
 
-  // ── Heartbeat every 60s ──
+  // ── Heartbeat every 60s (+ immediate on mount to re-activate session after reload) ──
   useEffect(() => {
     const token = localStorage.getItem("digix_token");
     if (!token) return;
-    const hb = setInterval(() => {
-      fetch(`${API_BASE}/track/heartbeat`, {
-        method: "POST", headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => {});
-    }, 60000);
+    const sendHB = () => fetch(`${API_BASE}/track/heartbeat`, {
+      method: "POST", headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {});
+    sendHB(); // immediate
+    const hb = setInterval(sendHB, 60000);
     return () => clearInterval(hb);
   }, []);
 
-  // ── Send logout beacon on tab close / navigate away ──
+  // ── Mark session inactive on tab close (without killing auth token) ──
   useEffect(() => {
     const handleUnload = () => {
       const token = localStorage.getItem("digix_token");
       if (!token) return;
-      // navigator.sendBeacon can't set Authorization header, so use keepalive fetch
+      // Use dedicated endpoint that marks session inactive but does NOT delete the auth token
+      // This way page reload still works with the same token
       try {
-        fetch(`${API_BASE}/auth/logout`, {
+        fetch(`${API_BASE}/track/unload`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           keepalive: true,
