@@ -2,9 +2,10 @@
 import axios from "axios";
 import { safeGet, normalizeList } from "./httpFactory";
 
-// Device CRUD API - unified on port 8005
+// Device CRUD API - consolidated backend on port 8005
 const DEVICE_BASE_URL =
   process.env.REACT_APP_API_BASE_URL ||
+  process.env.REACT_APP_DEVICE_API_URL ||
   `${window.location.protocol}//${window.location.hostname}:8005`;
 
 const deviceApi = axios.create({
@@ -13,7 +14,7 @@ const deviceApi = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Auth interceptor for company users
+// Auth interceptor
 deviceApi.interceptors.request.use((config) => {
   const token = localStorage.getItem("digix_token") || localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -96,12 +97,12 @@ export async function insertDevice(payload) {
  * device.py has DELETE /device/{mobile_id}
  * If FK linked, backend returns 409 with detail object containing recent_links
  */
-export async function deleteDevice(mobileId) {
+export async function deleteDevice(mobileId, force = false) {
   try {
     const id = (mobileId ?? "").toString().trim();
     if (!id) return { ok: false, error: "mobile_id is required" };
 
-    const res = await deviceApi.delete(`/device/${enc(id)}`);
+    const res = await deviceApi.delete(`/device/${enc(id)}${force ? '?force=true' : ''}`);
     return { ok: true, data: res.data };
   } catch (err) {
     const data = err?.response?.data;
@@ -111,8 +112,8 @@ export async function deleteDevice(mobileId) {
     return {
       ok: false,
       status: err?.response?.status,
-      error: errMsg(err),        // always string
-      detailObj,                 // object with recent_links (if 409)
+      error: errMsg(err),
+      detailObj,
       raw: data,
     };
   }
