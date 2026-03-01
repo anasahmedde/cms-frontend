@@ -1403,12 +1403,12 @@ export default function Device() {
               <tr style={{ background: "#f9fafb", textAlign: "left" }}>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Device Name</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Mobile ID</th>
+                <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Status</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Group</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Resolution</th>
-                <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Downloaded</th>
-                <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Created</th>
+                <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Content</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Updated</th>
-                <th style={{ padding: 12, fontSize: 12, color: "#6b7280", width: 320, textAlign: "right" }}>
+                <th style={{ padding: 12, fontSize: 12, color: "#6b7280", width: 280, textAlign: "right" }}>
                   Actions
                 </th>
               </tr>
@@ -1438,6 +1438,31 @@ export default function Device() {
                       )}
                     </td>
                     <td style={{ padding: 12, fontFamily: "monospace", fontSize: 12, color: "#6b7280" }}>{d.mobile_id}</td>
+                    {/* Online/Offline Status with colored indicator */}
+                    <td style={{ padding: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          background: d.is_online ? "#22c55e" : "#ef4444",
+                          display: "inline-block",
+                          boxShadow: d.is_online ? "0 0 6px rgba(34, 197, 94, 0.5)" : "none",
+                        }} />
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: d.is_online ? "#16a34a" : "#dc2626",
+                        }}>
+                          {d.is_online ? "Online" : "Offline"}
+                        </span>
+                      </div>
+                      {d.temperature !== null && d.temperature !== undefined && (
+                        <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>
+                          🌡️ {d.temperature.toFixed(1)}°C
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: 12 }}>
                       {d.group_name ? (
                         <span style={{
@@ -1480,8 +1505,49 @@ export default function Device() {
                         <span style={{ color: "#9ca3af", fontSize: 12 }}>Auto</span>
                       )}
                     </td>
-                    <td style={{ padding: 12 }}>{d.download_status ? "Yes" : "No"}</td>
-                    <td style={{ padding: 12 }}>{fmtDate(d.created_at)}</td>
+                    {/* Content Status with colored indicator */}
+                    <td style={{ padding: 12 }}>
+                      {(() => {
+                        const status = d.content_status || (d.download_status ? "synced" : "pending");
+                        const videoCount = d.video_count || 0;
+                        
+                        const statusConfig = {
+                          synced: { color: "#22c55e", bg: "#dcfce7", label: "Synced", icon: "🟢" },
+                          syncing: { color: "#f59e0b", bg: "#fef3c7", label: "Syncing", icon: "🟡" },
+                          pending: { color: "#ef4444", bg: "#fee2e2", label: "Pending", icon: "🔴" },
+                          no_content: { color: "#6b7280", bg: "#f3f4f6", label: "No Content", icon: "⚪" },
+                        };
+                        
+                        const cfg = statusConfig[status] || statusConfig.pending;
+                        
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: "50%",
+                                background: cfg.color,
+                                display: "inline-block",
+                                boxShadow: status === "synced" ? `0 0 6px ${cfg.color}50` : "none",
+                              }} />
+                              <span style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: cfg.color,
+                              }}>
+                                {cfg.label}
+                              </span>
+                            </div>
+                            {videoCount > 0 && (
+                              <span style={{ fontSize: 10, color: "#6b7280" }}>
+                                {videoCount} video{videoCount !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td style={{ padding: 12 }}>{fmtDate(d.updated_at)}</td>
                     <td style={{ padding: 12, textAlign: "right" }}>
                       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
