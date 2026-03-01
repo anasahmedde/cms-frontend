@@ -1,7 +1,6 @@
 // src/components/PlatformAdmin.js
 // Platform-level admin panel for managing companies (tenants)
-// Features: Dashboard overview, company CRUD, delete, suspend/reactivate, impersonate
-// UPDATED: Company Expiration management with color-coded status, notifications
+// FIXED: Device count display, Expiration column, Background task info
 import React, { useState, useEffect, useCallback } from "react";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
@@ -51,7 +50,7 @@ function StatusBadge({ status }) {
       display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11,
       fontWeight: 600, background: `${c}20`, color: c, textTransform: "uppercase",
     }}>
-      {status}
+      {status?.replace(/_/g, ' ') || 'active'}
     </span>
   );
 }
@@ -66,7 +65,7 @@ function ExpirationBadge({ expiresAt, daysUntil, status }) {
         padding: "4px 10px", borderRadius: 8, fontSize: 11,
         fontWeight: 500, background: "#f3f4f6", color: "#6b7280"
       }}>
-        <span style={{ fontSize: 10 }}>∞</span> Not Set
+        ∞ Not Set
       </span>
     );
   }
@@ -104,413 +103,54 @@ function ExpirationBadge({ expiresAt, daysUntil, status }) {
   let color, bg, border, icon;
   
   if (days <= 7) {
-    // RED - Critical
-    color = "#dc2626";
-    bg = "#fef2f2";
-    border = "#fecaca";
-    icon = "🔴";
+    color = "#dc2626"; bg = "#fef2f2"; border = "#fecaca"; icon = "🔴";
   } else if (days <= 30) {
-    // YELLOW - Warning
-    color = "#b45309";
-    bg = "#fef3c7";
-    border = "#fcd34d";
-    icon = "🟡";
+    color = "#b45309"; bg = "#fef3c7"; border = "#fcd34d"; icon = "🟡";
   } else {
-    // GREEN - Good
-    color = "#16a34a";
-    bg = "#dcfce7";
-    border = "#86efac";
-    icon = "🟢";
+    color = "#16a34a"; bg = "#dcfce7"; border = "#86efac"; icon = "🟢";
   }
   
   return (
-    <span style={{ 
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: "4px 10px", borderRadius: 8, fontSize: 11,
-      fontWeight: 600, background: bg, color: color,
-      border: `1px solid ${border}`
-    }}>
-      {icon} {days} days
-    </span>
-  );
-}
-
-// ─── Device Count Display ───
-function DeviceCount({ total, online, offline }) {
-  if (!total || total === 0) {
-    return <span style={{ fontSize: 12, color: "#9ca3af" }}>0 devices</span>;
-  }
-  
-  const pct = total > 0 ? Math.round((online / total) * 100) : 0;
-  
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div style={{ flex: 1, height: 6, borderRadius: 3, background: "#f3f4f6", overflow: "hidden", minWidth: 40 }}>
-        <div style={{ width: `${pct}%`, height: "100%", borderRadius: 3, background: "#16a34a", transition: "width 0.3s" }} />
-      </div>
-      <span style={{ fontSize: 11, color: "#6b7280", whiteSpace: "nowrap" }}>
-        <span style={{ color: "#16a34a", fontWeight: 600 }}>{online}</span>
-        <span style={{ color: "#9ca3af" }}> / {total}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <span style={{ 
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "4px 10px", borderRadius: 8, fontSize: 11,
+        fontWeight: 600, background: bg, color: color,
+        border: `1px solid ${border}`
+      }}>
+        {icon} {days}d left
+      </span>
+      <span style={{ fontSize: 10, color: "#9ca3af" }}>
+        {new Date(expiresAt).toLocaleDateString()}
       </span>
     </div>
   );
 }
 
-// ─── Expiration Countdown Timer ───
-function ExpirationCountdown({ expiresAt }) {
-  const [timeLeft, setTimeLeft] = useState("");
+// ─── Device Count with Online Bar ───
+function DeviceDisplay({ total, online, offline }) {
+  const deviceCount = total || 0;
+  const onlineCount = online || 0;
+  const offlineCount = offline || 0;
   
-  useEffect(() => {
-    if (!expiresAt) return;
-    
-    const updateTimer = () => {
-      const now = new Date();
-      const expires = new Date(expiresAt);
-      const diff = expires - now;
-      
-      if (diff <= 0) {
-        setTimeLeft("Expired");
-        return;
-      }
-      
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      
-      if (days > 0) {
-        setTimeLeft(`${days}d ${hours}h ${minutes}m`);
-      } else if (hours > 0) {
-        setTimeLeft(`${hours}h ${minutes}m`);
-      } else {
-        setTimeLeft(`${minutes}m`);
-      }
-    };
-    
-    updateTimer();
-    const interval = setInterval(updateTimer, 60000); // Update every minute
-    return () => clearInterval(interval);
-  }, [expiresAt]);
-  
-  if (!expiresAt) return null;
-  
-  return (
-    <span style={{ fontSize: 10, color: "#6b7280", fontFamily: "monospace" }}>
-      {timeLeft}
-    </span>
-  );
-}
-
-// ─── Expired Companies Tab Component ───
-function ExpiredCompaniesTab({ onReactivate }) {
-  const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(null);
-
-  const fetchExpired = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/platform/companies/expiration?status=expired`, { headers: authHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        setCompanies(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch expired companies:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchExpired(); }, [fetchExpired]);
-
-  const handleReactivate = async (companyId, companyName, days = 30) => {
-    if (!window.confirm(`Reactivate "${companyName}" and extend by ${days} days?`)) return;
-    setActionLoading(companyId);
-    try {
-      const res = await fetch(`${API_BASE}/platform/company/${companyId}/reactivate?extend_days=${days}`, {
-        method: "POST", headers: authHeaders()
-      });
-      if (res.ok) {
-        alert(`Successfully reactivated ${companyName}`);
-        fetchExpired();
-        if (onReactivate) onReactivate();
-      } else {
-        const data = await res.json();
-        alert(data.detail || "Failed to reactivate");
-      }
-    } catch (err) {
-      alert("Error reactivating company");
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  if (loading) {
-    return <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Loading expired companies...</div>;
+  if (deviceCount === 0) {
+    return <span style={{ fontSize: 12, color: "#9ca3af" }}>No devices</span>;
   }
-
-  if (companies.length === 0) {
-    return (
-      <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
-        <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>No expired companies</div>
-        <div style={{ fontSize: 13, marginTop: 8 }}>All companies are active and up to date.</div>
-      </div>
-    );
-  }
-
+  
+  const pct = deviceCount > 0 ? Math.round((onlineCount / deviceCount) * 100) : 0;
+  
   return (
-    <div>
-      <div style={{ marginBottom: 16, padding: 12, background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>
-        <span style={{ color: "#dc2626", fontWeight: 600 }}>⚠️ {companies.length} expired companies</span>
-        <span style={{ color: "#7f1d1d", marginLeft: 8, fontSize: 13 }}>— Users cannot login and devices show "Not Enrolled"</span>
-      </div>
-
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-        <thead>
-          <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
-            <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Company</th>
-            <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Status</th>
-            <th style={{ padding: 12, textAlign: "center", fontWeight: 600 }}>Devices</th>
-            <th style={{ padding: 12, textAlign: "center", fontWeight: 600 }}>Users</th>
-            <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Expired</th>
-            <th style={{ padding: 12, textAlign: "right", fontWeight: 600 }}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {companies.map((c) => (
-            <tr key={c.company_id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-              <td style={{ padding: 12 }}>
-                <div style={{ fontWeight: 600 }}>{c.company_name}</div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>{c.company_slug}</div>
-              </td>
-              <td style={{ padding: 12 }}>
-                <StatusBadge status={c.expiration_status} />
-              </td>
-              <td style={{ padding: 12, textAlign: "center" }}>{c.device_count || 0}</td>
-              <td style={{ padding: 12, textAlign: "center" }}>{c.user_count || 0}</td>
-              <td style={{ padding: 12 }}>
-                <span style={{ color: "#dc2626", fontWeight: 500 }}>
-                  {c.days_since_expiration || 0} days ago
-                </span>
-              </td>
-              <td style={{ padding: 12, textAlign: "right" }}>
-                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                  <button
-                    onClick={() => handleReactivate(c.company_id, c.company_name, 30)}
-                    disabled={actionLoading === c.company_id}
-                    style={{
-                      padding: "6px 12px", background: "#16a34a", color: "#fff",
-                      border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600,
-                      opacity: actionLoading === c.company_id ? 0.6 : 1
-                    }}
-                  >
-                    {actionLoading === c.company_id ? "..." : "Reactivate (30d)"}
-                  </button>
-                  <button
-                    onClick={() => handleReactivate(c.company_id, c.company_name, 365)}
-                    disabled={actionLoading === c.company_id}
-                    style={{
-                      padding: "6px 12px", background: "#3b82f6", color: "#fff",
-                      border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600,
-                      opacity: actionLoading === c.company_id ? 0.6 : 1
-                    }}
-                  >
-                    +1 Year
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ─── Expiring Soon Tab Component ───
-function ExpiringSoonTab() {
-  const [companies, setCompanies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [days, setDays] = useState(30);
-  const [extendModal, setExtendModal] = useState(null);
-  const [extendDays, setExtendDays] = useState(30);
-  const [extending, setExtending] = useState(false);
-
-  const fetchExpiring = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/platform/companies/expiring-soon?days=${days}`, { headers: authHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        setCompanies(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch expiring companies:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [days]);
-
-  useEffect(() => { fetchExpiring(); }, [fetchExpiring]);
-
-  const handleExtend = async () => {
-    if (!extendModal) return;
-    setExtending(true);
-    try {
-      const res = await fetch(`${API_BASE}/platform/company/${extendModal.company_id}/extend`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({ extend_days: extendDays, notes: "Extended from dashboard" })
-      });
-      if (res.ok) {
-        alert(`Extended ${extendModal.company_name} by ${extendDays} days`);
-        setExtendModal(null);
-        fetchExpiring();
-      } else {
-        const data = await res.json();
-        alert(data.detail || "Failed to extend");
-      }
-    } catch (err) {
-      alert("Error extending company");
-    } finally {
-      setExtending(false);
-    }
-  };
-
-  return (
-    <div>
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
-        <span style={{ fontWeight: 500 }}>Show companies expiring in:</span>
-        {[7, 14, 30, 60, 90].map(d => (
-          <button
-            key={d}
-            onClick={() => setDays(d)}
-            style={{
-              padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 6,
-              background: days === d ? "#3b82f6" : "#fff",
-              color: days === d ? "#fff" : "#374151",
-              cursor: "pointer", fontSize: 13, fontWeight: 500
-            }}
-          >
-            {d} days
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Loading...</div>
-      ) : companies.length === 0 ? (
-        <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>No companies expiring soon</div>
-          <div style={{ fontSize: 13, marginTop: 8 }}>No companies are expiring in the next {days} days.</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 80 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ flex: 1, height: 6, borderRadius: 3, background: "#f3f4f6", overflow: "hidden" }}>
+          <div style={{ width: `${pct}%`, height: "100%", borderRadius: 3, background: "#16a34a", transition: "width 0.3s" }} />
         </div>
-      ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-          <thead>
-            <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
-              <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Company</th>
-              <th style={{ padding: 12, textAlign: "center", fontWeight: 600 }}>Devices</th>
-              <th style={{ padding: 12, textAlign: "center", fontWeight: 600 }}>Users</th>
-              <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Time Left</th>
-              <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Expiry Date</th>
-              <th style={{ padding: 12, textAlign: "right", fontWeight: 600 }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {companies.map((c) => (
-              <tr key={c.company_id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                <td style={{ padding: 12 }}>
-                  <div style={{ fontWeight: 600 }}>{c.company_name}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>{c.company_slug}</div>
-                </td>
-                <td style={{ padding: 12, textAlign: "center" }}>{c.device_count || 0}</td>
-                <td style={{ padding: 12, textAlign: "center" }}>{c.user_count || 0}</td>
-                <td style={{ padding: 12 }}>
-                  <ExpirationBadge 
-                    expiresAt={c.expires_at} 
-                    status={c.expiration_status}
-                    daysUntil={c.days_until_expiration}
-                  />
-                </td>
-                <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>
-                  {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "—"}
-                </td>
-                <td style={{ padding: 12, textAlign: "right" }}>
-                  <button
-                    onClick={() => { setExtendModal(c); setExtendDays(30); }}
-                    style={{
-                      padding: "6px 12px", background: "#f59e0b", color: "#fff",
-                      border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600
-                    }}
-                  >
-                    Extend
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {/* Extend Modal */}
-      {extendModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
-          onClick={() => setExtendModal(null)}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: 400 }}
-            onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>Extend Subscription</h3>
-            <p style={{ margin: "0 0 16px", color: "#6b7280" }}>
-              Extend <strong>{extendModal.company_name}</strong> by:
-            </p>
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              {[7, 30, 90, 180, 365].map(d => (
-                <button
-                  key={d}
-                  onClick={() => setExtendDays(d)}
-                  style={{
-                    flex: 1, padding: "8px", border: "1px solid #e5e7eb", borderRadius: 6,
-                    background: extendDays === d ? "#3b82f6" : "#fff",
-                    color: extendDays === d ? "#fff" : "#374151",
-                    cursor: "pointer", fontSize: 12, fontWeight: 500
-                  }}
-                >
-                  {d}d
-                </button>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              <input
-                type="number"
-                value={extendDays}
-                onChange={e => setExtendDays(parseInt(e.target.value) || 0)}
-                style={{ flex: 1, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6 }}
-              />
-              <span style={{ padding: "8px 0", color: "#6b7280" }}>days</span>
-            </div>
-            <div style={{ display: "flex", gap: 12 }}>
-              <button
-                onClick={() => setExtendModal(null)}
-                style={{ flex: 1, padding: 10, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleExtend}
-                disabled={extending || extendDays < 1}
-                style={{
-                  flex: 1, padding: 10, background: "#16a34a", color: "#fff",
-                  border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600,
-                  opacity: extending ? 0.6 : 1
-                }}
-              >
-                {extending ? "Extending..." : `Extend ${extendDays} days`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
+      <span style={{ fontSize: 11, color: "#6b7280" }}>
+        <span style={{ color: "#16a34a", fontWeight: 600 }}>{onlineCount}</span>
+        <span style={{ color: "#9ca3af" }}> / {deviceCount}</span>
+        {offlineCount > 0 && <span style={{ color: "#dc2626", marginLeft: 4 }}>({offlineCount} offline)</span>}
+      </span>
     </div>
   );
 }
@@ -531,6 +171,9 @@ export default function PlatformAdmin({ onImpersonate }) {
   const [deleting, setDeleting] = useState(null);
   const [expiredCount, setExpiredCount] = useState(0);
   const [expiringSoonCount, setExpiringSoonCount] = useState(0);
+  const [expiredCompanies, setExpiredCompanies] = useState([]);
+  const [expiringCompanies, setExpiringCompanies] = useState([]);
+  const [expiringDays, setExpiringDays] = useState(30);
   
   // Set Expiration Modal state
   const [showSetExpiration, setShowSetExpiration] = useState(null);
@@ -558,28 +201,31 @@ export default function PlatformAdmin({ onImpersonate }) {
     finally { setLoading(false); }
   }, [search, statusFilter]);
 
-  const fetchExpirationCounts = useCallback(async () => {
+  const fetchExpirationData = useCallback(async () => {
     try {
-      const [expiredRes, expiringRes] = await Promise.all([
-        fetch(`${API_BASE}/platform/companies/expiration?status=expired`, { headers: authHeaders() }),
-        fetch(`${API_BASE}/platform/companies/expiring-soon?days=30`, { headers: authHeaders() })
-      ]);
+      // Fetch expired companies
+      const expiredRes = await fetch(`${API_BASE}/platform/companies/expiration?status=expired`, { headers: authHeaders() });
       if (expiredRes.ok) {
         const data = await expiredRes.json();
+        setExpiredCompanies(data);
         setExpiredCount(data.length);
       }
+      
+      // Fetch expiring soon companies
+      const expiringRes = await fetch(`${API_BASE}/platform/companies/expiring-soon?days=${expiringDays}`, { headers: authHeaders() });
       if (expiringRes.ok) {
         const data = await expiringRes.json();
+        setExpiringCompanies(data);
         setExpiringSoonCount(data.length);
       }
-    } catch (err) { console.error("Failed to fetch expiration counts"); }
-  }, []);
+    } catch (err) { console.error("Failed to fetch expiration data", err); }
+  }, [expiringDays]);
 
   useEffect(() => { 
     fetchDashboard(); 
     fetchCompanies(); 
-    fetchExpirationCounts();
-  }, [fetchDashboard, fetchCompanies, fetchExpirationCounts]);
+    fetchExpirationData();
+  }, [fetchDashboard, fetchCompanies, fetchExpirationData]);
 
   const fetchStats = async (slug) => {
     try {
@@ -630,16 +276,14 @@ export default function PlatformAdmin({ onImpersonate }) {
       
       setCreateResult(data);
       setSuccess(`Company "${data.company.name}" created successfully!`);
-      fetchCompanies(); fetchDashboard(); fetchExpirationCounts();
+      fetchCompanies(); fetchDashboard(); fetchExpirationData();
     } catch (err) { setError(err.message); }
   };
 
   const handleDelete = async (slug, name) => {
-    const confirmText = prompt(
-      `⚠️ PERMANENT DELETE\n\nThis will permanently delete "${name}" (${slug}) and ALL its data including:\n• All devices, videos, advertisements\n• All users and roles\n• All groups, shops, and links\n• All S3 media files\n\nType the company slug "${slug}" to confirm:`
-    );
+    const confirmText = prompt(`⚠️ DELETE "${name}"?\n\nType the slug "${slug}" to confirm:`);
     if (confirmText !== slug) {
-      if (confirmText !== null) alert("Slug did not match. Deletion cancelled.");
+      if (confirmText !== null) alert("Slug did not match.");
       return;
     }
     setDeleting(slug);
@@ -649,64 +293,68 @@ export default function PlatformAdmin({ onImpersonate }) {
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.detail || "Failed to delete company");
+        throw new Error(data.detail || "Failed to delete");
       }
-      setSuccess(`Company "${name}" deleted successfully.`);
+      setSuccess(`Company "${name}" deleted.`);
       setSelectedCompany(null);
-      fetchCompanies(); fetchDashboard(); fetchExpirationCounts();
+      fetchCompanies(); fetchDashboard(); fetchExpirationData();
     } catch (err) { setError(err.message); }
     finally { setDeleting(null); }
   };
 
-  const handleSuspend = async (company) => {
-    const reason = prompt(`Enter reason for suspending "${company.name}":`);
+  const handleSuspend = async (companyId, name) => {
+    const reason = prompt(`Reason for suspending "${name}":`);
     if (!reason) return;
     try {
-      const res = await fetch(`${API_BASE}/platform/company/${company.id}/suspend`, {
+      const res = await fetch(`${API_BASE}/platform/company/${companyId}/suspend`, {
         method: "POST", headers: authHeaders(),
         body: JSON.stringify({ reason })
       });
       if (res.ok) {
-        setSuccess(`Company "${company.name}" suspended.`);
-        fetchCompanies(); fetchExpirationCounts();
+        setSuccess(`"${name}" suspended.`);
+        fetchCompanies(); fetchExpirationData();
+      } else {
+        const data = await res.json();
+        setError(data.detail || "Failed to suspend");
       }
-    } catch (err) { setError("Failed to suspend company"); }
+    } catch (err) { setError("Failed to suspend"); }
   };
 
-  const handleReactivate = async (company) => {
-    const days = prompt(`How many days to extend "${company.name}"?`, "30");
-    if (!days) return;
+  const handleReactivate = async (companyId, name, extendDays = 30) => {
     try {
-      const res = await fetch(`${API_BASE}/platform/company/${company.id}/reactivate?extend_days=${days}`, {
+      const res = await fetch(`${API_BASE}/platform/company/${companyId}/reactivate?extend_days=${extendDays}`, {
         method: "POST", headers: authHeaders()
       });
       if (res.ok) {
-        setSuccess(`Company "${company.name}" reactivated for ${days} days.`);
-        fetchCompanies(); fetchExpirationCounts();
+        setSuccess(`"${name}" reactivated for ${extendDays} days.`);
+        fetchCompanies(); fetchExpirationData();
+      } else {
+        const data = await res.json();
+        setError(data.detail || "Failed to reactivate");
       }
-    } catch (err) { setError("Failed to reactivate company"); }
+    } catch (err) { setError("Failed to reactivate"); }
   };
 
   const handleSetExpiration = async () => {
     if (!showSetExpiration) return;
     setSettingExpiration(true);
+    setError("");
     try {
       if (!expirationDate) {
         // Remove expiration
         const res = await fetch(`${API_BASE}/platform/company/${showSetExpiration.id}/expiration`, {
-          method: "DELETE",
-          headers: authHeaders()
+          method: "DELETE", headers: authHeaders()
         });
         if (res.ok) {
           setSuccess(`Expiration removed for ${showSetExpiration.name}`);
         } else {
-          throw new Error("Failed to remove");
+          const data = await res.json();
+          throw new Error(data.detail || "Failed to remove expiration");
         }
       } else {
         // Set expiration
         const res = await fetch(`${API_BASE}/platform/company/${showSetExpiration.id}/expiration`, {
-          method: "PUT",
-          headers: authHeaders(),
+          method: "PUT", headers: authHeaders(),
           body: JSON.stringify({
             expires_at: new Date(expirationDate).toISOString(),
             grace_period_days: gracePeriod,
@@ -714,35 +362,48 @@ export default function PlatformAdmin({ onImpersonate }) {
           })
         });
         if (res.ok) {
-          setSuccess(`Expiration set for ${showSetExpiration.name}`);
+          const data = await res.json();
+          setSuccess(`Expiration set for ${showSetExpiration.name}: ${data.expiration_status}`);
         } else {
           const data = await res.json();
-          throw new Error(data.detail || "Failed to set");
+          throw new Error(data.detail || "Failed to set expiration");
         }
       }
       
       setShowSetExpiration(null);
       fetchCompanies();
-      fetchExpirationCounts();
+      fetchExpirationData();
     } catch (err) {
-      setError(err.message || "Failed to update expiration");
+      setError(err.message);
     } finally {
       setSettingExpiration(false);
     }
   };
 
-  // Tab style helper
+  const handleExtend = async (companyId, name, days) => {
+    try {
+      const res = await fetch(`${API_BASE}/platform/company/${companyId}/extend`, {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ extend_days: days, notes: "Extended from dashboard" })
+      });
+      if (res.ok) {
+        setSuccess(`Extended "${name}" by ${days} days`);
+        fetchCompanies(); fetchExpirationData();
+      } else {
+        const data = await res.json();
+        setError(data.detail || "Failed to extend");
+      }
+    } catch (err) { setError("Failed to extend"); }
+  };
+
   const tabStyle = (active) => ({
-    padding: "10px 20px",
-    background: active ? "#fff" : "transparent",
-    border: "none",
-    borderBottom: active ? "2px solid #3b82f6" : "2px solid transparent",
-    cursor: "pointer",
-    fontWeight: active ? 600 : 500,
-    color: active ? "#3b82f6" : "#6b7280",
-    fontSize: 14,
-    position: "relative"
+    padding: "10px 20px", background: active ? "#fff" : "transparent",
+    border: "none", borderBottom: active ? "2px solid #3b82f6" : "2px solid transparent",
+    cursor: "pointer", fontWeight: active ? 600 : 500,
+    color: active ? "#3b82f6" : "#6b7280", fontSize: 14, position: "relative"
   });
+
+  const inputStyle = { width: "100%", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14, boxSizing: "border-box" };
 
   return (
     <div style={{ padding: "24px 32px", minHeight: "100vh", background: "#f3f4f6" }}>
@@ -750,72 +411,53 @@ export default function PlatformAdmin({ onImpersonate }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#0a1628" }}>Platform Admin</h1>
-          <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 14 }}>Manage companies, subscriptions, and platform settings</p>
+          <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 14 }}>Manage companies and subscriptions</p>
         </div>
         <button
           onClick={() => { setShowCreate(true); setCreateResult(null); setError(""); }}
           style={{
             padding: "12px 24px", background: "#f59e0b", color: "#0a1628", border: "none",
-            borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", gap: 8
+            borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 14
           }}
         >
-          <span>+</span> Onboard Company
+          + Onboard Company
         </button>
       </div>
 
+      {/* Messages */}
       {success && (
-        <div style={{ padding: 12, background: "#dcfce7", borderRadius: 8, marginBottom: 16, color: "#166534" }}>
+        <div style={{ padding: 12, background: "#dcfce7", borderRadius: 8, marginBottom: 16, color: "#166534", display: "flex", justifyContent: "space-between" }}>
           {success}
-          <button onClick={() => setSuccess("")} style={{ float: "right", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+          <button onClick={() => setSuccess("")} style={{ background: "none", border: "none", cursor: "pointer" }}>✕</button>
         </div>
       )}
       {error && (
-        <div style={{ padding: 12, background: "#fef2f2", borderRadius: 8, marginBottom: 16, color: "#dc2626" }}>
+        <div style={{ padding: 12, background: "#fef2f2", borderRadius: 8, marginBottom: 16, color: "#dc2626", display: "flex", justifyContent: "space-between" }}>
           {error}
-          <button onClick={() => setError("")} style={{ float: "right", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+          <button onClick={() => setError("")} style={{ background: "none", border: "none", cursor: "pointer" }}>✕</button>
         </div>
       )}
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e5e7eb", marginBottom: 24, background: "#fff", borderRadius: "8px 8px 0 0" }}>
-        <button style={tabStyle(tab === "dashboard")} onClick={() => setTab("dashboard")}>
-          📊 Dashboard
-        </button>
-        <button style={tabStyle(tab === "companies")} onClick={() => setTab("companies")}>
-          🏢 Companies
-        </button>
+        <button style={tabStyle(tab === "dashboard")} onClick={() => setTab("dashboard")}>📊 Dashboard</button>
+        <button style={tabStyle(tab === "companies")} onClick={() => setTab("companies")}>🏢 Companies</button>
         <button style={tabStyle(tab === "expired")} onClick={() => setTab("expired")}>
-          ⚠️ Expired
-          {expiredCount > 0 && (
-            <span style={{
-              marginLeft: 6, background: "#dc2626", color: "#fff", padding: "2px 6px",
-              borderRadius: 10, fontSize: 11, fontWeight: 600
-            }}>
-              {expiredCount}
-            </span>
-          )}
+          ⚠️ Expired {expiredCount > 0 && <span style={{ marginLeft: 6, background: "#dc2626", color: "#fff", padding: "2px 6px", borderRadius: 10, fontSize: 11 }}>{expiredCount}</span>}
         </button>
         <button style={tabStyle(tab === "expiring")} onClick={() => setTab("expiring")}>
-          ⏰ Expiring Soon
-          {expiringSoonCount > 0 && (
-            <span style={{
-              marginLeft: 6, background: "#f59e0b", color: "#fff", padding: "2px 6px",
-              borderRadius: 10, fontSize: 11, fontWeight: 600
-            }}>
-              {expiringSoonCount}
-            </span>
-          )}
+          ⏰ Expiring Soon {expiringSoonCount > 0 && <span style={{ marginLeft: 6, background: "#f59e0b", color: "#fff", padding: "2px 6px", borderRadius: 10, fontSize: 11 }}>{expiringSoonCount}</span>}
         </button>
       </div>
 
       {/* Dashboard Tab */}
       {tab === "dashboard" && dashboard && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
           <StatCard label="Total Companies" value={dashboard.total_companies} color="#3b82f6" icon="🏢" />
-          <StatCard label="Active Companies" value={dashboard.active_companies} color="#16a34a" icon="✅" />
+          <StatCard label="Active" value={dashboard.active_companies} color="#16a34a" icon="✅" />
           <StatCard label="Total Devices" value={dashboard.total_devices} color="#8b5cf6" icon="📱" />
-          <StatCard label="Devices Online" value={dashboard.online_devices} sub={`${dashboard.offline_devices || 0} offline`} color="#10b981" icon="🟢" />
-          <StatCard label="Total Users" value={dashboard.total_users} color="#f59e0b" icon="👥" />
+          <StatCard label="Online" value={dashboard.online_devices} sub={`${dashboard.offline_devices || 0} offline`} color="#10b981" icon="🟢" />
+          <StatCard label="Users" value={dashboard.total_users} color="#f59e0b" icon="👥" />
           <StatCard label="Expired" value={expiredCount} color="#dc2626" icon="⚠️" />
         </div>
       )}
@@ -823,29 +465,18 @@ export default function PlatformAdmin({ onImpersonate }) {
       {/* Companies Tab */}
       {tab === "companies" && (
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden" }}>
-          {/* Filters */}
           <div style={{ padding: 16, borderBottom: "1px solid #e5e7eb", display: "flex", gap: 12 }}>
-            <input
-              type="text"
-              placeholder="Search companies..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ flex: 1, padding: 10, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14 }}
-            />
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              style={{ padding: 10, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14 }}
-            >
+            <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)}
+              style={{ flex: 1, padding: 10, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14 }} />
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+              style={{ padding: 10, border: "1px solid #e5e7eb", borderRadius: 8 }}>
               <option value="">All Status</option>
               <option value="active">Active</option>
               <option value="suspended">Suspended</option>
               <option value="trial">Trial</option>
-              <option value="cancelled">Cancelled</option>
             </select>
           </div>
 
-          {/* Table */}
           {loading ? (
             <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Loading...</div>
           ) : (
@@ -870,32 +501,15 @@ export default function PlatformAdmin({ onImpersonate }) {
                       </div>
                       <div style={{ fontSize: 12, color: "#6b7280" }}>{c.slug}</div>
                     </td>
+                    <td style={{ padding: 12 }}><StatusBadge status={c.status} /></td>
                     <td style={{ padding: 12 }}>
-                      <StatusBadge status={c.status} />
+                      <ExpirationBadge expiresAt={c.expires_at} daysUntil={c.days_until_expiration} status={c.expiration_status} />
                     </td>
                     <td style={{ padding: 12 }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <ExpirationBadge 
-                          expiresAt={c.expires_at} 
-                          daysUntil={c.days_until_expiration}
-                          status={c.expiration_status}
-                        />
-                        {c.expires_at && (
-                          <ExpirationCountdown expiresAt={c.expires_at} />
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ padding: 12, minWidth: 100 }}>
-                      <DeviceCount 
-                        total={c.device_count || 0} 
-                        online={c.devices_online || 0} 
-                        offline={c.devices_offline || 0} 
-                      />
+                      <DeviceDisplay total={c.device_count} online={c.devices_online} offline={c.devices_offline} />
                     </td>
                     <td style={{ padding: 12 }}>{c.user_count || 0}</td>
-                    <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>
-                      {new Date(c.created_at).toLocaleDateString()}
-                    </td>
+                    <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>{new Date(c.created_at).toLocaleDateString()}</td>
                     <td style={{ padding: 12, textAlign: "right" }}>
                       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
                         {onImpersonate && (
@@ -905,29 +519,17 @@ export default function PlatformAdmin({ onImpersonate }) {
                           </button>
                         )}
                         <button 
-                          onClick={() => {
-                            setShowSetExpiration(c);
-                            setExpirationDate(c.expires_at ? new Date(c.expires_at).toISOString().slice(0, 16) : "");
-                            setGracePeriod(c.grace_period_days || 7);
-                          }}
-                          style={{ 
-                            padding: "4px 8px", 
-                            background: c.expires_at ? "#8b5cf6" : "#6b7280", 
-                            color: "#fff", 
-                            border: "none", 
-                            borderRadius: 4, 
-                            cursor: "pointer", 
-                            fontSize: 11 
-                          }}>
+                          onClick={() => { setShowSetExpiration(c); setExpirationDate(c.expires_at ? new Date(c.expires_at).toISOString().slice(0, 16) : ""); setGracePeriod(c.grace_period_days || 7); }}
+                          style={{ padding: "4px 8px", background: c.expires_at ? "#8b5cf6" : "#6b7280", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
                           📅
                         </button>
                         {c.expiration_status === "expired" || c.expiration_status === "suspended" ? (
-                          <button onClick={() => handleReactivate(c)}
+                          <button onClick={() => handleReactivate(c.id, c.name)}
                             style={{ padding: "4px 8px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
                             Reactivate
                           </button>
                         ) : (
-                          <button onClick={() => handleSuspend(c)}
+                          <button onClick={() => handleSuspend(c.id, c.name)}
                             style={{ padding: "4px 8px", background: "#f59e0b", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
                             Suspend
                           </button>
@@ -947,18 +549,114 @@ export default function PlatformAdmin({ onImpersonate }) {
       {/* Expired Tab */}
       {tab === "expired" && (
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 24 }}>
-          <ExpiredCompaniesTab onReactivate={() => { fetchCompanies(); fetchExpirationCounts(); }} />
+          {expiredCompanies.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>No expired companies</div>
+            </div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 16, padding: 12, background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>
+                <span style={{ color: "#dc2626", fontWeight: 600 }}>⚠️ {expiredCompanies.length} expired</span>
+                <span style={{ color: "#7f1d1d", marginLeft: 8, fontSize: 13 }}>— Users cannot login, devices show "Not Enrolled"</span>
+              </div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                    <th style={{ padding: 12, textAlign: "left" }}>Company</th>
+                    <th style={{ padding: 12, textAlign: "center" }}>Devices</th>
+                    <th style={{ padding: 12, textAlign: "center" }}>Users</th>
+                    <th style={{ padding: 12, textAlign: "left" }}>Expired</th>
+                    <th style={{ padding: 12, textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expiredCompanies.map((c) => (
+                    <tr key={c.company_id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                      <td style={{ padding: 12 }}>
+                        <div style={{ fontWeight: 600 }}>{c.company_name}</div>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>{c.company_slug}</div>
+                      </td>
+                      <td style={{ padding: 12, textAlign: "center" }}>{c.device_count || 0}</td>
+                      <td style={{ padding: 12, textAlign: "center" }}>{c.user_count || 0}</td>
+                      <td style={{ padding: 12, color: "#dc2626" }}>{c.days_since_expiration || 0} days ago</td>
+                      <td style={{ padding: 12, textAlign: "right" }}>
+                        <button onClick={() => handleReactivate(c.company_id, c.company_name, 30)}
+                          style={{ padding: "6px 12px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, marginRight: 8 }}>
+                          Reactivate 30d
+                        </button>
+                        <button onClick={() => handleReactivate(c.company_id, c.company_name, 365)}
+                          style={{ padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                          +1 Year
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
         </div>
       )}
 
       {/* Expiring Soon Tab */}
       {tab === "expiring" && (
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 24 }}>
-          <ExpiringSoonTab />
+          <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
+            <span style={{ fontWeight: 500 }}>Show expiring in:</span>
+            {[7, 14, 30, 60, 90].map(d => (
+              <button key={d} onClick={() => setExpiringDays(d)}
+                style={{ padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 6, background: expiringDays === d ? "#3b82f6" : "#fff", color: expiringDays === d ? "#fff" : "#374151", cursor: "pointer", fontSize: 13 }}>
+                {d}d
+              </button>
+            ))}
+          </div>
+
+          {expiringCompanies.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+              <div>No companies expiring in {expiringDays} days</div>
+            </div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <thead>
+                <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                  <th style={{ padding: 12, textAlign: "left" }}>Company</th>
+                  <th style={{ padding: 12, textAlign: "center" }}>Devices</th>
+                  <th style={{ padding: 12, textAlign: "center" }}>Users</th>
+                  <th style={{ padding: 12, textAlign: "left" }}>Time Left</th>
+                  <th style={{ padding: 12, textAlign: "left" }}>Expires</th>
+                  <th style={{ padding: 12, textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expiringCompanies.map((c) => (
+                  <tr key={c.company_id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                    <td style={{ padding: 12 }}>
+                      <div style={{ fontWeight: 600 }}>{c.company_name}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>{c.company_slug}</div>
+                    </td>
+                    <td style={{ padding: 12, textAlign: "center" }}>{c.device_count || 0}</td>
+                    <td style={{ padding: 12, textAlign: "center" }}>{c.user_count || 0}</td>
+                    <td style={{ padding: 12 }}>
+                      <ExpirationBadge expiresAt={c.expires_at} daysUntil={c.days_until_expiration} status={c.expiration_status} />
+                    </td>
+                    <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>{c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "—"}</td>
+                    <td style={{ padding: 12, textAlign: "right" }}>
+                      <button onClick={() => handleExtend(c.company_id, c.company_name, 30)}
+                        style={{ padding: "6px 12px", background: "#f59e0b", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
+                        +30d
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
-      {/* ═══ COMPANY DETAILS MODAL ═══ */}
+      {/* Company Details Modal */}
       {selectedCompany && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
           onClick={() => { setSelectedCompany(null); setStats(null); }}>
@@ -970,65 +668,30 @@ export default function PlatformAdmin({ onImpersonate }) {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 14 }}>
               <div><strong>Slug:</strong> <code style={{ background: "#f3f4f6", padding: "2px 6px", borderRadius: 4 }}>{selectedCompany.slug}</code></div>
+              <div><strong>ID:</strong> {selectedCompany.id}</div>
               <div><strong>Email:</strong> {selectedCompany.email || "—"}</div>
-              <div><strong>Phone:</strong> {selectedCompany.phone || "—"}</div>
               <div><strong>Max Devices:</strong> {selectedCompany.max_devices}</div>
               <div><strong>Max Users:</strong> {selectedCompany.max_users}</div>
               <div><strong>Storage:</strong> {selectedCompany.max_storage_mb} MB</div>
-              <div style={{ gridColumn: "1 / -1" }}><strong>Created:</strong> {new Date(selectedCompany.created_at).toLocaleString()}</div>
             </div>
 
             {/* Expiration Info */}
-            <div style={{ 
-              marginTop: 16, 
-              padding: 16, 
-              background: selectedCompany.expires_at ? "#fef3c7" : "#f3f4f6", 
-              borderRadius: 12,
-              border: selectedCompany.expires_at ? "1px solid #fcd34d" : "1px solid #e5e7eb"
-            }}>
+            <div style={{ marginTop: 16, padding: 16, background: selectedCompany.expires_at ? "#fef3c7" : "#f3f4f6", borderRadius: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
-                  <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Subscription Expiration</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <ExpirationBadge 
-                      expiresAt={selectedCompany.expires_at} 
-                      daysUntil={selectedCompany.days_until_expiration}
-                      status={selectedCompany.expiration_status}
-                    />
-                    {selectedCompany.expires_at && (
-                      <span style={{ fontSize: 12, color: "#6b7280" }}>
-                        ({new Date(selectedCompany.expires_at).toLocaleDateString()})
-                      </span>
-                    )}
-                  </div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Expiration</div>
+                  <ExpirationBadge expiresAt={selectedCompany.expires_at} daysUntil={selectedCompany.days_until_expiration} status={selectedCompany.expiration_status} />
                 </div>
-                <button
-                  onClick={() => {
-                    setShowSetExpiration(selectedCompany);
-                    setExpirationDate(selectedCompany.expires_at 
-                      ? new Date(selectedCompany.expires_at).toISOString().slice(0, 16) 
-                      : "");
-                    setGracePeriod(selectedCompany.grace_period_days || 7);
-                  }}
-                  style={{
-                    padding: "8px 16px",
-                    background: "#f59e0b",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 8,
-                    cursor: "pointer",
-                    fontWeight: 600,
-                    fontSize: 13
-                  }}
-                >
-                  {selectedCompany.expires_at ? "✏️ Edit" : "📅 Set Expiration"}
+                <button onClick={() => { setShowSetExpiration(selectedCompany); setExpirationDate(selectedCompany.expires_at ? new Date(selectedCompany.expires_at).toISOString().slice(0, 16) : ""); setGracePeriod(selectedCompany.grace_period_days || 7); }}
+                  style={{ padding: "8px 16px", background: "#f59e0b", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                  {selectedCompany.expires_at ? "Edit" : "Set Expiration"}
                 </button>
               </div>
             </div>
 
             {stats && (
               <div style={{ marginTop: 16, padding: 16, background: "#f9fafb", borderRadius: 12 }}>
-                <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600 }}>Usage Statistics</h4>
+                <h4 style={{ margin: "0 0 12px", fontSize: 14 }}>Usage Statistics</h4>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
                   {[["Devices", stats.device_count], ["Users", stats.user_count], ["Videos", stats.video_count],
                     ["Ads", stats.advertisement_count], ["Groups", stats.group_count], ["Shops", stats.shop_count]].map(([label, val]) => (
@@ -1048,88 +711,42 @@ export default function PlatformAdmin({ onImpersonate }) {
               </button>
               <button onClick={() => handleDelete(selectedCompany.slug, selectedCompany.name)}
                 disabled={deleting === selectedCompany.slug}
-                style={{
-                  padding: "12px 24px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 8,
-                  cursor: deleting === selectedCompany.slug ? "wait" : "pointer", fontWeight: 600,
-                  opacity: deleting === selectedCompany.slug ? 0.6 : 1,
-                }}>
-                {deleting === selectedCompany.slug ? "Deleting..." : "Delete Company"}
+                style={{ padding: "12px 24px", background: "#dc2626", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, opacity: deleting ? 0.6 : 1 }}>
+                {deleting === selectedCompany.slug ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ═══ SET EXPIRATION MODAL ═══ */}
+      {/* Set Expiration Modal */}
       {showSetExpiration && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1001 }}
           onClick={() => setShowSetExpiration(null)}>
           <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 440 }}
             onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: "0 0 20px", fontSize: 18 }}>
-              Set Expiration for "{showSetExpiration.name}"
-            </h3>
+            <h3 style={{ margin: "0 0 20px", fontSize: 18 }}>Set Expiration: {showSetExpiration.name}</h3>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                Expiration Date
-              </label>
-              <input
-                type="datetime-local"
-                value={expirationDate}
-                onChange={(e) => setExpirationDate(e.target.value)}
-                style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
-              />
-              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
-                Leave empty to remove expiration (never expires)
-              </div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Expiration Date & Time</label>
+              <input type="datetime-local" value={expirationDate} onChange={e => setExpirationDate(e.target.value)}
+                style={{ ...inputStyle }} />
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Leave empty to remove expiration</div>
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                Grace Period (days)
-              </label>
-              <input
-                type="number"
-                value={gracePeriod}
-                onChange={(e) => setGracePeriod(parseInt(e.target.value) || 0)}
-                min={0}
-                max={30}
-                style={{ width: 100, padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14 }}
-              />
-              <span style={{ marginLeft: 8, fontSize: 12, color: "#6b7280" }}>
-                Days after expiration before full block
-              </span>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Grace Period</label>
+              <input type="number" value={gracePeriod} onChange={e => setGracePeriod(parseInt(e.target.value) || 0)} min={0} max={30}
+                style={{ width: 100, padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 8 }} />
+              <span style={{ marginLeft: 8, fontSize: 12, color: "#6b7280" }}>days after expiry</span>
             </div>
 
-            {/* Quick set buttons */}
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 8 }}>Quick Set:</div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {[
-                  { label: "30 days", days: 30 },
-                  { label: "90 days", days: 90 },
-                  { label: "6 months", days: 180 },
-                  { label: "1 year", days: 365 },
-                ].map(opt => (
-                  <button
-                    key={opt.days}
-                    type="button"
-                    onClick={() => {
-                      const date = new Date();
-                      date.setDate(date.getDate() + opt.days);
-                      setExpirationDate(date.toISOString().slice(0, 16));
-                    }}
-                    style={{
-                      padding: "6px 12px",
-                      background: "#f3f4f6",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontWeight: 500
-                    }}
-                  >
+                {[{ label: "30d", days: 30 }, { label: "90d", days: 90 }, { label: "6mo", days: 180 }, { label: "1yr", days: 365 }].map(opt => (
+                  <button key={opt.days} onClick={() => { const d = new Date(); d.setDate(d.getDate() + opt.days); setExpirationDate(d.toISOString().slice(0, 16)); }}
+                    style={{ padding: "6px 12px", background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer", fontSize: 12 }}>
                     {opt.label}
                   </button>
                 ))}
@@ -1137,37 +754,19 @@ export default function PlatformAdmin({ onImpersonate }) {
             </div>
 
             <div style={{ display: "flex", gap: 12 }}>
-              <button
-                onClick={() => setShowSetExpiration(null)}
-                style={{
-                  flex: 1, padding: 12, background: "#f3f4f6", border: "none",
-                  borderRadius: 8, cursor: "pointer", fontWeight: 600
-                }}
-              >
+              <button onClick={() => setShowSetExpiration(null)}
+                style={{ flex: 1, padding: 12, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
                 Cancel
               </button>
               {showSetExpiration.expires_at && (
-                <button
-                  onClick={() => { setExpirationDate(""); handleSetExpiration(); }}
+                <button onClick={() => { setExpirationDate(""); handleSetExpiration(); }}
                   disabled={settingExpiration}
-                  style={{
-                    padding: "12px 16px", background: "#6b7280", color: "#fff",
-                    border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600,
-                    opacity: settingExpiration ? 0.6 : 1
-                  }}
-                >
+                  style={{ padding: "12px 16px", background: "#6b7280", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
                   Remove
                 </button>
               )}
-              <button
-                onClick={handleSetExpiration}
-                disabled={settingExpiration}
-                style={{
-                  flex: 1, padding: 12, background: "#16a34a", color: "#fff",
-                  border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600,
-                  opacity: settingExpiration ? 0.6 : 1
-                }}
-              >
+              <button onClick={handleSetExpiration} disabled={settingExpiration}
+                style={{ flex: 1, padding: 12, background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, opacity: settingExpiration ? 0.6 : 1 }}>
                 {settingExpiration ? "Saving..." : "Save"}
               </button>
             </div>
@@ -1175,7 +774,7 @@ export default function PlatformAdmin({ onImpersonate }) {
         </div>
       )}
 
-      {/* ═══ CREATE COMPANY MODAL ═══ */}
+      {/* Create Company Modal */}
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
           onClick={() => setShowCreate(false)}>
@@ -1186,12 +785,12 @@ export default function PlatformAdmin({ onImpersonate }) {
             {createResult ? (
               <div>
                 <div style={{ padding: 16, background: "#dcfce7", borderRadius: 12, marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, color: "#166534", marginBottom: 8 }}>Company Created Successfully!</div>
+                  <div style={{ fontWeight: 700, color: "#166534", marginBottom: 8 }}>Created Successfully!</div>
                   <div style={{ fontSize: 13 }}>
                     <div><strong>Company:</strong> {createResult.company.name} ({createResult.company.slug})</div>
-                    <div style={{ marginTop: 8 }}><strong>Admin Username:</strong> <code>{createResult.admin_user.username}</code></div>
-                    <div><strong>Temporary Password:</strong> <code style={{ background: "#fef3c7", padding: "2px 6px", borderRadius: 4 }}>{createResult.admin_user.temp_password}</code></div>
-                    <div style={{ marginTop: 8, fontSize: 12, color: "#92400e" }}>⚠️ Save this password now — it will not be shown again.</div>
+                    <div style={{ marginTop: 8 }}><strong>Admin:</strong> <code>{createResult.admin_user.username}</code></div>
+                    <div><strong>Password:</strong> <code style={{ background: "#fef3c7", padding: "2px 6px", borderRadius: 4 }}>{createResult.admin_user.temp_password}</code></div>
+                    <div style={{ marginTop: 8, fontSize: 12, color: "#92400e" }}>⚠️ Save this password now!</div>
                   </div>
                 </div>
                 <button onClick={() => { setShowCreate(false); setCreateResult(null); }}
@@ -1203,9 +802,9 @@ export default function PlatformAdmin({ onImpersonate }) {
               <form onSubmit={handleCreate}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 12, borderBottom: "1px solid #e5e7eb", paddingBottom: 8 }}>Company Details</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                  <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Company Name *</label>
+                  <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Name *</label>
                     <input name="name" required style={inputStyle} /></div>
-                  <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Slug * <span style={{ color: "#9ca3af", fontWeight: 400 }}>(url-safe)</span></label>
+                  <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Slug *</label>
                     <input name="slug" required pattern="[a-z0-9][a-z0-9\-]*[a-z0-9]" style={inputStyle} /></div>
                   <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Email</label>
                     <input name="email" type="email" style={inputStyle} /></div>
@@ -1219,32 +818,19 @@ export default function PlatformAdmin({ onImpersonate }) {
                     <input name="max_devices" type="number" defaultValue={50} style={inputStyle} /></div>
                   <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Max Users</label>
                     <input name="max_users" type="number" defaultValue={10} style={inputStyle} /></div>
-                  <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Storage (MB)</label>
+                  <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Storage MB</label>
                     <input name="max_storage_mb" type="number" defaultValue={5120} style={inputStyle} /></div>
                 </div>
 
-                {/* Subscription/Expiration Section */}
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 12, borderBottom: "1px solid #e5e7eb", paddingBottom: 8 }}>
-                  Subscription / Expiration
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 12, borderBottom: "1px solid #e5e7eb", paddingBottom: 8 }}>Subscription</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                      Expiration Date <span style={{ color: "#9ca3af", fontWeight: 400 }}>(optional)</span>
-                    </label>
-                    <input name="expires_at" type="datetime-local" style={inputStyle} />
-                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Leave empty for no expiration</div>
-                  </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                      Grace Period (days)
-                    </label>
-                    <input name="grace_period_days" type="number" defaultValue={7} min={0} max={30} style={inputStyle} />
-                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Days after expiry before full block</div>
-                  </div>
+                  <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Expiration</label>
+                    <input name="expires_at" type="datetime-local" style={inputStyle} /></div>
+                  <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Grace Period</label>
+                    <input name="grace_period_days" type="number" defaultValue={7} min={0} max={30} style={inputStyle} /></div>
                 </div>
 
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 12, borderBottom: "1px solid #e5e7eb", paddingBottom: 8 }}>First Admin User</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 12, borderBottom: "1px solid #e5e7eb", paddingBottom: 8 }}>Admin User</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
                   <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Username *</label>
                     <input name="admin_username" required style={inputStyle} /></div>
@@ -1254,14 +840,14 @@ export default function PlatformAdmin({ onImpersonate }) {
                     <input name="admin_email" type="email" style={inputStyle} /></div>
                 </div>
 
-                {error && <div style={{ padding: 10, background: "#fef2f2", color: "#dc2626", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>{error}</div>}
-
                 <div style={{ display: "flex", gap: 12 }}>
                   <button type="button" onClick={() => setShowCreate(false)}
-                    style={{ flex: 1, padding: 12, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>Cancel</button>
+                    style={{ flex: 1, padding: 12, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
+                    Cancel
+                  </button>
                   <button type="submit"
                     style={{ flex: 1, padding: 12, background: "#f59e0b", color: "#0a1628", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
-                    Create Company
+                    Create
                   </button>
                 </div>
               </form>
@@ -1272,5 +858,3 @@ export default function PlatformAdmin({ onImpersonate }) {
     </div>
   );
 }
-
-const inputStyle = { width: "100%", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14, boxSizing: "border-box" };
