@@ -34,8 +34,15 @@ function StatCard({ label, value, sub, color = "#3b82f6", icon }) {
   );
 }
 
-// ─── Status Badge ───
-function StatusBadge({ status }) {
+// ─── Status Badge - shows combined status including expiration ───
+function StatusBadge({ status, expirationStatus }) {
+  // Use expiration_status if it indicates the company is blocked
+  const effectiveStatus = 
+    expirationStatus === 'expired' ? 'expired' :
+    expirationStatus === 'suspended' ? 'suspended' :
+    expirationStatus === 'grace_period' ? 'grace_period' :
+    status;
+    
   const colors = { 
     active: "#16a34a", 
     suspended: "#dc2626", 
@@ -44,13 +51,13 @@ function StatusBadge({ status }) {
     expired: "#dc2626",
     grace_period: "#f59e0b"
   };
-  const c = colors[status] || "#6b7280";
+  const c = colors[effectiveStatus] || "#6b7280";
   return (
     <span style={{
       display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11,
       fontWeight: 600, background: `${c}20`, color: c, textTransform: "uppercase",
     }}>
-      {status?.replace(/_/g, ' ') || 'active'}
+      {effectiveStatus?.replace(/_/g, ' ') || 'active'}
     </span>
   );
 }
@@ -501,7 +508,7 @@ export default function PlatformAdmin({ onImpersonate }) {
                       </div>
                       <div style={{ fontSize: 12, color: "#6b7280" }}>{c.slug}</div>
                     </td>
-                    <td style={{ padding: 12 }}><StatusBadge status={c.status} /></td>
+                    <td style={{ padding: 12 }}><StatusBadge status={c.status} expirationStatus={c.expiration_status} /></td>
                     <td style={{ padding: 12 }}>
                       <ExpirationBadge expiresAt={c.expires_at} daysUntil={c.days_until_expiration} status={c.expiration_status} />
                     </td>
