@@ -709,7 +709,7 @@ export default function PlatformAdmin({ onImpersonate }) {
           <StatCard label="Total Companies" value={dashboard.total_companies} color="#3b82f6" icon="🏢" />
           <StatCard label="Active Companies" value={dashboard.active_companies} color="#16a34a" icon="✅" />
           <StatCard label="Total Devices" value={dashboard.total_devices} color="#8b5cf6" icon="📱" />
-          <StatCard label="Devices Online" value={dashboard.devices_online} sub={`${dashboard.devices_offline} offline`} color="#10b981" icon="🟢" />
+          <StatCard label="Devices Online" value={dashboard.online_devices} sub={`${dashboard.offline_devices} offline`} color="#10b981" icon="🟢" />
           <StatCard label="Total Users" value={dashboard.total_users} color="#f59e0b" icon="👥" />
           <StatCard label="Expired" value={expiredCount} color="#dc2626" icon="⚠️" />
         </div>
