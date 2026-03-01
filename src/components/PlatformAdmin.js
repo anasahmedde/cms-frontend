@@ -1,7 +1,7 @@
 // src/components/PlatformAdmin.js
 // Platform-level admin panel for managing companies (tenants)
 // Features: Dashboard overview, company CRUD, delete, suspend/reactivate, impersonate
-// UPDATED: Company Expiration management, Expired Companies tab
+// UPDATED: Company Expiration management with color-coded status, notifications
 import React, { useState, useEffect, useCallback } from "react";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
@@ -25,7 +25,7 @@ function StatCard({ label, value, sub, color = "#3b82f6", icon }) {
       }} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#0a1628", lineHeight: 1.1 }}>{value}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#0a1628", lineHeight: 1.1 }}>{value ?? 0}</div>
           <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4, fontWeight: 500 }}>{label}</div>
           {sub && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub}</div>}
         </div>
@@ -56,77 +56,147 @@ function StatusBadge({ status }) {
   );
 }
 
-// ─── Expiration Badge ───
-function ExpirationBadge({ expiresAt, status, daysUntil, daysSince }) {
-  if (!expiresAt && status === 'active') {
-    return <span style={{ fontSize: 11, color: "#6b7280" }}>Never expires</span>;
-  }
-  
-  if (status === 'expired') {
+// ─── Expiration Badge with Color Coding ───
+function ExpirationBadge({ expiresAt, daysUntil, status }) {
+  // Not set
+  if (!expiresAt) {
     return (
       <span style={{ 
-        display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11,
-        fontWeight: 600, background: "#fef2f2", color: "#dc2626"
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "4px 10px", borderRadius: 8, fontSize: 11,
+        fontWeight: 500, background: "#f3f4f6", color: "#6b7280"
       }}>
-        Expired {daysSince} days ago
+        <span style={{ fontSize: 10 }}>∞</span> Not Set
       </span>
     );
   }
   
+  // Expired or suspended
+  if (status === 'expired' || status === 'suspended') {
+    return (
+      <span style={{ 
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "4px 10px", borderRadius: 8, fontSize: 11,
+        fontWeight: 600, background: "#fef2f2", color: "#dc2626",
+        border: "1px solid #fecaca"
+      }}>
+        ⚠️ {status === 'suspended' ? 'Suspended' : 'Expired'}
+      </span>
+    );
+  }
+  
+  // Grace period
   if (status === 'grace_period') {
     return (
       <span style={{ 
-        display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11,
-        fontWeight: 600, background: "#fef3c7", color: "#b45309"
+        display: "inline-flex", alignItems: "center", gap: 4,
+        padding: "4px 10px", borderRadius: 8, fontSize: 11,
+        fontWeight: 600, background: "#fef3c7", color: "#b45309",
+        border: "1px solid #fcd34d"
       }}>
-        Grace period ({daysSince} days)
+        ⏳ Grace Period
       </span>
     );
   }
   
-  if (status === 'suspended') {
-    return (
-      <span style={{ 
-        display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11,
-        fontWeight: 600, background: "#fef2f2", color: "#dc2626"
-      }}>
-        Suspended
-      </span>
-    );
+  // Active with expiration - color code by days remaining
+  const days = daysUntil ?? 999;
+  let color, bg, border, icon;
+  
+  if (days <= 7) {
+    // RED - Critical
+    color = "#dc2626";
+    bg = "#fef2f2";
+    border = "#fecaca";
+    icon = "🔴";
+  } else if (days <= 30) {
+    // YELLOW - Warning
+    color = "#b45309";
+    bg = "#fef3c7";
+    border = "#fcd34d";
+    icon = "🟡";
+  } else {
+    // GREEN - Good
+    color = "#16a34a";
+    bg = "#dcfce7";
+    border = "#86efac";
+    icon = "🟢";
   }
   
-  // Active with expiration date
-  if (daysUntil !== null && daysUntil !== undefined) {
-    const color = daysUntil <= 7 ? "#dc2626" : daysUntil <= 30 ? "#f59e0b" : "#16a34a";
-    const bg = daysUntil <= 7 ? "#fef2f2" : daysUntil <= 30 ? "#fef3c7" : "#dcfce7";
-    return (
-      <span style={{ 
-        display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11,
-        fontWeight: 600, background: bg, color: color
-      }}>
-        {daysUntil} days left
-      </span>
-    );
-  }
-  
-  return null;
+  return (
+    <span style={{ 
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: "4px 10px", borderRadius: 8, fontSize: 11,
+      fontWeight: 600, background: bg, color: color,
+      border: `1px solid ${border}`
+    }}>
+      {icon} {days} days
+    </span>
+  );
 }
 
-// ─── Online/Offline Indicator ───
-function OnlineBar({ online, offline, total }) {
-  if (total === 0) return <span style={{ fontSize: 12, color: "#9ca3af" }}>No devices</span>;
+// ─── Device Count Display ───
+function DeviceCount({ total, online, offline }) {
+  if (!total || total === 0) {
+    return <span style={{ fontSize: 12, color: "#9ca3af" }}>0 devices</span>;
+  }
+  
   const pct = total > 0 ? Math.round((online / total) * 100) : 0;
+  
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div style={{ flex: 1, height: 6, borderRadius: 3, background: "#f3f4f6", overflow: "hidden", minWidth: 50 }}>
+      <div style={{ flex: 1, height: 6, borderRadius: 3, background: "#f3f4f6", overflow: "hidden", minWidth: 40 }}>
         <div style={{ width: `${pct}%`, height: "100%", borderRadius: 3, background: "#16a34a", transition: "width 0.3s" }} />
       </div>
       <span style={{ fontSize: 11, color: "#6b7280", whiteSpace: "nowrap" }}>
         <span style={{ color: "#16a34a", fontWeight: 600 }}>{online}</span>
-        {" / "}
-        {total}
+        <span style={{ color: "#9ca3af" }}> / {total}</span>
       </span>
     </div>
+  );
+}
+
+// ─── Expiration Countdown Timer ───
+function ExpirationCountdown({ expiresAt }) {
+  const [timeLeft, setTimeLeft] = useState("");
+  
+  useEffect(() => {
+    if (!expiresAt) return;
+    
+    const updateTimer = () => {
+      const now = new Date();
+      const expires = new Date(expiresAt);
+      const diff = expires - now;
+      
+      if (diff <= 0) {
+        setTimeLeft("Expired");
+        return;
+      }
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      if (days > 0) {
+        setTimeLeft(`${days}d ${hours}h ${minutes}m`);
+      } else if (hours > 0) {
+        setTimeLeft(`${hours}h ${minutes}m`);
+      } else {
+        setTimeLeft(`${minutes}m`);
+      }
+    };
+    
+    updateTimer();
+    const interval = setInterval(updateTimer, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+  
+  if (!expiresAt) return null;
+  
+  return (
+    <span style={{ fontSize: 10, color: "#6b7280", fontFamily: "monospace" }}>
+      {timeLeft}
+    </span>
   );
 }
 
@@ -217,11 +287,11 @@ function ExpiredCompaniesTab({ onReactivate }) {
               <td style={{ padding: 12 }}>
                 <StatusBadge status={c.expiration_status} />
               </td>
-              <td style={{ padding: 12, textAlign: "center" }}>{c.device_count}</td>
-              <td style={{ padding: 12, textAlign: "center" }}>{c.user_count}</td>
+              <td style={{ padding: 12, textAlign: "center" }}>{c.device_count || 0}</td>
+              <td style={{ padding: 12, textAlign: "center" }}>{c.user_count || 0}</td>
               <td style={{ padding: 12 }}>
                 <span style={{ color: "#dc2626", fontWeight: 500 }}>
-                  {c.days_since_expiration} days ago
+                  {c.days_since_expiration || 0} days ago
                 </span>
               </td>
               <td style={{ padding: 12, textAlign: "right" }}>
@@ -343,7 +413,7 @@ function ExpiringSoonTab() {
               <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Company</th>
               <th style={{ padding: 12, textAlign: "center", fontWeight: 600 }}>Devices</th>
               <th style={{ padding: 12, textAlign: "center", fontWeight: 600 }}>Users</th>
-              <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Expires In</th>
+              <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Time Left</th>
               <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Expiry Date</th>
               <th style={{ padding: 12, textAlign: "right", fontWeight: 600 }}>Actions</th>
             </tr>
@@ -355,14 +425,13 @@ function ExpiringSoonTab() {
                   <div style={{ fontWeight: 600 }}>{c.company_name}</div>
                   <div style={{ fontSize: 12, color: "#6b7280" }}>{c.company_slug}</div>
                 </td>
-                <td style={{ padding: 12, textAlign: "center" }}>{c.device_count}</td>
-                <td style={{ padding: 12, textAlign: "center" }}>{c.user_count}</td>
+                <td style={{ padding: 12, textAlign: "center" }}>{c.device_count || 0}</td>
+                <td style={{ padding: 12, textAlign: "center" }}>{c.user_count || 0}</td>
                 <td style={{ padding: 12 }}>
                   <ExpirationBadge 
                     expiresAt={c.expires_at} 
                     status={c.expiration_status}
                     daysUntil={c.days_until_expiration}
-                    daysSince={c.days_since_expiration}
                   />
                 </td>
                 <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>
@@ -463,8 +532,8 @@ export default function PlatformAdmin({ onImpersonate }) {
   const [expiredCount, setExpiredCount] = useState(0);
   const [expiringSoonCount, setExpiringSoonCount] = useState(0);
   
-  // NEW: Set Expiration Modal state
-  const [showSetExpiration, setShowSetExpiration] = useState(null); // company object
+  // Set Expiration Modal state
+  const [showSetExpiration, setShowSetExpiration] = useState(null);
   const [expirationDate, setExpirationDate] = useState("");
   const [gracePeriod, setGracePeriod] = useState(7);
   const [settingExpiration, setSettingExpiration] = useState(false);
@@ -524,7 +593,6 @@ export default function PlatformAdmin({ onImpersonate }) {
     setError(""); setSuccess(""); setCreateResult(null);
     const form = new FormData(e.target);
     
-    // Build body with expiration fields
     const body = {
       slug: form.get("slug"), 
       name: form.get("name"), 
@@ -547,14 +615,14 @@ export default function PlatformAdmin({ onImpersonate }) {
       
       // If expiration date was set, apply it
       const expiresAt = form.get("expires_at");
-      const gracePeriod = parseInt(form.get("grace_period_days") || "7");
+      const gracePeriodDays = parseInt(form.get("grace_period_days") || "7");
       if (expiresAt && data.company?.id) {
         await fetch(`${API_BASE}/platform/company/${data.company.id}/expiration`, {
           method: "PUT",
           headers: authHeaders(),
           body: JSON.stringify({
             expires_at: new Date(expiresAt).toISOString(),
-            grace_period_days: gracePeriod,
+            grace_period_days: gracePeriodDays,
             notes: "Set during company creation"
           })
         });
@@ -590,40 +658,77 @@ export default function PlatformAdmin({ onImpersonate }) {
     finally { setDeleting(null); }
   };
 
-  const handleSuspend = async (slug, name) => {
-    const reason = prompt(`Enter reason for suspending "${name}":`);
+  const handleSuspend = async (company) => {
+    const reason = prompt(`Enter reason for suspending "${company.name}":`);
     if (!reason) return;
     try {
-      // Find company ID
-      const company = companies.find(c => c.slug === slug);
-      if (!company) return;
-      
       const res = await fetch(`${API_BASE}/platform/company/${company.id}/suspend`, {
         method: "POST", headers: authHeaders(),
         body: JSON.stringify({ reason })
       });
       if (res.ok) {
-        setSuccess(`Company "${name}" suspended.`);
+        setSuccess(`Company "${company.name}" suspended.`);
         fetchCompanies(); fetchExpirationCounts();
       }
     } catch (err) { setError("Failed to suspend company"); }
   };
 
-  const handleReactivate = async (slug, name) => {
-    const days = prompt(`How many days to extend "${name}"?`, "30");
+  const handleReactivate = async (company) => {
+    const days = prompt(`How many days to extend "${company.name}"?`, "30");
     if (!days) return;
     try {
-      const company = companies.find(c => c.slug === slug);
-      if (!company) return;
-      
       const res = await fetch(`${API_BASE}/platform/company/${company.id}/reactivate?extend_days=${days}`, {
         method: "POST", headers: authHeaders()
       });
       if (res.ok) {
-        setSuccess(`Company "${name}" reactivated for ${days} days.`);
+        setSuccess(`Company "${company.name}" reactivated for ${days} days.`);
         fetchCompanies(); fetchExpirationCounts();
       }
     } catch (err) { setError("Failed to reactivate company"); }
+  };
+
+  const handleSetExpiration = async () => {
+    if (!showSetExpiration) return;
+    setSettingExpiration(true);
+    try {
+      if (!expirationDate) {
+        // Remove expiration
+        const res = await fetch(`${API_BASE}/platform/company/${showSetExpiration.id}/expiration`, {
+          method: "DELETE",
+          headers: authHeaders()
+        });
+        if (res.ok) {
+          setSuccess(`Expiration removed for ${showSetExpiration.name}`);
+        } else {
+          throw new Error("Failed to remove");
+        }
+      } else {
+        // Set expiration
+        const res = await fetch(`${API_BASE}/platform/company/${showSetExpiration.id}/expiration`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            expires_at: new Date(expirationDate).toISOString(),
+            grace_period_days: gracePeriod,
+            notes: "Set from dashboard"
+          })
+        });
+        if (res.ok) {
+          setSuccess(`Expiration set for ${showSetExpiration.name}`);
+        } else {
+          const data = await res.json();
+          throw new Error(data.detail || "Failed to set");
+        }
+      }
+      
+      setShowSetExpiration(null);
+      fetchCompanies();
+      fetchExpirationCounts();
+    } catch (err) {
+      setError(err.message || "Failed to update expiration");
+    } finally {
+      setSettingExpiration(false);
+    }
   };
 
   // Tab style helper
@@ -709,7 +814,7 @@ export default function PlatformAdmin({ onImpersonate }) {
           <StatCard label="Total Companies" value={dashboard.total_companies} color="#3b82f6" icon="🏢" />
           <StatCard label="Active Companies" value={dashboard.active_companies} color="#16a34a" icon="✅" />
           <StatCard label="Total Devices" value={dashboard.total_devices} color="#8b5cf6" icon="📱" />
-          <StatCard label="Devices Online" value={dashboard.online_devices} sub={`${dashboard.offline_devices} offline`} color="#10b981" icon="🟢" />
+          <StatCard label="Devices Online" value={dashboard.online_devices} sub={`${dashboard.offline_devices || 0} offline`} color="#10b981" icon="🟢" />
           <StatCard label="Total Users" value={dashboard.total_users} color="#f59e0b" icon="👥" />
           <StatCard label="Expired" value={expiredCount} color="#dc2626" icon="⚠️" />
         </div>
@@ -749,6 +854,7 @@ export default function PlatformAdmin({ onImpersonate }) {
                 <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
                   <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Company</th>
                   <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Status</th>
+                  <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Expiration</th>
                   <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Devices</th>
                   <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Users</th>
                   <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Created</th>
@@ -768,7 +874,23 @@ export default function PlatformAdmin({ onImpersonate }) {
                       <StatusBadge status={c.status} />
                     </td>
                     <td style={{ padding: 12 }}>
-                      <OnlineBar online={c.devices_online || 0} offline={c.devices_offline || 0} total={(c.devices_online || 0) + (c.devices_offline || 0)} />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <ExpirationBadge 
+                          expiresAt={c.expires_at} 
+                          daysUntil={c.days_until_expiration}
+                          status={c.expiration_status}
+                        />
+                        {c.expires_at && (
+                          <ExpirationCountdown expiresAt={c.expires_at} />
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: 12, minWidth: 100 }}>
+                      <DeviceCount 
+                        total={c.device_count || 0} 
+                        online={c.devices_online || 0} 
+                        offline={c.devices_offline || 0} 
+                      />
                     </td>
                     <td style={{ padding: 12 }}>{c.user_count || 0}</td>
                     <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>
@@ -797,24 +919,24 @@ export default function PlatformAdmin({ onImpersonate }) {
                             cursor: "pointer", 
                             fontSize: 11 
                           }}>
-                          {c.expires_at ? "📅" : "⏱️"}
+                          📅
                         </button>
-                        {c.status === "active" ? (
-                          <button onClick={() => handleSuspend(c.slug, c.name)}
-                            style={{ padding: "4px 8px", background: "#f59e0b", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
-                            Suspend
-                          </button>
-                        ) : (
-                          <button onClick={() => handleReactivate(c.slug, c.name)}
+                        {c.expiration_status === "expired" || c.expiration_status === "suspended" ? (
+                          <button onClick={() => handleReactivate(c)}
                             style={{ padding: "4px 8px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
                             Reactivate
+                          </button>
+                        ) : (
+                          <button onClick={() => handleSuspend(c)}
+                            style={{ padding: "4px 8px", background: "#f59e0b", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
+                            Suspend
                           </button>
                         )}
                       </div>
                     </td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={6} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>No companies found</td></tr>
+                  <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>No companies found</td></tr>
                 )}
               </tbody>
             </table>
@@ -867,10 +989,17 @@ export default function PlatformAdmin({ onImpersonate }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Subscription Expiration</div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>
-                    {selectedCompany.expires_at 
-                      ? new Date(selectedCompany.expires_at).toLocaleDateString() 
-                      : "Never expires"}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <ExpirationBadge 
+                      expiresAt={selectedCompany.expires_at} 
+                      daysUntil={selectedCompany.days_until_expiration}
+                      status={selectedCompany.expiration_status}
+                    />
+                    {selectedCompany.expires_at && (
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>
+                        ({new Date(selectedCompany.expires_at).toLocaleDateString()})
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button
@@ -949,7 +1078,7 @@ export default function PlatformAdmin({ onImpersonate }) {
                 type="datetime-local"
                 value={expirationDate}
                 onChange={(e) => setExpirationDate(e.target.value)}
-                style={{ ...inputStyle, width: "100%" }}
+                style={{ width: "100%", padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
               />
               <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
                 Leave empty to remove expiration (never expires)
@@ -966,7 +1095,7 @@ export default function PlatformAdmin({ onImpersonate }) {
                 onChange={(e) => setGracePeriod(parseInt(e.target.value) || 0)}
                 min={0}
                 max={30}
-                style={{ ...inputStyle, width: 100 }}
+                style={{ width: 100, padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14 }}
               />
               <span style={{ marginLeft: 8, fontSize: 12, color: "#6b7280" }}>
                 Days after expiration before full block
@@ -1019,29 +1148,7 @@ export default function PlatformAdmin({ onImpersonate }) {
               </button>
               {showSetExpiration.expires_at && (
                 <button
-                  onClick={async () => {
-                    setSettingExpiration(true);
-                    try {
-                      const res = await fetch(`${API_BASE}/platform/company/${showSetExpiration.id}/expiration`, {
-                        method: "DELETE",
-                        headers: authHeaders()
-                      });
-                      if (res.ok) {
-                        setSuccess(`Expiration removed for ${showSetExpiration.name}`);
-                        setShowSetExpiration(null);
-                        setSelectedCompany(null);
-                        fetchCompanies();
-                        fetchExpirationCounts();
-                      } else {
-                        const data = await res.json();
-                        setError(data.detail || "Failed to remove expiration");
-                      }
-                    } catch (err) {
-                      setError("Network error");
-                    } finally {
-                      setSettingExpiration(false);
-                    }
-                  }}
+                  onClick={() => { setExpirationDate(""); handleSetExpiration(); }}
                   disabled={settingExpiration}
                   style={{
                     padding: "12px 16px", background: "#6b7280", color: "#fff",
@@ -1053,51 +1160,7 @@ export default function PlatformAdmin({ onImpersonate }) {
                 </button>
               )}
               <button
-                onClick={async () => {
-                  setSettingExpiration(true);
-                  try {
-                    const body = {
-                      expires_at: expirationDate ? new Date(expirationDate).toISOString() : null,
-                      grace_period_days: gracePeriod,
-                      notes: "Set from dashboard"
-                    };
-                    
-                    if (!expirationDate) {
-                      // Remove expiration
-                      const res = await fetch(`${API_BASE}/platform/company/${showSetExpiration.id}/expiration`, {
-                        method: "DELETE",
-                        headers: authHeaders()
-                      });
-                      if (res.ok) {
-                        setSuccess(`Expiration removed for ${showSetExpiration.name}`);
-                      } else {
-                        throw new Error("Failed to remove");
-                      }
-                    } else {
-                      // Set expiration
-                      const res = await fetch(`${API_BASE}/platform/company/${showSetExpiration.id}/expiration`, {
-                        method: "PUT",
-                        headers: authHeaders(),
-                        body: JSON.stringify(body)
-                      });
-                      if (res.ok) {
-                        setSuccess(`Expiration set for ${showSetExpiration.name}`);
-                      } else {
-                        const data = await res.json();
-                        throw new Error(data.detail || "Failed to set");
-                      }
-                    }
-                    
-                    setShowSetExpiration(null);
-                    setSelectedCompany(null);
-                    fetchCompanies();
-                    fetchExpirationCounts();
-                  } catch (err) {
-                    setError(err.message || "Failed to update expiration");
-                  } finally {
-                    setSettingExpiration(false);
-                  }
-                }}
+                onClick={handleSetExpiration}
                 disabled={settingExpiration}
                 style={{
                   flex: 1, padding: 12, background: "#16a34a", color: "#fff",
@@ -1160,7 +1223,7 @@ export default function PlatformAdmin({ onImpersonate }) {
                     <input name="max_storage_mb" type="number" defaultValue={5120} style={inputStyle} /></div>
                 </div>
 
-                {/* NEW: Subscription/Expiration Section */}
+                {/* Subscription/Expiration Section */}
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 12, borderBottom: "1px solid #e5e7eb", paddingBottom: 8 }}>
                   Subscription / Expiration
                 </div>
