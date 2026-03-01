@@ -509,6 +509,10 @@ function Dashboard({ user, onLogout }) {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isDark, setIsDark] = useState(() => localStorage.getItem("digix_theme") === "dark");
   const [impersonating, setImpersonating] = useState(null); // { slug, name }
+  
+  // Company expiration warning state
+  const [companyExpiration, setCompanyExpiration] = useState(null);
+  const [expirationDismissed, setExpirationDismissed] = useState(false);
 
   const toggleTheme = useCallback(() => {
     setIsDark(prev => {
@@ -521,6 +525,32 @@ function Dashboard({ user, onLogout }) {
   const theme = isDark ? themes.dark : themes.light;
 
   useEffect(() => { const timer = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(timer); }, []);
+
+  // ── Fetch company expiration status for company users ──
+  useEffect(() => {
+    const fetchExpiration = async () => {
+      // Only check for company users (not platform users)
+      if (user?.user_type === "platform" || !user?.tenant_id) return;
+      
+      try {
+        const token = localStorage.getItem("digix_token");
+        const res = await fetch(`${API_BASE}/company/expiration-status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCompanyExpiration(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch expiration status:", err);
+      }
+    };
+    
+    fetchExpiration();
+    // Check every 5 minutes
+    const interval = setInterval(fetchExpiration, 300000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // ── Activity tracking: page visits ──
   const prevPageRef = React.useRef(null);
@@ -640,6 +670,96 @@ function Dashboard({ user, onLogout }) {
               </div>
               <button onClick={handleStopImpersonate} style={{ padding: "6px 16px", background: "#0a1628", color: "#f59e0b", border: "none", borderRadius: 6, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
                 ✕ Exit Impersonation
+              </button>
+            </div>
+          )}
+          
+          {/* Company Expiration Warning Banner - for company users */}
+          {companyExpiration && !expirationDismissed && companyExpiration.status !== "active" && (
+            <div style={{ 
+              background: companyExpiration.status === "grace_period" 
+                ? "linear-gradient(90deg, #f59e0b, #d97706)" 
+                : "linear-gradient(90deg, #dc2626, #b91c1c)", 
+              padding: "12px 24px", 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "space-between", 
+              color: companyExpiration.status === "grace_period" ? "#0a1628" : "#fff",
+              zIndex: 199 
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 24 }}>{companyExpiration.status === "grace_period" ? "⏰" : "🚨"}</span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>
+                    {companyExpiration.status === "grace_period" 
+                      ? `Subscription Expired - Grace Period Ends in ${companyExpiration.days_remaining} days` 
+                      : "Subscription Expired"}
+                  </div>
+                  <div style={{ fontSize: 13, opacity: 0.9 }}>
+                    {companyExpiration.status === "grace_period"
+                      ? "Please contact your administrator to renew the subscription to continue using all features."
+                      : "Your company subscription has expired. Contact your administrator immediately."}
+                  </div>
+                </div>
+              </div>
+              {companyExpiration.status === "grace_period" && (
+                <button 
+                  onClick={() => setExpirationDismissed(true)} 
+                  style={{ 
+                    padding: "6px 16px", 
+                    background: "rgba(0,0,0,0.2)", 
+                    color: "inherit", 
+                    border: "none", 
+                    borderRadius: 6, 
+                    fontWeight: 600, 
+                    cursor: "pointer", 
+                    fontSize: 12 
+                  }}
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
+          )}
+          
+          {/* Expiring Soon Warning Banner - show when less than 14 days left */}
+          {companyExpiration && !expirationDismissed && companyExpiration.status === "active" && companyExpiration.days_remaining !== null && companyExpiration.days_remaining <= 14 && (
+            <div style={{ 
+              background: companyExpiration.days_remaining <= 7 
+                ? "linear-gradient(90deg, #dc2626, #b91c1c)" 
+                : "linear-gradient(90deg, #f59e0b, #d97706)", 
+              padding: "10px 24px", 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "space-between", 
+              color: companyExpiration.days_remaining <= 7 ? "#fff" : "#0a1628",
+              zIndex: 199 
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 20 }}>⚠️</span>
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: 14 }}>
+                    Subscription expires in {companyExpiration.days_remaining} day{companyExpiration.days_remaining !== 1 ? "s" : ""}
+                  </span>
+                  <span style={{ marginLeft: 8, fontSize: 13, opacity: 0.9 }}>
+                    — Contact your administrator to renew
+                  </span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setExpirationDismissed(true)} 
+                style={{ 
+                  padding: "6px 16px", 
+                  background: "rgba(0,0,0,0.2)", 
+                  color: "inherit", 
+                  border: "none", 
+                  borderRadius: 6, 
+                  fontWeight: 600, 
+                  cursor: "pointer", 
+                  fontSize: 12 
+                }}
+              >
+                Dismiss
               </button>
             </div>
           )}
