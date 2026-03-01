@@ -10,6 +10,146 @@ function authHeaders() {
   return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 }
 
+// ─── Notification Bell Component ───
+function NotificationBell({ notifications, expiredCompanies, expiringCompanies }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const totalAlerts = (expiredCompanies?.length || 0) + (expiringCompanies?.length || 0);
+  const hasUrgent = (expiredCompanies?.length || 0) > 0;
+  
+  if (totalAlerts === 0) {
+    return (
+      <div style={{ position: "relative" }}>
+        <button style={{
+          width: 44, height: 44, borderRadius: 10, border: "1px solid #e5e7eb",
+          background: "#f8fafc", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 20, color: "#94a3b8"
+        }}>
+          🔔
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: 44, height: 44, borderRadius: 10, border: "1px solid #e5e7eb",
+          background: hasUrgent ? "#fef2f2" : "#fffbeb", cursor: "pointer", 
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 20, position: "relative",
+          animation: hasUrgent ? "bellShake 0.5s ease-in-out infinite" : "none"
+        }}
+      >
+        🔔
+        {/* Badge */}
+        <span style={{
+          position: "absolute", top: -4, right: -4,
+          background: hasUrgent ? "#dc2626" : "#f59e0b",
+          color: "#fff", fontSize: 11, fontWeight: 700,
+          minWidth: 20, height: 20, borderRadius: 10,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          border: "2px solid #fff",
+          animation: hasUrgent ? "pulse 2s ease-in-out infinite" : "none"
+        }}>
+          {totalAlerts}
+        </span>
+      </button>
+      
+      {/* Dropdown */}
+      {isOpen && (
+        <>
+          <div 
+            style={{ position: "fixed", inset: 0, zIndex: 999 }} 
+            onClick={() => setIsOpen(false)} 
+          />
+          <div style={{
+            position: "absolute", top: 50, right: 0, width: 360,
+            background: "#fff", borderRadius: 14, boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+            border: "1px solid #e5e7eb", zIndex: 1000, overflow: "hidden"
+          }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", background: "#f8fafc" }}>
+              <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 15 }}>Notifications</div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>{totalAlerts} alert{totalAlerts !== 1 ? "s" : ""} requiring attention</div>
+            </div>
+            
+            <div style={{ maxHeight: 400, overflowY: "auto" }}>
+              {/* Expired Companies */}
+              {expiredCompanies?.length > 0 && (
+                <div style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  <div style={{ padding: "12px 20px", background: "#fef2f2", display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>🚨</span>
+                    <span style={{ fontWeight: 700, color: "#dc2626", fontSize: 13 }}>EXPIRED - Immediate Action Required</span>
+                  </div>
+                  {expiredCompanies.map((c, i) => (
+                    <div key={i} style={{ padding: "12px 20px", borderBottom: "1px solid #fef2f2", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: "#1f2937", fontSize: 13 }}>{c.company_name}</div>
+                        <div style={{ fontSize: 11, color: "#dc2626" }}>Expired {c.days_since_expiration || 0} days ago</div>
+                      </div>
+                      <span style={{ fontSize: 10, color: "#dc2626", fontWeight: 600 }}>BLOCKED</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Expiring Soon */}
+              {expiringCompanies?.length > 0 && (
+                <div>
+                  <div style={{ padding: "12px 20px", background: "#fffbeb", display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>⏰</span>
+                    <span style={{ fontWeight: 700, color: "#92400e", fontSize: 13 }}>Expiring Soon</span>
+                  </div>
+                  {expiringCompanies.slice(0, 5).map((c, i) => (
+                    <div key={i} style={{ padding: "12px 20px", borderBottom: "1px solid #fffbeb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: "#1f2937", fontSize: 13 }}>{c.company_name}</div>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>
+                          {c.status === "grace_period" ? "In grace period" : `Expires ${c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "soon"}`}
+                        </div>
+                      </div>
+                      <span style={{ 
+                        padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                        background: c.days_until_expiration <= 7 ? "#fef2f2" : "#fffbeb",
+                        color: c.days_until_expiration <= 7 ? "#dc2626" : "#b45309"
+                      }}>
+                        {c.days_until_expiration}d
+                      </span>
+                    </div>
+                  ))}
+                  {expiringCompanies.length > 5 && (
+                    <div style={{ padding: "10px 20px", textAlign: "center", fontSize: 12, color: "#64748b" }}>
+                      +{expiringCompanies.length - 5} more companies...
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div style={{ padding: "12px 20px", borderTop: "1px solid #e5e7eb", background: "#f8fafc", textAlign: "center" }}>
+              <span style={{ fontSize: 12, color: "#64748b" }}>Go to Platform Admin for full management</span>
+            </div>
+          </div>
+        </>
+      )}
+      
+      <style>{`
+        @keyframes bellShake {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(10deg); }
+          75% { transform: rotate(-10deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // ─── Mini Bar Chart (pure CSS) ───
 function MiniBar({ value, max, color = "#3b82f6", height = 8 }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
@@ -275,13 +415,69 @@ export default function PlatformDashboard() {
 
   const maxDevicesInCompany = Math.max(...companies.map(c => c.device_count), 1);
 
-  // Calculate aggregates
-  const activeCompanies = companies.filter(c => c.status === "active").length;
+  // Calculate aggregates from actual expiration status
+  const activeCompanies = data.active_companies || 0;
   const companiesWithOnlineDevices = companies.filter(c => c.devices_online > 0).length;
+  
+  // Notifications
+  const notifications = data.notifications || [];
+  const expiredCount = data.expired_companies || 0;
+  const expiringSoonCount = data.expiring_soon_companies || 0;
+  const totalAlerts = expiredCount + expiringSoonCount;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* ─── Header ─── */}
+      {/* ─── Critical Alert Sliding Banner ─── */}
+      {expiredCount > 0 && (
+        <div style={{ 
+          background: "linear-gradient(90deg, #dc2626, #b91c1c)", 
+          padding: "10px 0",
+          borderRadius: 10,
+          overflow: "hidden",
+          position: "relative"
+        }}>
+          <div style={{
+            display: "flex",
+            animation: "slideText 20s linear infinite",
+            whiteSpace: "nowrap",
+            color: "#fff",
+            fontWeight: 600,
+            fontSize: 14
+          }}>
+            <span style={{ paddingRight: 100 }}>🚨 ALERT: {expiredCount} company{expiredCount > 1 ? "ies" : ""} expired! Users are blocked and devices showing enrollment screen. Take action immediately!</span>
+            <span style={{ paddingRight: 100 }}>🚨 ALERT: {expiredCount} company{expiredCount > 1 ? "ies" : ""} expired! Users are blocked and devices showing enrollment screen. Take action immediately!</span>
+          </div>
+          <style>{`
+            @keyframes slideText {
+              0% { transform: translateX(0); }
+              100% { transform: translateX(-50%); }
+            }
+          `}</style>
+        </div>
+      )}
+      
+      {/* ─── Warning Banner for Expiring Soon ─── */}
+      {expiredCount === 0 && expiringSoonCount > 0 && (
+        <div style={{ 
+          background: "linear-gradient(90deg, #f59e0b, #d97706)", 
+          padding: "12px 20px",
+          borderRadius: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          color: "#0a1628"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 24 }}>⏰</span>
+            <div>
+              <div style={{ fontWeight: 700 }}>{expiringSoonCount} company{expiringSoonCount > 1 ? "ies" : ""} expiring soon</div>
+              <div style={{ fontSize: 12, opacity: 0.8 }}>Contact companies to renew subscriptions</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Header with Notification Bell ─── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.02em" }}>
@@ -291,14 +487,19 @@ export default function PlatformDashboard() {
             Real-time analytics across all companies
           </p>
         </div>
-        <button onClick={() => { load(); if (activeTab === "activity") loadActivity(); }} disabled={loading} style={{
-          padding: "8px 16px", background: loading ? "#e5e7eb" : "#f8fafc", border: "1px solid #e5e7eb",
-          borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 500, color: "#64748b",
-          display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s",
-        }}>
-          <span style={{ display: "inline-block", animation: loading ? "spin 1s linear infinite" : "none" }}>↻</span>
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Notification Bell */}
+          <NotificationBell notifications={notifications} expiredCompanies={data.expired_companies_list || []} expiringCompanies={data.expiring_companies || []} />
+          
+          <button onClick={() => { load(); if (activeTab === "activity") loadActivity(); }} disabled={loading} style={{
+            padding: "8px 16px", background: loading ? "#e5e7eb" : "#f8fafc", border: "1px solid #e5e7eb",
+            borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 500, color: "#64748b",
+            display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s",
+          }}>
+            <span style={{ display: "inline-block", animation: loading ? "spin 1s linear infinite" : "none" }}>↻</span>
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
       </div>
 
       {/* ─── Tab Bar ─── */}
@@ -315,6 +516,73 @@ export default function PlatformDashboard() {
       </div>
 
       {activeTab === "overview" && (<>
+      
+      {/* ─── Expiration Alerts Section ─── */}
+      {(expiredCount > 0 || expiringSoonCount > 0) && (
+        <div style={{ display: "grid", gridTemplateColumns: expiredCount > 0 && expiringSoonCount > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
+          {/* Expired Companies Card */}
+          {expiredCount > 0 && (
+            <div style={{ background: "#fff", borderRadius: 14, border: "2px solid #fecaca", overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", background: "#fef2f2", borderBottom: "1px solid #fecaca", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 24 }}>🚨</span>
+                  <div>
+                    <div style={{ fontWeight: 700, color: "#991b1b" }}>Expired Companies</div>
+                    <div style={{ fontSize: 12, color: "#dc2626" }}>Users blocked, devices showing enrollment</div>
+                  </div>
+                </div>
+                <span style={{ background: "#dc2626", color: "#fff", padding: "6px 14px", borderRadius: 20, fontWeight: 700, fontSize: 14 }}>{expiredCount}</span>
+              </div>
+              <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                {(data.expired_companies_list || []).map((c, i) => (
+                  <div key={i} style={{ padding: "12px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: 600, color: "#1f2937" }}>{c.company_name}</div>
+                      <div style={{ fontSize: 11, color: "#dc2626" }}>Expired {c.days_since_expiration || 0} days ago</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Expiring Soon Companies Card */}
+          {expiringSoonCount > 0 && (
+            <div style={{ background: "#fff", borderRadius: 14, border: "2px solid #fcd34d", overflow: "hidden" }}>
+              <div style={{ padding: "16px 20px", background: "#fffbeb", borderBottom: "1px solid #fcd34d", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 24 }}>⏰</span>
+                  <div>
+                    <div style={{ fontWeight: 700, color: "#92400e" }}>Expiring Soon</div>
+                    <div style={{ fontSize: 12, color: "#b45309" }}>Contact to renew subscriptions</div>
+                  </div>
+                </div>
+                <span style={{ background: "#f59e0b", color: "#fff", padding: "6px 14px", borderRadius: 20, fontWeight: 700, fontSize: 14 }}>{expiringSoonCount}</span>
+              </div>
+              <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                {(data.expiring_companies || []).slice(0, 5).map((c, i) => (
+                  <div key={i} style={{ padding: "12px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: 600, color: "#1f2937" }}>{c.company_name}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>{c.status === "grace_period" ? "In grace period" : `Expires ${c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "soon"}`}</div>
+                    </div>
+                    <span style={{ 
+                      padding: "4px 10px", 
+                      borderRadius: 8, 
+                      fontSize: 12, 
+                      fontWeight: 700,
+                      background: c.days_until_expiration <= 7 ? "#fef2f2" : "#fffbeb",
+                      color: c.days_until_expiration <= 7 ? "#dc2626" : "#b45309"
+                    }}>
+                      {c.days_until_expiration}d left
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ─── Top Metric Cards ─── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
@@ -354,7 +622,7 @@ export default function PlatformDashboard() {
           </div>
         </div>
 
-        {/* Company Status Donut */}
+        {/* Company Status - Updated with Expired */}
         <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #e8ecf1", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 20 }}>Company Status</div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -363,25 +631,57 @@ export default function PlatformDashboard() {
               centerValue={data.total_companies}
               centerLabel="Companies"
               segments={[
-                { value: data.active_companies, color: "#3b82f6" },
-                { value: data.trial_companies, color: "#f59e0b" },
-                { value: data.suspended_companies, color: "#ef4444" },
+                { value: data.active_companies || 0, color: "#22c55e" },
+                { value: data.trial_companies || 0, color: "#f59e0b" },
+                { value: data.grace_period_companies || 0, color: "#fb923c" },
+                { value: data.expired_companies || 0, color: "#ef4444" },
+                { value: data.suspended_companies || 0, color: "#6b7280" },
               ]}
             />
           </div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 14, marginTop: 16, fontSize: 12, flexWrap: "wrap" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#3b82f6" }} />
-              Active: <strong>{data.active_companies}</strong>
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#f59e0b" }} />
-              Trial: <strong>{data.trial_companies}</strong>
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} />
-              Suspended: <strong>{data.suspended_companies}</strong>
-            </span>
+          {/* List format */}
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#f0fdf4", borderRadius: 8 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#166534" }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e" }} />
+                Active
+              </span>
+              <strong style={{ color: "#166534" }}>{data.active_companies || 0}</strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#fef3c7", borderRadius: 8 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#92400e" }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#f59e0b" }} />
+                Trial
+              </span>
+              <strong style={{ color: "#92400e" }}>{data.trial_companies || 0}</strong>
+            </div>
+            {(data.grace_period_companies || 0) > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#fff7ed", borderRadius: 8 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#c2410c" }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fb923c" }} />
+                  Grace Period
+                </span>
+                <strong style={{ color: "#c2410c" }}>{data.grace_period_companies}</strong>
+              </div>
+            )}
+            {(data.expired_companies || 0) > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#dc2626", fontWeight: 600 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} />
+                  🚨 Expired
+                </span>
+                <strong style={{ color: "#dc2626" }}>{data.expired_companies}</strong>
+              </div>
+            )}
+            {(data.suspended_companies || 0) > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#f3f4f6", borderRadius: 8 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#4b5563" }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#6b7280" }} />
+                  Suspended
+                </span>
+                <strong style={{ color: "#4b5563" }}>{data.suspended_companies}</strong>
+              </div>
+            )}
           </div>
         </div>
 
