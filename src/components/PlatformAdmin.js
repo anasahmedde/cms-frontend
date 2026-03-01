@@ -462,6 +462,12 @@ export default function PlatformAdmin({ onImpersonate }) {
   const [deleting, setDeleting] = useState(null);
   const [expiredCount, setExpiredCount] = useState(0);
   const [expiringSoonCount, setExpiringSoonCount] = useState(0);
+  
+  // NEW: Set Expiration Modal state
+  const [showSetExpiration, setShowSetExpiration] = useState(null); // company object
+  const [expirationDate, setExpirationDate] = useState("");
+  const [gracePeriod, setGracePeriod] = useState(7);
+  const [settingExpiration, setSettingExpiration] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -769,13 +775,30 @@ export default function PlatformAdmin({ onImpersonate }) {
                       {new Date(c.created_at).toLocaleDateString()}
                     </td>
                     <td style={{ padding: 12, textAlign: "right" }}>
-                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
                         {onImpersonate && (
                           <button onClick={() => onImpersonate(c.slug)}
                             style={{ padding: "4px 8px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
                             Enter
                           </button>
                         )}
+                        <button 
+                          onClick={() => {
+                            setShowSetExpiration(c);
+                            setExpirationDate(c.expires_at ? new Date(c.expires_at).toISOString().slice(0, 16) : "");
+                            setGracePeriod(c.grace_period_days || 7);
+                          }}
+                          style={{ 
+                            padding: "4px 8px", 
+                            background: c.expires_at ? "#8b5cf6" : "#6b7280", 
+                            color: "#fff", 
+                            border: "none", 
+                            borderRadius: 4, 
+                            cursor: "pointer", 
+                            fontSize: 11 
+                          }}>
+                          {c.expires_at ? "📅" : "⏱️"}
+                        </button>
                         {c.status === "active" ? (
                           <button onClick={() => handleSuspend(c.slug, c.name)}
                             style={{ padding: "4px 8px", background: "#f59e0b", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
@@ -817,7 +840,7 @@ export default function PlatformAdmin({ onImpersonate }) {
       {selectedCompany && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
           onClick={() => { setSelectedCompany(null); setStats(null); }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 520, maxHeight: "80vh", overflow: "auto" }}
+          <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 560, maxHeight: "80vh", overflow: "auto" }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 20 }}>{selectedCompany.name}</h3>
@@ -833,8 +856,49 @@ export default function PlatformAdmin({ onImpersonate }) {
               <div style={{ gridColumn: "1 / -1" }}><strong>Created:</strong> {new Date(selectedCompany.created_at).toLocaleString()}</div>
             </div>
 
+            {/* Expiration Info */}
+            <div style={{ 
+              marginTop: 16, 
+              padding: 16, 
+              background: selectedCompany.expires_at ? "#fef3c7" : "#f3f4f6", 
+              borderRadius: 12,
+              border: selectedCompany.expires_at ? "1px solid #fcd34d" : "1px solid #e5e7eb"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Subscription Expiration</div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>
+                    {selectedCompany.expires_at 
+                      ? new Date(selectedCompany.expires_at).toLocaleDateString() 
+                      : "Never expires"}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowSetExpiration(selectedCompany);
+                    setExpirationDate(selectedCompany.expires_at 
+                      ? new Date(selectedCompany.expires_at).toISOString().slice(0, 16) 
+                      : "");
+                    setGracePeriod(selectedCompany.grace_period_days || 7);
+                  }}
+                  style={{
+                    padding: "8px 16px",
+                    background: "#f59e0b",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    fontSize: 13
+                  }}
+                >
+                  {selectedCompany.expires_at ? "✏️ Edit" : "📅 Set Expiration"}
+                </button>
+              </div>
+            </div>
+
             {stats && (
-              <div style={{ marginTop: 20, padding: 16, background: "#f9fafb", borderRadius: 12 }}>
+              <div style={{ marginTop: 16, padding: 16, background: "#f9fafb", borderRadius: 12 }}>
                 <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600 }}>Usage Statistics</h4>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
                   {[["Devices", stats.device_count], ["Users", stats.user_count], ["Videos", stats.video_count],
@@ -861,6 +925,187 @@ export default function PlatformAdmin({ onImpersonate }) {
                   opacity: deleting === selectedCompany.slug ? 0.6 : 1,
                 }}>
                 {deleting === selectedCompany.slug ? "Deleting..." : "Delete Company"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ SET EXPIRATION MODAL ═══ */}
+      {showSetExpiration && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1001 }}
+          onClick={() => setShowSetExpiration(null)}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 440 }}
+            onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 20px", fontSize: 18 }}>
+              Set Expiration for "{showSetExpiration.name}"
+            </h3>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                Expiration Date
+              </label>
+              <input
+                type="datetime-local"
+                value={expirationDate}
+                onChange={(e) => setExpirationDate(e.target.value)}
+                style={{ ...inputStyle, width: "100%" }}
+              />
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                Leave empty to remove expiration (never expires)
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                Grace Period (days)
+              </label>
+              <input
+                type="number"
+                value={gracePeriod}
+                onChange={(e) => setGracePeriod(parseInt(e.target.value) || 0)}
+                min={0}
+                max={30}
+                style={{ ...inputStyle, width: 100 }}
+              />
+              <span style={{ marginLeft: 8, fontSize: 12, color: "#6b7280" }}>
+                Days after expiration before full block
+              </span>
+            </div>
+
+            {/* Quick set buttons */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 8 }}>Quick Set:</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {[
+                  { label: "30 days", days: 30 },
+                  { label: "90 days", days: 90 },
+                  { label: "6 months", days: 180 },
+                  { label: "1 year", days: 365 },
+                ].map(opt => (
+                  <button
+                    key={opt.days}
+                    type="button"
+                    onClick={() => {
+                      const date = new Date();
+                      date.setDate(date.getDate() + opt.days);
+                      setExpirationDate(date.toISOString().slice(0, 16));
+                    }}
+                    style={{
+                      padding: "6px 12px",
+                      background: "#f3f4f6",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 12,
+                      fontWeight: 500
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                onClick={() => setShowSetExpiration(null)}
+                style={{
+                  flex: 1, padding: 12, background: "#f3f4f6", border: "none",
+                  borderRadius: 8, cursor: "pointer", fontWeight: 600
+                }}
+              >
+                Cancel
+              </button>
+              {showSetExpiration.expires_at && (
+                <button
+                  onClick={async () => {
+                    setSettingExpiration(true);
+                    try {
+                      const res = await fetch(`${API_BASE}/platform/company/${showSetExpiration.id}/expiration`, {
+                        method: "DELETE",
+                        headers: authHeaders()
+                      });
+                      if (res.ok) {
+                        setSuccess(`Expiration removed for ${showSetExpiration.name}`);
+                        setShowSetExpiration(null);
+                        setSelectedCompany(null);
+                        fetchCompanies();
+                        fetchExpirationCounts();
+                      } else {
+                        const data = await res.json();
+                        setError(data.detail || "Failed to remove expiration");
+                      }
+                    } catch (err) {
+                      setError("Network error");
+                    } finally {
+                      setSettingExpiration(false);
+                    }
+                  }}
+                  disabled={settingExpiration}
+                  style={{
+                    padding: "12px 16px", background: "#6b7280", color: "#fff",
+                    border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600,
+                    opacity: settingExpiration ? 0.6 : 1
+                  }}
+                >
+                  Remove
+                </button>
+              )}
+              <button
+                onClick={async () => {
+                  setSettingExpiration(true);
+                  try {
+                    const body = {
+                      expires_at: expirationDate ? new Date(expirationDate).toISOString() : null,
+                      grace_period_days: gracePeriod,
+                      notes: "Set from dashboard"
+                    };
+                    
+                    if (!expirationDate) {
+                      // Remove expiration
+                      const res = await fetch(`${API_BASE}/platform/company/${showSetExpiration.id}/expiration`, {
+                        method: "DELETE",
+                        headers: authHeaders()
+                      });
+                      if (res.ok) {
+                        setSuccess(`Expiration removed for ${showSetExpiration.name}`);
+                      } else {
+                        throw new Error("Failed to remove");
+                      }
+                    } else {
+                      // Set expiration
+                      const res = await fetch(`${API_BASE}/platform/company/${showSetExpiration.id}/expiration`, {
+                        method: "PUT",
+                        headers: authHeaders(),
+                        body: JSON.stringify(body)
+                      });
+                      if (res.ok) {
+                        setSuccess(`Expiration set for ${showSetExpiration.name}`);
+                      } else {
+                        const data = await res.json();
+                        throw new Error(data.detail || "Failed to set");
+                      }
+                    }
+                    
+                    setShowSetExpiration(null);
+                    setSelectedCompany(null);
+                    fetchCompanies();
+                    fetchExpirationCounts();
+                  } catch (err) {
+                    setError(err.message || "Failed to update expiration");
+                  } finally {
+                    setSettingExpiration(false);
+                  }
+                }}
+                disabled={settingExpiration}
+                style={{
+                  flex: 1, padding: 12, background: "#16a34a", color: "#fff",
+                  border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600,
+                  opacity: settingExpiration ? 0.6 : 1
+                }}
+              >
+                {settingExpiration ? "Saving..." : "Save"}
               </button>
             </div>
           </div>
