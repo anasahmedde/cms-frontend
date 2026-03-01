@@ -457,16 +457,249 @@ export default function PlatformAdmin({ onImpersonate }) {
         </button>
       </div>
 
-      {/* Dashboard Tab */}
+      {/* Dashboard Tab - Enhanced with notifications and expiring companies */}
       {tab === "dashboard" && dashboard && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
-          <StatCard label="Total Companies" value={dashboard.total_companies} color="#3b82f6" icon="🏢" />
-          <StatCard label="Active" value={dashboard.active_companies} color="#16a34a" icon="✅" />
-          <StatCard label="Total Devices" value={dashboard.total_devices} color="#8b5cf6" icon="📱" />
-          <StatCard label="Online" value={dashboard.online_devices} sub={`${dashboard.offline_devices || 0} offline`} color="#10b981" icon="🟢" />
-          <StatCard label="Users" value={dashboard.total_users} color="#f59e0b" icon="👥" />
-          <StatCard label="Expired" value={expiredCount} color="#dc2626" icon="⚠️" />
-        </div>
+        <>
+          {/* Alert Banners */}
+          {expiredCount > 0 && (
+            <div style={{ 
+              background: "linear-gradient(90deg, #dc2626, #b91c1c)", 
+              padding: "16px 20px", 
+              borderRadius: 12, 
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              color: "#fff"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 28 }}>🚨</span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>{expiredCount} Company{expiredCount > 1 ? "ies" : ""} Expired!</div>
+                  <div style={{ fontSize: 13, opacity: 0.9 }}>Users cannot login and devices are showing enrollment screen</div>
+                </div>
+              </div>
+              <button onClick={() => setTab("expired")} style={{ 
+                padding: "10px 20px", 
+                background: "#fff", 
+                color: "#dc2626", 
+                border: "none", 
+                borderRadius: 8, 
+                fontWeight: 700, 
+                cursor: "pointer" 
+              }}>
+                View & Reactivate →
+              </button>
+            </div>
+          )}
+          
+          {expiringSoonCount > 0 && (
+            <div style={{ 
+              background: "linear-gradient(90deg, #f59e0b, #d97706)", 
+              padding: "16px 20px", 
+              borderRadius: 12, 
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              color: "#0a1628"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 28 }}>⏰</span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>{expiringSoonCount} Company{expiringSoonCount > 1 ? "ies" : ""} Expiring Soon</div>
+                  <div style={{ fontSize: 13, opacity: 0.8 }}>Contact these companies to renew their subscriptions</div>
+                </div>
+              </div>
+              <button onClick={() => setTab("expiring")} style={{ 
+                padding: "10px 20px", 
+                background: "#0a1628", 
+                color: "#f59e0b", 
+                border: "none", 
+                borderRadius: 8, 
+                fontWeight: 700, 
+                cursor: "pointer" 
+              }}>
+                View Details →
+              </button>
+            </div>
+          )}
+
+          {/* Stats Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
+            <StatCard label="Total Companies" value={dashboard.total_companies} color="#3b82f6" icon="🏢" />
+            <StatCard label="Active" value={dashboard.active_companies} color="#16a34a" icon="✅" />
+            <StatCard label="Total Devices" value={dashboard.total_devices} color="#8b5cf6" icon="📱" />
+            <StatCard label="Online" value={dashboard.online_devices} sub={`${dashboard.offline_devices || 0} offline`} color="#10b981" icon="🟢" />
+            <StatCard label="Users" value={dashboard.total_users} color="#f59e0b" icon="👥" />
+            <StatCard label="Expired" value={expiredCount} color="#dc2626" icon="⚠️" />
+          </div>
+
+          {/* Subscription Overview Section */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
+            {/* Expiring Soon List */}
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+              <div style={{ 
+                padding: "16px 20px", 
+                borderBottom: "1px solid #e5e7eb", 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between",
+                background: "#fffbeb"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>⏰</span>
+                  <span style={{ fontWeight: 700, color: "#92400e" }}>Expiring Soon</span>
+                </div>
+                <span style={{ 
+                  background: "#f59e0b", 
+                  color: "#fff", 
+                  padding: "4px 10px", 
+                  borderRadius: 12, 
+                  fontSize: 12, 
+                  fontWeight: 700 
+                }}>
+                  {expiringSoonCount}
+                </span>
+              </div>
+              <div style={{ maxHeight: 300, overflowY: "auto" }}>
+                {expiringCompanies.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                    <div>No companies expiring in the next {expiringDays} days</div>
+                  </div>
+                ) : (
+                  expiringCompanies.slice(0, 5).map((c, idx) => (
+                    <div key={c.company_id || idx} style={{ 
+                      padding: "12px 20px", 
+                      borderBottom: "1px solid #f3f4f6",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between"
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: "#1f2937" }}>{c.company_name}</div>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>{c.device_count || 0} devices · {c.user_count || 0} users</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ 
+                          fontSize: 13, 
+                          fontWeight: 700, 
+                          color: c.days_until_expiration <= 7 ? "#dc2626" : "#f59e0b" 
+                        }}>
+                          {c.days_until_expiration}d left
+                        </div>
+                        <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                          {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "N/A"}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {expiringCompanies.length > 5 && (
+                  <div style={{ padding: "12px 20px", textAlign: "center" }}>
+                    <button onClick={() => setTab("expiring")} style={{ 
+                      color: "#f59e0b", 
+                      background: "none", 
+                      border: "none", 
+                      cursor: "pointer", 
+                      fontWeight: 600,
+                      fontSize: 13
+                    }}>
+                      View all {expiringCompanies.length} →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Expired List */}
+            <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+              <div style={{ 
+                padding: "16px 20px", 
+                borderBottom: "1px solid #e5e7eb", 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between",
+                background: "#fef2f2"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>🚨</span>
+                  <span style={{ fontWeight: 700, color: "#991b1b" }}>Expired Companies</span>
+                </div>
+                <span style={{ 
+                  background: "#dc2626", 
+                  color: "#fff", 
+                  padding: "4px 10px", 
+                  borderRadius: 12, 
+                  fontSize: 12, 
+                  fontWeight: 700 
+                }}>
+                  {expiredCount}
+                </span>
+              </div>
+              <div style={{ maxHeight: 300, overflowY: "auto" }}>
+                {expiredCompanies.length === 0 ? (
+                  <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                    <div>No expired companies</div>
+                  </div>
+                ) : (
+                  expiredCompanies.slice(0, 5).map((c, idx) => (
+                    <div key={c.company_id || idx} style={{ 
+                      padding: "12px 20px", 
+                      borderBottom: "1px solid #f3f4f6",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between"
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: "#1f2937" }}>{c.company_name}</div>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>{c.device_count || 0} devices · {c.user_count || 0} users</div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "#dc2626" }}>
+                            Expired {c.days_since_expiration || 0}d ago
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => handleReactivate(c.company_id, c.company_name, 30)}
+                          style={{ 
+                            padding: "6px 12px", 
+                            background: "#16a34a", 
+                            color: "#fff", 
+                            border: "none", 
+                            borderRadius: 6, 
+                            fontSize: 11, 
+                            fontWeight: 600,
+                            cursor: "pointer" 
+                          }}
+                        >
+                          +30d
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {expiredCompanies.length > 5 && (
+                  <div style={{ padding: "12px 20px", textAlign: "center" }}>
+                    <button onClick={() => setTab("expired")} style={{ 
+                      color: "#dc2626", 
+                      background: "none", 
+                      border: "none", 
+                      cursor: "pointer", 
+                      fontWeight: 600,
+                      fontSize: 13
+                    }}>
+                      View all {expiredCompanies.length} →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Companies Tab */}
