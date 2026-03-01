@@ -1,6 +1,7 @@
 // src/components/PlatformAdmin.js
 // Platform-level admin panel for managing companies (tenants)
 // Features: Dashboard overview, company CRUD, delete, suspend/reactivate, impersonate
+// UPDATED: Company Expiration management, Expired Companies tab
 import React, { useState, useEffect, useCallback } from "react";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
@@ -36,7 +37,14 @@ function StatCard({ label, value, sub, color = "#3b82f6", icon }) {
 
 // ─── Status Badge ───
 function StatusBadge({ status }) {
-  const colors = { active: "#16a34a", suspended: "#dc2626", trial: "#f59e0b", cancelled: "#6b7280" };
+  const colors = { 
+    active: "#16a34a", 
+    suspended: "#dc2626", 
+    trial: "#f59e0b", 
+    cancelled: "#6b7280",
+    expired: "#dc2626",
+    grace_period: "#f59e0b"
+  };
   const c = colors[status] || "#6b7280";
   return (
     <span style={{
@@ -46,6 +54,62 @@ function StatusBadge({ status }) {
       {status}
     </span>
   );
+}
+
+// ─── Expiration Badge ───
+function ExpirationBadge({ expiresAt, status, daysUntil, daysSince }) {
+  if (!expiresAt && status === 'active') {
+    return <span style={{ fontSize: 11, color: "#6b7280" }}>Never expires</span>;
+  }
+  
+  if (status === 'expired') {
+    return (
+      <span style={{ 
+        display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11,
+        fontWeight: 600, background: "#fef2f2", color: "#dc2626"
+      }}>
+        Expired {daysSince} days ago
+      </span>
+    );
+  }
+  
+  if (status === 'grace_period') {
+    return (
+      <span style={{ 
+        display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11,
+        fontWeight: 600, background: "#fef3c7", color: "#b45309"
+      }}>
+        Grace period ({daysSince} days)
+      </span>
+    );
+  }
+  
+  if (status === 'suspended') {
+    return (
+      <span style={{ 
+        display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11,
+        fontWeight: 600, background: "#fef2f2", color: "#dc2626"
+      }}>
+        Suspended
+      </span>
+    );
+  }
+  
+  // Active with expiration date
+  if (daysUntil !== null && daysUntil !== undefined) {
+    const color = daysUntil <= 7 ? "#dc2626" : daysUntil <= 30 ? "#f59e0b" : "#16a34a";
+    const bg = daysUntil <= 7 ? "#fef2f2" : daysUntil <= 30 ? "#fef3c7" : "#dcfce7";
+    return (
+      <span style={{ 
+        display: "inline-block", padding: "2px 10px", borderRadius: 12, fontSize: 11,
+        fontWeight: 600, background: bg, color: color
+      }}>
+        {daysUntil} days left
+      </span>
+    );
+  }
+  
+  return null;
 }
 
 // ─── Online/Offline Indicator ───
@@ -66,6 +130,322 @@ function OnlineBar({ online, offline, total }) {
   );
 }
 
+// ─── Expired Companies Tab Component ───
+function ExpiredCompaniesTab({ onReactivate }) {
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
+
+  const fetchExpired = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/platform/companies/expiration?status=expired`, { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setCompanies(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch expired companies:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchExpired(); }, [fetchExpired]);
+
+  const handleReactivate = async (companyId, companyName, days = 30) => {
+    if (!window.confirm(`Reactivate "${companyName}" and extend by ${days} days?`)) return;
+    setActionLoading(companyId);
+    try {
+      const res = await fetch(`${API_BASE}/platform/company/${companyId}/reactivate?extend_days=${days}`, {
+        method: "POST", headers: authHeaders()
+      });
+      if (res.ok) {
+        alert(`Successfully reactivated ${companyName}`);
+        fetchExpired();
+        if (onReactivate) onReactivate();
+      } else {
+        const data = await res.json();
+        alert(data.detail || "Failed to reactivate");
+      }
+    } catch (err) {
+      alert("Error reactivating company");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  if (loading) {
+    return <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Loading expired companies...</div>;
+  }
+
+  if (companies.length === 0) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+        <div style={{ fontSize: 16, fontWeight: 600 }}>No expired companies</div>
+        <div style={{ fontSize: 13, marginTop: 8 }}>All companies are active and up to date.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16, padding: 12, background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>
+        <span style={{ color: "#dc2626", fontWeight: 600 }}>⚠️ {companies.length} expired companies</span>
+        <span style={{ color: "#7f1d1d", marginLeft: 8, fontSize: 13 }}>— Users cannot login and devices show "Not Enrolled"</span>
+      </div>
+
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+        <thead>
+          <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+            <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Company</th>
+            <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Status</th>
+            <th style={{ padding: 12, textAlign: "center", fontWeight: 600 }}>Devices</th>
+            <th style={{ padding: 12, textAlign: "center", fontWeight: 600 }}>Users</th>
+            <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Expired</th>
+            <th style={{ padding: 12, textAlign: "right", fontWeight: 600 }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {companies.map((c) => (
+            <tr key={c.company_id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+              <td style={{ padding: 12 }}>
+                <div style={{ fontWeight: 600 }}>{c.company_name}</div>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>{c.company_slug}</div>
+              </td>
+              <td style={{ padding: 12 }}>
+                <StatusBadge status={c.expiration_status} />
+              </td>
+              <td style={{ padding: 12, textAlign: "center" }}>{c.device_count}</td>
+              <td style={{ padding: 12, textAlign: "center" }}>{c.user_count}</td>
+              <td style={{ padding: 12 }}>
+                <span style={{ color: "#dc2626", fontWeight: 500 }}>
+                  {c.days_since_expiration} days ago
+                </span>
+              </td>
+              <td style={{ padding: 12, textAlign: "right" }}>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => handleReactivate(c.company_id, c.company_name, 30)}
+                    disabled={actionLoading === c.company_id}
+                    style={{
+                      padding: "6px 12px", background: "#16a34a", color: "#fff",
+                      border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                      opacity: actionLoading === c.company_id ? 0.6 : 1
+                    }}
+                  >
+                    {actionLoading === c.company_id ? "..." : "Reactivate (30d)"}
+                  </button>
+                  <button
+                    onClick={() => handleReactivate(c.company_id, c.company_name, 365)}
+                    disabled={actionLoading === c.company_id}
+                    style={{
+                      padding: "6px 12px", background: "#3b82f6", color: "#fff",
+                      border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                      opacity: actionLoading === c.company_id ? 0.6 : 1
+                    }}
+                  >
+                    +1 Year
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Expiring Soon Tab Component ───
+function ExpiringSoonTab() {
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [days, setDays] = useState(30);
+  const [extendModal, setExtendModal] = useState(null);
+  const [extendDays, setExtendDays] = useState(30);
+  const [extending, setExtending] = useState(false);
+
+  const fetchExpiring = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/platform/companies/expiring-soon?days=${days}`, { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setCompanies(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch expiring companies:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [days]);
+
+  useEffect(() => { fetchExpiring(); }, [fetchExpiring]);
+
+  const handleExtend = async () => {
+    if (!extendModal) return;
+    setExtending(true);
+    try {
+      const res = await fetch(`${API_BASE}/platform/company/${extendModal.company_id}/extend`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ extend_days: extendDays, notes: "Extended from dashboard" })
+      });
+      if (res.ok) {
+        alert(`Extended ${extendModal.company_name} by ${extendDays} days`);
+        setExtendModal(null);
+        fetchExpiring();
+      } else {
+        const data = await res.json();
+        alert(data.detail || "Failed to extend");
+      }
+    } catch (err) {
+      alert("Error extending company");
+    } finally {
+      setExtending(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center" }}>
+        <span style={{ fontWeight: 500 }}>Show companies expiring in:</span>
+        {[7, 14, 30, 60, 90].map(d => (
+          <button
+            key={d}
+            onClick={() => setDays(d)}
+            style={{
+              padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 6,
+              background: days === d ? "#3b82f6" : "#fff",
+              color: days === d ? "#fff" : "#374151",
+              cursor: "pointer", fontSize: 13, fontWeight: 500
+            }}
+          >
+            {d} days
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Loading...</div>
+      ) : companies.length === 0 ? (
+        <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>No companies expiring soon</div>
+          <div style={{ fontSize: 13, marginTop: 8 }}>No companies are expiring in the next {days} days.</div>
+        </div>
+      ) : (
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          <thead>
+            <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+              <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Company</th>
+              <th style={{ padding: 12, textAlign: "center", fontWeight: 600 }}>Devices</th>
+              <th style={{ padding: 12, textAlign: "center", fontWeight: 600 }}>Users</th>
+              <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Expires In</th>
+              <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Expiry Date</th>
+              <th style={{ padding: 12, textAlign: "right", fontWeight: 600 }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {companies.map((c) => (
+              <tr key={c.company_id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: 12 }}>
+                  <div style={{ fontWeight: 600 }}>{c.company_name}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280" }}>{c.company_slug}</div>
+                </td>
+                <td style={{ padding: 12, textAlign: "center" }}>{c.device_count}</td>
+                <td style={{ padding: 12, textAlign: "center" }}>{c.user_count}</td>
+                <td style={{ padding: 12 }}>
+                  <ExpirationBadge 
+                    expiresAt={c.expires_at} 
+                    status={c.expiration_status}
+                    daysUntil={c.days_until_expiration}
+                    daysSince={c.days_since_expiration}
+                  />
+                </td>
+                <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>
+                  {c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "—"}
+                </td>
+                <td style={{ padding: 12, textAlign: "right" }}>
+                  <button
+                    onClick={() => { setExtendModal(c); setExtendDays(30); }}
+                    style={{
+                      padding: "6px 12px", background: "#f59e0b", color: "#fff",
+                      border: "none", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600
+                    }}
+                  >
+                    Extend
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {/* Extend Modal */}
+      {extendModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setExtendModal(null)}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, width: 400 }}
+            onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 18 }}>Extend Subscription</h3>
+            <p style={{ margin: "0 0 16px", color: "#6b7280" }}>
+              Extend <strong>{extendModal.company_name}</strong> by:
+            </p>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              {[7, 30, 90, 180, 365].map(d => (
+                <button
+                  key={d}
+                  onClick={() => setExtendDays(d)}
+                  style={{
+                    flex: 1, padding: "8px", border: "1px solid #e5e7eb", borderRadius: 6,
+                    background: extendDays === d ? "#3b82f6" : "#fff",
+                    color: extendDays === d ? "#fff" : "#374151",
+                    cursor: "pointer", fontSize: 12, fontWeight: 500
+                  }}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              <input
+                type="number"
+                value={extendDays}
+                onChange={e => setExtendDays(parseInt(e.target.value) || 0)}
+                style={{ flex: 1, padding: 8, border: "1px solid #e5e7eb", borderRadius: 6 }}
+              />
+              <span style={{ padding: "8px 0", color: "#6b7280" }}>days</span>
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                onClick={() => setExtendModal(null)}
+                style={{ flex: 1, padding: 10, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExtend}
+                disabled={extending || extendDays < 1}
+                style={{
+                  flex: 1, padding: 10, background: "#16a34a", color: "#fff",
+                  border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600,
+                  opacity: extending ? 0.6 : 1
+                }}
+              >
+                {extending ? "Extending..." : `Extend ${extendDays} days`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PlatformAdmin({ onImpersonate }) {
   const [tab, setTab] = useState("dashboard");
   const [dashboard, setDashboard] = useState(null);
@@ -80,6 +460,8 @@ export default function PlatformAdmin({ onImpersonate }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [deleting, setDeleting] = useState(null);
+  const [expiredCount, setExpiredCount] = useState(0);
+  const [expiringSoonCount, setExpiringSoonCount] = useState(0);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -101,7 +483,28 @@ export default function PlatformAdmin({ onImpersonate }) {
     finally { setLoading(false); }
   }, [search, statusFilter]);
 
-  useEffect(() => { fetchDashboard(); fetchCompanies(); }, [fetchDashboard, fetchCompanies]);
+  const fetchExpirationCounts = useCallback(async () => {
+    try {
+      const [expiredRes, expiringRes] = await Promise.all([
+        fetch(`${API_BASE}/platform/companies/expiration?status=expired`, { headers: authHeaders() }),
+        fetch(`${API_BASE}/platform/companies/expiring-soon?days=30`, { headers: authHeaders() })
+      ]);
+      if (expiredRes.ok) {
+        const data = await expiredRes.json();
+        setExpiredCount(data.length);
+      }
+      if (expiringRes.ok) {
+        const data = await expiringRes.json();
+        setExpiringSoonCount(data.length);
+      }
+    } catch (err) { console.error("Failed to fetch expiration counts"); }
+  }, []);
+
+  useEffect(() => { 
+    fetchDashboard(); 
+    fetchCompanies(); 
+    fetchExpirationCounts();
+  }, [fetchDashboard, fetchCompanies, fetchExpirationCounts]);
 
   const fetchStats = async (slug) => {
     try {
@@ -114,23 +517,46 @@ export default function PlatformAdmin({ onImpersonate }) {
     e.preventDefault();
     setError(""); setSuccess(""); setCreateResult(null);
     const form = new FormData(e.target);
+    
+    // Build body with expiration fields
     const body = {
-      slug: form.get("slug"), name: form.get("name"), email: form.get("email") || null,
-      phone: form.get("phone") || null, max_devices: parseInt(form.get("max_devices") || "50"),
+      slug: form.get("slug"), 
+      name: form.get("name"), 
+      email: form.get("email") || null,
+      phone: form.get("phone") || null, 
+      max_devices: parseInt(form.get("max_devices") || "50"),
       max_users: parseInt(form.get("max_users") || "10"),
       max_storage_mb: parseInt(form.get("max_storage_mb") || "5120"),
-      admin_username: form.get("admin_username"), admin_email: form.get("admin_email") || null,
+      admin_username: form.get("admin_username"), 
+      admin_email: form.get("admin_email") || null,
       admin_full_name: form.get("admin_full_name") || null,
     };
+    
     try {
       const res = await fetch(`${API_BASE}/platform/companies`, {
         method: "POST", headers: authHeaders(), body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Failed to create company");
+      
+      // If expiration date was set, apply it
+      const expiresAt = form.get("expires_at");
+      const gracePeriod = parseInt(form.get("grace_period_days") || "7");
+      if (expiresAt && data.company?.id) {
+        await fetch(`${API_BASE}/platform/company/${data.company.id}/expiration`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            expires_at: new Date(expiresAt).toISOString(),
+            grace_period_days: gracePeriod,
+            notes: "Set during company creation"
+          })
+        });
+      }
+      
       setCreateResult(data);
       setSuccess(`Company "${data.company.name}" created successfully!`);
-      fetchCompanies(); fetchDashboard();
+      fetchCompanies(); fetchDashboard(); fetchExpirationCounts();
     } catch (err) { setError(err.message); }
   };
 
@@ -139,268 +565,251 @@ export default function PlatformAdmin({ onImpersonate }) {
       `⚠️ PERMANENT DELETE\n\nThis will permanently delete "${name}" (${slug}) and ALL its data including:\n• All devices, videos, advertisements\n• All users and roles\n• All groups, shops, and links\n• All S3 media files\n\nType the company slug "${slug}" to confirm:`
     );
     if (confirmText !== slug) {
-      if (confirmText !== null) setError("Slug did not match. Deletion cancelled.");
+      if (confirmText !== null) alert("Slug did not match. Deletion cancelled.");
       return;
     }
     setDeleting(slug);
     try {
-      const res = await fetch(`${API_BASE}/platform/companies/${slug}?force=true`, {
+      const res = await fetch(`${API_BASE}/platform/companies/${slug}`, {
         method: "DELETE", headers: authHeaders(),
       });
-      const data = await res.json();
       if (!res.ok) {
-        // Check if it's a linked resources error
-        const detail = data.detail;
-        if (res.status === 409 && detail?.linked) {
-          const parts = Object.entries(detail.linked).map(([k, v]) => `• ${v} ${k}`);
-          const forceConfirm = window.confirm(
-            `Company "${name}" has linked resources:\n${parts.join('\n')}\n\nForce delete everything?`
-          );
-          if (forceConfirm) {
-            const res2 = await fetch(`${API_BASE}/platform/companies/${slug}?force=true`, {
-              method: "DELETE", headers: authHeaders(),
-            });
-            const data2 = await res2.json();
-            if (!res2.ok) throw new Error(typeof data2.detail === 'string' ? data2.detail : data2.detail?.message || "Failed to delete company");
-            setSuccess(`Company "${name}" permanently deleted. ${data2.s3_keys_deleted || 0} media files cleaned up.`);
-            setSelectedCompany(null); setStats(null);
-            fetchCompanies(); fetchDashboard();
-          }
-          return;
-        }
-        throw new Error(typeof detail === 'string' ? detail : detail?.message || "Failed to delete company");
+        const data = await res.json();
+        throw new Error(data.detail || "Failed to delete company");
       }
-      setSuccess(`Company "${name}" permanently deleted. ${data.s3_keys_deleted || 0} media files cleaned up.`);
-      setSelectedCompany(null); setStats(null);
-      fetchCompanies(); fetchDashboard();
+      setSuccess(`Company "${name}" deleted successfully.`);
+      setSelectedCompany(null);
+      fetchCompanies(); fetchDashboard(); fetchExpirationCounts();
     } catch (err) { setError(err.message); }
     finally { setDeleting(null); }
   };
 
-  const handleSuspend = async (slug) => {
-    if (!window.confirm(`Suspend company "${slug}"? All users will be logged out.`)) return;
+  const handleSuspend = async (slug, name) => {
+    const reason = prompt(`Enter reason for suspending "${name}":`);
+    if (!reason) return;
     try {
-      const res = await fetch(`${API_BASE}/platform/companies/${slug}/suspend`, { method: "POST", headers: authHeaders() });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.detail); }
-      setSuccess(`Company "${slug}" suspended`);
-      fetchCompanies(); fetchDashboard();
-    } catch (err) { setError(err.message); }
+      // Find company ID
+      const company = companies.find(c => c.slug === slug);
+      if (!company) return;
+      
+      const res = await fetch(`${API_BASE}/platform/company/${company.id}/suspend`, {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ reason })
+      });
+      if (res.ok) {
+        setSuccess(`Company "${name}" suspended.`);
+        fetchCompanies(); fetchExpirationCounts();
+      }
+    } catch (err) { setError("Failed to suspend company"); }
   };
 
-  const handleReactivate = async (slug) => {
+  const handleReactivate = async (slug, name) => {
+    const days = prompt(`How many days to extend "${name}"?`, "30");
+    if (!days) return;
     try {
-      const res = await fetch(`${API_BASE}/platform/companies/${slug}/reactivate`, { method: "POST", headers: authHeaders() });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.detail); }
-      setSuccess(`Company "${slug}" reactivated`);
-      fetchCompanies(); fetchDashboard();
-    } catch (err) { setError(err.message); }
+      const company = companies.find(c => c.slug === slug);
+      if (!company) return;
+      
+      const res = await fetch(`${API_BASE}/platform/company/${company.id}/reactivate?extend_days=${days}`, {
+        method: "POST", headers: authHeaders()
+      });
+      if (res.ok) {
+        setSuccess(`Company "${name}" reactivated for ${days} days.`);
+        fetchCompanies(); fetchExpirationCounts();
+      }
+    } catch (err) { setError("Failed to reactivate company"); }
   };
 
+  // Tab style helper
   const tabStyle = (active) => ({
-    padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer",
-    border: "none", borderRadius: "8px 8px 0 0",
+    padding: "10px 20px",
     background: active ? "#fff" : "transparent",
-    color: active ? "#0a1628" : "#6b7280",
-    borderBottom: active ? "2px solid #f59e0b" : "2px solid transparent",
-    transition: "all 0.2s",
+    border: "none",
+    borderBottom: active ? "2px solid #3b82f6" : "2px solid transparent",
+    cursor: "pointer",
+    fontWeight: active ? 600 : 500,
+    color: active ? "#3b82f6" : "#6b7280",
+    fontSize: 14,
+    position: "relative"
   });
 
   return (
-    <div>
+    <div style={{ padding: "24px 32px", minHeight: "100vh", background: "#f3f4f6" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Platform Administration</h2>
-          <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 14 }}>Manage companies and tenants</p>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#0a1628" }}>Platform Admin</h1>
+          <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 14 }}>Manage companies, subscriptions, and platform settings</p>
         </div>
-        <button onClick={() => { setShowCreate(true); setCreateResult(null); setError(""); }}
-          style={{ padding: "10px 20px", background: "#f59e0b", color: "#0a1628", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 14 }}>
-          + New Company
+        <button
+          onClick={() => { setShowCreate(true); setCreateResult(null); setError(""); }}
+          style={{
+            padding: "12px 24px", background: "#f59e0b", color: "#0a1628", border: "none",
+            borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", gap: 8
+          }}
+        >
+          <span>+</span> Onboard Company
         </button>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 0, borderBottom: "1px solid #e5e7eb" }}>
-        <button style={tabStyle(tab === "dashboard")} onClick={() => setTab("dashboard")}>Dashboard</button>
-        <button style={tabStyle(tab === "companies")} onClick={() => setTab("companies")}>Companies</button>
-      </div>
-
-      {/* Alerts */}
-      {error && <div style={{ padding: 12, background: "#fef2f2", color: "#dc2626", borderRadius: 8, marginTop: 16, marginBottom: 8 }}>{error}
-        <button onClick={() => setError("")} style={{ float: "right", background: "none", border: "none", color: "#dc2626", cursor: "pointer" }}>✕</button></div>}
-      {success && <div style={{ padding: 12, background: "#dcfce7", color: "#166534", borderRadius: 8, marginTop: 16, marginBottom: 8 }}>{success}
-        <button onClick={() => setSuccess("")} style={{ float: "right", background: "none", border: "none", color: "#166534", cursor: "pointer" }}>✕</button></div>}
-
-      {/* ═══ DASHBOARD TAB ═══ */}
-      {tab === "dashboard" && (
-        <div style={{ marginTop: 20 }}>
-          {!dashboard ? <p style={{ color: "#9ca3af" }}>Loading dashboard...</p> : (
-            <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
-                <StatCard label="Companies" value={dashboard.total_companies}
-                  sub={`${dashboard.active_companies} active · ${dashboard.suspended_companies} suspended`}
-                  color="#3b82f6" icon="🏢" />
-                <StatCard label="Total Devices" value={dashboard.total_devices}
-                  sub={`${dashboard.online_devices} online · ${dashboard.offline_devices} offline`}
-                  color="#16a34a" icon="📱" />
-                <StatCard label="Videos" value={dashboard.total_videos} color="#8b5cf6" icon="🎬" />
-                <StatCard label="Advertisements" value={dashboard.total_advertisements} color="#f59e0b" icon="📢" />
-                <StatCard label="Users" value={dashboard.total_users} color="#ec4899" icon="👥" />
-                <StatCard label="Groups" value={dashboard.total_groups}
-                  sub={`${dashboard.total_shops} shops`} color="#06b6d4" icon="📂" />
-              </div>
-
-              {dashboard.total_devices > 0 && (
-                <div style={{ background: "#fff", borderRadius: 12, padding: "16px 24px", border: "1px solid #e5e7eb", marginBottom: 28 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 10 }}>Fleet Device Health</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <div style={{ flex: 1, height: 12, borderRadius: 6, background: "#f3f4f6", overflow: "hidden" }}>
-                      <div style={{
-                        width: `${Math.round((dashboard.online_devices / dashboard.total_devices) * 100)}%`,
-                        height: "100%", borderRadius: 6,
-                        background: "linear-gradient(90deg, #16a34a, #22c55e)",
-                        transition: "width 0.5s",
-                      }} />
-                    </div>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#16a34a", minWidth: 60, textAlign: "right" }}>
-                      {Math.round((dashboard.online_devices / dashboard.total_devices) * 100)}% online
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden" }}>
-                <div style={{ padding: "16px 24px", borderBottom: "1px solid #e5e7eb" }}>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#0a1628" }}>Company Breakdown</span>
-                </div>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: "#f9fafb" }}>
-                        {["Company", "Status", "Devices", "Videos", "Ads", "Users", "Groups", "Shops", "Actions"].map(h => (
-                          <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(dashboard.companies || []).map(c => (
-                        <tr key={c.id} style={{ borderBottom: "1px solid #f3f4f6" }}
-                          onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          <td style={{ padding: "12px 14px" }}>
-                            <div style={{ fontWeight: 600, fontSize: 13 }}>{c.name}</div>
-                            <div style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{c.slug}</div>
-                          </td>
-                          <td style={{ padding: "12px 14px" }}><StatusBadge status={c.status} /></td>
-                          <td style={{ padding: "12px 14px", minWidth: 130 }}>
-                            <OnlineBar online={c.devices_online} offline={c.devices_offline} total={c.device_count} />
-                          </td>
-                          <td style={{ padding: "12px 14px", fontWeight: 500, textAlign: "center" }}>{c.video_count}</td>
-                          <td style={{ padding: "12px 14px", fontWeight: 500, textAlign: "center" }}>{c.ad_count}</td>
-                          <td style={{ padding: "12px 14px", fontWeight: 500, textAlign: "center" }}>{c.user_count}</td>
-                          <td style={{ padding: "12px 14px", fontWeight: 500, textAlign: "center" }}>{c.group_count}</td>
-                          <td style={{ padding: "12px 14px", fontWeight: 500, textAlign: "center" }}>{c.shop_count}</td>
-                          <td style={{ padding: "12px 14px" }}>
-                            <button onClick={() => { if (onImpersonate) onImpersonate(c.slug, c.name); }}
-                              style={{ padding: "4px 10px", fontSize: 11, border: "1px solid #3b82f6", borderRadius: 6, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontWeight: 600 }}>
-                              Enter
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {(dashboard.companies || []).length === 0 && (
-                        <tr><td colSpan={9} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>No companies yet</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
+      {success && (
+        <div style={{ padding: 12, background: "#dcfce7", borderRadius: 8, marginBottom: 16, color: "#166534" }}>
+          {success}
+          <button onClick={() => setSuccess("")} style={{ float: "right", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+        </div>
+      )}
+      {error && (
+        <div style={{ padding: 12, background: "#fef2f2", borderRadius: 8, marginBottom: 16, color: "#dc2626" }}>
+          {error}
+          <button onClick={() => setError("")} style={{ float: "right", background: "none", border: "none", cursor: "pointer" }}>✕</button>
         </div>
       )}
 
-      {/* ═══ COMPANIES TAB ═══ */}
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e5e7eb", marginBottom: 24, background: "#fff", borderRadius: "8px 8px 0 0" }}>
+        <button style={tabStyle(tab === "dashboard")} onClick={() => setTab("dashboard")}>
+          📊 Dashboard
+        </button>
+        <button style={tabStyle(tab === "companies")} onClick={() => setTab("companies")}>
+          🏢 Companies
+        </button>
+        <button style={tabStyle(tab === "expired")} onClick={() => setTab("expired")}>
+          ⚠️ Expired
+          {expiredCount > 0 && (
+            <span style={{
+              marginLeft: 6, background: "#dc2626", color: "#fff", padding: "2px 6px",
+              borderRadius: 10, fontSize: 11, fontWeight: 600
+            }}>
+              {expiredCount}
+            </span>
+          )}
+        </button>
+        <button style={tabStyle(tab === "expiring")} onClick={() => setTab("expiring")}>
+          ⏰ Expiring Soon
+          {expiringSoonCount > 0 && (
+            <span style={{
+              marginLeft: 6, background: "#f59e0b", color: "#fff", padding: "2px 6px",
+              borderRadius: 10, fontSize: 11, fontWeight: 600
+            }}>
+              {expiringSoonCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Dashboard Tab */}
+      {tab === "dashboard" && dashboard && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
+          <StatCard label="Total Companies" value={dashboard.total_companies} color="#3b82f6" icon="🏢" />
+          <StatCard label="Active Companies" value={dashboard.active_companies} color="#16a34a" icon="✅" />
+          <StatCard label="Total Devices" value={dashboard.total_devices} color="#8b5cf6" icon="📱" />
+          <StatCard label="Devices Online" value={dashboard.devices_online} sub={`${dashboard.devices_offline} offline`} color="#10b981" icon="🟢" />
+          <StatCard label="Total Users" value={dashboard.total_users} color="#f59e0b" icon="👥" />
+          <StatCard label="Expired" value={expiredCount} color="#dc2626" icon="⚠️" />
+        </div>
+      )}
+
+      {/* Companies Tab */}
       {tab === "companies" && (
-        <div style={{ marginTop: 20 }}>
-          <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-            <input placeholder="Search companies..." value={search} onChange={e => setSearch(e.target.value)}
-              style={{ flex: 1, padding: "10px 14px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14 }} />
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              style={{ padding: "10px 14px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14 }}>
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+          {/* Filters */}
+          <div style={{ padding: 16, borderBottom: "1px solid #e5e7eb", display: "flex", gap: 12 }}>
+            <input
+              type="text"
+              placeholder="Search companies..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ flex: 1, padding: 10, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14 }}
+            />
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              style={{ padding: 10, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 14 }}
+            >
               <option value="">All Status</option>
               <option value="active">Active</option>
               <option value="suspended">Suspended</option>
               <option value="trial">Trial</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </div>
 
-          {loading ? <p>Loading...</p> : (
+          {/* Table */}
+          {loading ? (
+            <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Loading...</div>
+          ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
-                <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
-                  {["Company", "Slug", "Status", "Limits", "Created", "Actions"].map(h => (
-                    <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#374151" }}>{h}</th>
-                  ))}
+                <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                  <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Company</th>
+                  <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Status</th>
+                  <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Devices</th>
+                  <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Users</th>
+                  <th style={{ padding: 12, textAlign: "left", fontWeight: 600 }}>Created</th>
+                  <th style={{ padding: 12, textAlign: "right", fontWeight: 600 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {companies.map(c => (
-                  <tr key={c.id} style={{ borderBottom: "1px solid #f3f4f6" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <td style={{ padding: "12px" }}>
-                      <div style={{ fontWeight: 600 }}>{c.name}</div>
-                      <div style={{ fontSize: 12, color: "#6b7280" }}>{c.email || "—"}</div>
+                {companies.length > 0 ? companies.map((c) => (
+                  <tr key={c.slug} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                    <td style={{ padding: 12 }}>
+                      <div style={{ fontWeight: 600, cursor: "pointer" }} onClick={() => { setSelectedCompany(c); fetchStats(c.slug); }}>
+                        {c.name}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>{c.slug}</div>
                     </td>
-                    <td style={{ padding: "12px", fontFamily: "monospace", fontSize: 13 }}>{c.slug}</td>
-                    <td style={{ padding: "12px" }}><StatusBadge status={c.status} /></td>
-                    <td style={{ padding: "12px", fontSize: 12, color: "#6b7280" }}>
-                      {c.max_devices} devices · {c.max_users} users
+                    <td style={{ padding: 12 }}>
+                      <StatusBadge status={c.status} />
                     </td>
-                    <td style={{ padding: "12px", fontSize: 12, color: "#6b7280" }}>
+                    <td style={{ padding: 12 }}>
+                      <OnlineBar online={c.devices_online || 0} offline={c.devices_offline || 0} total={(c.devices_online || 0) + (c.devices_offline || 0)} />
+                    </td>
+                    <td style={{ padding: 12 }}>{c.user_count || 0}</td>
+                    <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>
                       {new Date(c.created_at).toLocaleDateString()}
                     </td>
-                    <td style={{ padding: "12px" }}>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        <button onClick={() => { setSelectedCompany(c); fetchStats(c.slug); }}
-                          style={{ padding: "4px 10px", fontSize: 12, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer" }}>
-                          Details
-                        </button>
-                        <button onClick={() => { if (onImpersonate) onImpersonate(c.slug, c.name); }}
-                          style={{ padding: "4px 10px", fontSize: 12, border: "1px solid #3b82f6", borderRadius: 6, background: "#eff6ff", color: "#2563eb", cursor: "pointer" }}>
-                          Enter
-                        </button>
+                    <td style={{ padding: 12, textAlign: "right" }}>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        {onImpersonate && (
+                          <button onClick={() => onImpersonate(c.slug)}
+                            style={{ padding: "4px 8px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
+                            Enter
+                          </button>
+                        )}
                         {c.status === "active" ? (
-                          <button onClick={() => handleSuspend(c.slug)}
-                            style={{ padding: "4px 10px", fontSize: 12, border: "1px solid #fca5a5", borderRadius: 6, background: "#fef2f2", color: "#dc2626", cursor: "pointer" }}>
+                          <button onClick={() => handleSuspend(c.slug, c.name)}
+                            style={{ padding: "4px 8px", background: "#f59e0b", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
                             Suspend
                           </button>
-                        ) : c.status === "suspended" ? (
-                          <button onClick={() => handleReactivate(c.slug)}
-                            style={{ padding: "4px 10px", fontSize: 12, border: "1px solid #86efac", borderRadius: 6, background: "#dcfce7", color: "#16a34a", cursor: "pointer" }}>
+                        ) : (
+                          <button onClick={() => handleReactivate(c.slug, c.name)}
+                            style={{ padding: "4px 8px", background: "#16a34a", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
                             Reactivate
                           </button>
-                        ) : null}
-                        <button onClick={() => handleDelete(c.slug, c.name)}
-                          disabled={deleting === c.slug}
-                          style={{
-                            padding: "4px 10px", fontSize: 12, border: "1px solid #dc2626", borderRadius: 6,
-                            background: deleting === c.slug ? "#fca5a5" : "#fff",
-                            color: "#dc2626", cursor: deleting === c.slug ? "wait" : "pointer", fontWeight: 600,
-                          }}>
-                          {deleting === c.slug ? "Deleting..." : "Delete"}
-                        </button>
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))}
-                {companies.length === 0 && (
+                )) : (
                   <tr><td colSpan={6} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>No companies found</td></tr>
                 )}
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* Expired Tab */}
+      {tab === "expired" && (
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 24 }}>
+          <ExpiredCompaniesTab onReactivate={() => { fetchCompanies(); fetchExpirationCounts(); }} />
+        </div>
+      )}
+
+      {/* Expiring Soon Tab */}
+      {tab === "expiring" && (
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 24 }}>
+          <ExpiringSoonTab />
         </div>
       )}
 
@@ -462,7 +871,7 @@ export default function PlatformAdmin({ onImpersonate }) {
       {showCreate && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
           onClick={() => setShowCreate(false)}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 560, maxHeight: "90vh", overflow: "auto" }}
+          <div style={{ background: "#fff", borderRadius: 16, padding: 32, width: 600, maxHeight: "90vh", overflow: "auto" }}
             onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: "0 0 20px", fontSize: 20 }}>Onboard New Company</h3>
 
@@ -504,6 +913,27 @@ export default function PlatformAdmin({ onImpersonate }) {
                     <input name="max_users" type="number" defaultValue={10} style={inputStyle} /></div>
                   <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Storage (MB)</label>
                     <input name="max_storage_mb" type="number" defaultValue={5120} style={inputStyle} /></div>
+                </div>
+
+                {/* NEW: Subscription/Expiration Section */}
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 12, borderBottom: "1px solid #e5e7eb", paddingBottom: 8 }}>
+                  Subscription / Expiration
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                      Expiration Date <span style={{ color: "#9ca3af", fontWeight: 400 }}>(optional)</span>
+                    </label>
+                    <input name="expires_at" type="datetime-local" style={inputStyle} />
+                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Leave empty for no expiration</div>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                      Grace Period (days)
+                    </label>
+                    <input name="grace_period_days" type="number" defaultValue={7} min={0} max={30} style={inputStyle} />
+                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Days after expiry before full block</div>
+                  </div>
                 </div>
 
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 12, borderBottom: "1px solid #e5e7eb", paddingBottom: 8 }}>First Admin User</div>
