@@ -1,6 +1,6 @@
 // src/components/PlatformDashboard.js
 // Platform-level analytics dashboard for super admin
-// Shows company overview, device stats, user counts, charts
+// Shows company overview, device stats, user counts, notifications, announcements
 import React, { useState, useEffect, useCallback } from "react";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
@@ -11,33 +11,23 @@ function authHeaders() {
 }
 
 // ─── Notification Bell Component ───
-function NotificationBell({ notifications, expiredCompanies, expiringCompanies }) {
+function NotificationBell({ expiredCompanies = [], expiringCompanies = [] }) {
   const [isOpen, setIsOpen] = useState(false);
   
-  const totalAlerts = (expiredCompanies?.length || 0) + (expiringCompanies?.length || 0);
-  const hasUrgent = (expiredCompanies?.length || 0) > 0;
-  
-  if (totalAlerts === 0) {
-    return (
-      <div style={{ position: "relative" }}>
-        <button style={{
-          width: 44, height: 44, borderRadius: 10, border: "1px solid #e5e7eb",
-          background: "#f8fafc", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 20, color: "#94a3b8"
-        }}>
-          🔔
-        </button>
-      </div>
-    );
-  }
+  const expiredCount = expiredCompanies.length;
+  const expiringCount = expiringCompanies.length;
+  const totalAlerts = expiredCount + expiringCount;
+  const hasUrgent = expiredCount > 0;
 
   return (
     <div style={{ position: "relative" }}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
         style={{
-          width: 44, height: 44, borderRadius: 10, border: "1px solid #e5e7eb",
-          background: hasUrgent ? "#fef2f2" : "#fffbeb", cursor: "pointer", 
+          width: 44, height: 44, borderRadius: 10, 
+          border: totalAlerts > 0 ? "2px solid " + (hasUrgent ? "#dc2626" : "#f59e0b") : "1px solid #e5e7eb",
+          background: totalAlerts > 0 ? (hasUrgent ? "#fef2f2" : "#fffbeb") : "#f8fafc", 
+          cursor: "pointer", 
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 20, position: "relative",
           animation: hasUrgent ? "bellShake 0.5s ease-in-out infinite" : "none"
@@ -45,17 +35,20 @@ function NotificationBell({ notifications, expiredCompanies, expiringCompanies }
       >
         🔔
         {/* Badge */}
-        <span style={{
-          position: "absolute", top: -4, right: -4,
-          background: hasUrgent ? "#dc2626" : "#f59e0b",
-          color: "#fff", fontSize: 11, fontWeight: 700,
-          minWidth: 20, height: 20, borderRadius: 10,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          border: "2px solid #fff",
-          animation: hasUrgent ? "pulse 2s ease-in-out infinite" : "none"
-        }}>
-          {totalAlerts}
-        </span>
+        {totalAlerts > 0 && (
+          <span style={{
+            position: "absolute", top: -6, right: -6,
+            background: hasUrgent ? "#dc2626" : "#f59e0b",
+            color: "#fff", fontSize: 11, fontWeight: 700,
+            minWidth: 22, height: 22, borderRadius: 11,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: "2px solid #fff",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+            animation: hasUrgent ? "pulse 2s ease-in-out infinite" : "none"
+          }}>
+            {totalAlerts}
+          </span>
+        )}
       </button>
       
       {/* Dropdown */}
@@ -66,70 +59,78 @@ function NotificationBell({ notifications, expiredCompanies, expiringCompanies }
             onClick={() => setIsOpen(false)} 
           />
           <div style={{
-            position: "absolute", top: 50, right: 0, width: 360,
-            background: "#fff", borderRadius: 14, boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+            position: "absolute", top: 52, right: 0, width: 380,
+            background: "#fff", borderRadius: 14, boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
             border: "1px solid #e5e7eb", zIndex: 1000, overflow: "hidden"
           }}>
             <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", background: "#f8fafc" }}>
-              <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 15 }}>Notifications</div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>{totalAlerts} alert{totalAlerts !== 1 ? "s" : ""} requiring attention</div>
+              <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 15 }}>🔔 Notifications</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                {totalAlerts > 0 ? `${totalAlerts} alert${totalAlerts !== 1 ? "s" : ""} requiring attention` : "No alerts"}
+              </div>
             </div>
             
             <div style={{ maxHeight: 400, overflowY: "auto" }}>
-              {/* Expired Companies */}
-              {expiredCompanies?.length > 0 && (
-                <div style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <div style={{ padding: "12px 20px", background: "#fef2f2", display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>🚨</span>
-                    <span style={{ fontWeight: 700, color: "#dc2626", fontSize: 13 }}>EXPIRED - Immediate Action Required</span>
-                  </div>
-                  {expiredCompanies.map((c, i) => (
-                    <div key={i} style={{ padding: "12px 20px", borderBottom: "1px solid #fef2f2", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontWeight: 600, color: "#1f2937", fontSize: 13 }}>{c.company_name}</div>
-                        <div style={{ fontSize: 11, color: "#dc2626" }}>Expired {c.days_since_expiration || 0} days ago</div>
-                      </div>
-                      <span style={{ fontSize: 10, color: "#dc2626", fontWeight: 600 }}>BLOCKED</span>
-                    </div>
-                  ))}
+              {totalAlerts === 0 ? (
+                <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>
+                  <div style={{ fontSize: 40, marginBottom: 8 }}>✅</div>
+                  <div>All systems operational</div>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>No companies expired or expiring soon</div>
                 </div>
-              )}
-              
-              {/* Expiring Soon */}
-              {expiringCompanies?.length > 0 && (
-                <div>
-                  <div style={{ padding: "12px 20px", background: "#fffbeb", display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>⏰</span>
-                    <span style={{ fontWeight: 700, color: "#92400e", fontSize: 13 }}>Expiring Soon</span>
-                  </div>
-                  {expiringCompanies.slice(0, 5).map((c, i) => (
-                    <div key={i} style={{ padding: "12px 20px", borderBottom: "1px solid #fffbeb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontWeight: 600, color: "#1f2937", fontSize: 13 }}>{c.company_name}</div>
-                        <div style={{ fontSize: 11, color: "#6b7280" }}>
-                          {c.status === "grace_period" ? "In grace period" : `Expires ${c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "soon"}`}
-                        </div>
+              ) : (
+                <>
+                  {/* Expired Companies */}
+                  {expiredCount > 0 && (
+                    <div>
+                      <div style={{ padding: "12px 20px", background: "#fef2f2", borderBottom: "1px solid #fecaca", display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 18 }}>🚨</span>
+                        <span style={{ fontWeight: 700, color: "#dc2626", fontSize: 13 }}>EXPIRED ({expiredCount})</span>
                       </div>
-                      <span style={{ 
-                        padding: "3px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-                        background: c.days_until_expiration <= 7 ? "#fef2f2" : "#fffbeb",
-                        color: c.days_until_expiration <= 7 ? "#dc2626" : "#b45309"
-                      }}>
-                        {c.days_until_expiration}d
-                      </span>
-                    </div>
-                  ))}
-                  {expiringCompanies.length > 5 && (
-                    <div style={{ padding: "10px 20px", textAlign: "center", fontSize: 12, color: "#64748b" }}>
-                      +{expiringCompanies.length - 5} more companies...
+                      {expiredCompanies.map((c, i) => (
+                        <div key={i} style={{ padding: "12px 20px", borderBottom: "1px solid #fee2e2", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff" }}>
+                          <div>
+                            <div style={{ fontWeight: 600, color: "#1f2937", fontSize: 13 }}>{c.company_name}</div>
+                            <div style={{ fontSize: 11, color: "#dc2626" }}>Expired {c.days_since_expiration || 0} days ago</div>
+                          </div>
+                          <span style={{ fontSize: 10, color: "#fff", background: "#dc2626", padding: "3px 8px", borderRadius: 4, fontWeight: 700 }}>BLOCKED</span>
+                        </div>
+                      ))}
                     </div>
                   )}
-                </div>
+                  
+                  {/* Expiring Soon */}
+                  {expiringCount > 0 && (
+                    <div>
+                      <div style={{ padding: "12px 20px", background: "#fffbeb", borderBottom: "1px solid #fcd34d", display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 18 }}>⏰</span>
+                        <span style={{ fontWeight: 700, color: "#92400e", fontSize: 13 }}>EXPIRING SOON ({expiringCount})</span>
+                      </div>
+                      {expiringCompanies.slice(0, 5).map((c, i) => (
+                        <div key={i} style={{ padding: "12px 20px", borderBottom: "1px solid #fef3c7", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff" }}>
+                          <div>
+                            <div style={{ fontWeight: 600, color: "#1f2937", fontSize: 13 }}>{c.company_name}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>
+                              {c.status === "grace_period" ? "In grace period" : `Expires ${c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "soon"}`}
+                            </div>
+                          </div>
+                          <span style={{ 
+                            padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                            background: (c.days_until_expiration || 0) <= 7 ? "#dc2626" : "#f59e0b",
+                            color: "#fff"
+                          }}>
+                            {c.days_until_expiration || 0}d
+                          </span>
+                        </div>
+                      ))}
+                      {expiringCount > 5 && (
+                        <div style={{ padding: "10px 20px", textAlign: "center", fontSize: 12, color: "#64748b", background: "#fffbeb" }}>
+                          +{expiringCount - 5} more...
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
-            </div>
-            
-            <div style={{ padding: "12px 20px", borderTop: "1px solid #e5e7eb", background: "#f8fafc", textAlign: "center" }}>
-              <span style={{ fontSize: 12, color: "#64748b" }}>Go to Platform Admin for full management</span>
             </div>
           </div>
         </>
@@ -138,200 +139,349 @@ function NotificationBell({ notifications, expiredCompanies, expiringCompanies }
       <style>{`
         @keyframes bellShake {
           0%, 100% { transform: rotate(0deg); }
-          25% { transform: rotate(10deg); }
-          75% { transform: rotate(-10deg); }
+          25% { transform: rotate(15deg); }
+          75% { transform: rotate(-15deg); }
         }
         @keyframes pulse {
           0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
+          50% { transform: scale(1.15); }
         }
       `}</style>
     </div>
   );
 }
 
-// ─── Mini Bar Chart (pure CSS) ───
-function MiniBar({ value, max, color = "#3b82f6", height = 8 }) {
-  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
-  return (
-    <div style={{ width: "100%", height, background: "#f1f5f9", borderRadius: height / 2, overflow: "hidden" }}>
-      <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: height / 2, transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)" }} />
-    </div>
-  );
-}
-
-// ─── Donut Chart (SVG) ───
-function DonutChart({ segments, size = 140, strokeWidth = 18, centerLabel, centerValue }) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const total = segments.reduce((s, seg) => s + seg.value, 0);
-  let offset = 0;
-
-  return (
-    <div style={{ position: "relative", width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f1f5f9" strokeWidth={strokeWidth} />
-        {segments.map((seg, i) => {
-          const pct = total > 0 ? seg.value / total : 0;
-          const dash = pct * circumference;
-          const gap = circumference - dash;
-          const rot = (offset / total) * 360;
-          offset += seg.value;
-          return (
-            <circle key={i} cx={size / 2} cy={size / 2} r={radius} fill="none"
-              stroke={seg.color} strokeWidth={strokeWidth}
-              strokeDasharray={`${dash} ${gap}`}
-              strokeDashoffset={circumference / 4}
-              transform={`rotate(${rot} ${size / 2} ${size / 2})`}
-              style={{ transition: "stroke-dasharray 0.8s ease" }}
-            />
-          );
-        })}
-      </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>{centerValue}</div>
-        <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", marginTop: 2 }}>{centerLabel}</div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Horizontal Stacked Bar ───
-function StackedBar({ segments, height = 28, showLabels = true }) {
-  const total = segments.reduce((s, seg) => s + seg.value, 0);
-  return (
-    <div>
-      <div style={{ display: "flex", borderRadius: height / 2, overflow: "hidden", height, background: "#f1f5f9" }}>
-        {segments.map((seg, i) => {
-          const pct = total > 0 ? (seg.value / total) * 100 : 0;
-          if (pct === 0) return null;
-          return (
-            <div key={i} title={`${seg.label}: ${seg.value}`}
-              style={{ width: `${pct}%`, height: "100%", background: seg.color, transition: "width 0.8s ease", minWidth: pct > 0 ? 4 : 0 }} />
-          );
-        })}
-      </div>
-      {showLabels && (
-        <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
-          {segments.map((seg, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#64748b" }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: seg.color }} />
-              <span>{seg.label}: <strong style={{ color: "#0f172a" }}>{seg.value}</strong></span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Status Pill ───
-function StatusPill({ status }) {
+// ─── Sliding Announcement Banner ───
+function SlidingBanner({ text, type = "info", onClose }) {
+  if (!text) return null;
+  
   const colors = {
-    active: { bg: "#dcfce7", text: "#15803d", dot: "#22c55e" },
-    suspended: { bg: "#fee2e2", text: "#dc2626", dot: "#ef4444" },
-    trial: { bg: "#fef3c7", text: "#d97706", dot: "#f59e0b" },
-    cancelled: { bg: "#f1f5f9", text: "#64748b", dot: "#94a3b8" },
+    error: { bg: "linear-gradient(90deg, #dc2626, #b91c1c)", text: "#fff" },
+    warning: { bg: "linear-gradient(90deg, #f59e0b, #d97706)", text: "#0a1628" },
+    info: { bg: "linear-gradient(90deg, #3b82f6, #1d4ed8)", text: "#fff" },
   };
-  const c = colors[status] || colors.cancelled;
+  const c = colors[type] || colors.info;
+  
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: c.bg, fontSize: 11, fontWeight: 600, color: c.text }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.dot }} />
-      {status}
-    </span>
+    <div style={{ 
+      background: c.bg, 
+      padding: "12px 20px",
+      borderRadius: 10,
+      overflow: "hidden",
+      position: "relative",
+      display: "flex",
+      alignItems: "center"
+    }}>
+      <div style={{
+        flex: 1,
+        overflow: "hidden"
+      }}>
+        <div style={{
+          display: "inline-block",
+          animation: "slideText 25s linear infinite",
+          whiteSpace: "nowrap",
+          color: c.text,
+          fontWeight: 600,
+          fontSize: 14,
+          paddingLeft: "100%"
+        }}>
+          {text} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {text}
+        </div>
+      </div>
+      {onClose && (
+        <button onClick={onClose} style={{ 
+          background: "rgba(255,255,255,0.2)", 
+          border: "none", 
+          color: c.text, 
+          padding: "4px 10px", 
+          borderRadius: 6, 
+          cursor: "pointer",
+          marginLeft: 12,
+          fontSize: 12,
+          fontWeight: 600
+        }}>
+          ✕
+        </button>
+      )}
+      <style>{`
+        @keyframes slideText {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
+    </div>
   );
 }
 
 // ─── Metric Card ───
-function MetricCard({ icon, label, value, sub, color, trend }) {
+function MetricCard({ icon, label, value, sub, color }) {
   return (
     <div style={{
-      background: "#fff", borderRadius: 14, padding: "22px 20px",
+      background: "#fff", borderRadius: 14, padding: "20px",
       border: "1px solid #e8ecf1", position: "relative", overflow: "hidden",
-      display: "flex", flexDirection: "column", gap: 12,
       boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
     }}>
       <div style={{ position: "absolute", top: 0, left: 0, width: 4, height: "100%", background: color, borderRadius: "0 4px 4px 0" }} />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: `${color}14`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 10, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
           {icon}
         </div>
-        {trend !== undefined && (
-          <span style={{ fontSize: 11, fontWeight: 600, color: trend >= 0 ? "#16a34a" : "#dc2626", background: trend >= 0 ? "#f0fdf4" : "#fef2f2", padding: "2px 8px", borderRadius: 8 }}>
-            {trend >= 0 ? "↑" : "↓"} {Math.abs(trend)}%
-          </span>
-        )}
-      </div>
-      <div>
-        <div style={{ fontSize: 30, fontWeight: 800, color: "#0f172a", lineHeight: 1, letterSpacing: "-0.02em" }}>{value}</div>
-        <div style={{ fontSize: 13, color: "#64748b", marginTop: 4, fontWeight: 500 }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{sub}</div>}
+        <div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>{value}</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{label}</div>
+          {sub && <div style={{ fontSize: 11, color: "#94a3b8" }}>{sub}</div>}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Company Row ───
-function CompanyRow({ company, maxDevices, onNavigate }) {
-  const onlineRate = company.device_count > 0 ? Math.round((company.devices_online / company.device_count) * 100) : 0;
+// ─── Company Status List Card ───
+function CompanyStatusCard({ companies = [] }) {
+  // Sort: expired first, then by days until expiration, then by last activity
+  const sortedCompanies = [...companies].sort((a, b) => {
+    // Expired companies first
+    if (a.expiration_status === "expired" && b.expiration_status !== "expired") return -1;
+    if (b.expiration_status === "expired" && a.expiration_status !== "expired") return 1;
+    // Then grace period
+    if (a.expiration_status === "grace_period" && b.expiration_status !== "grace_period") return -1;
+    if (b.expiration_status === "grace_period" && a.expiration_status !== "grace_period") return 1;
+    // Then by days until expiration (ascending)
+    const aDays = a.days_until_expiration ?? 9999;
+    const bDays = b.days_until_expiration ?? 9999;
+    return aDays - bDays;
+  });
+
+  const getStatusBadge = (company) => {
+    const status = company.expiration_status || "active";
+    if (status === "expired") {
+      return { bg: "#dc2626", text: "#fff", label: "EXPIRED" };
+    }
+    if (status === "grace_period") {
+      return { bg: "#f59e0b", text: "#fff", label: "GRACE" };
+    }
+    if (status === "suspended") {
+      return { bg: "#6b7280", text: "#fff", label: "SUSPENDED" };
+    }
+    if (company.days_until_expiration !== null && company.days_until_expiration <= 7) {
+      return { bg: "#fef2f2", text: "#dc2626", label: `${company.days_until_expiration}d left` };
+    }
+    if (company.days_until_expiration !== null && company.days_until_expiration <= 30) {
+      return { bg: "#fffbeb", text: "#b45309", label: `${company.days_until_expiration}d left` };
+    }
+    return { bg: "#dcfce7", text: "#166534", label: "ACTIVE" };
+  };
+
+  const formatLastActivity = (company) => {
+    const lastActive = company.last_activity || company.created_at;
+    if (!lastActive) return "No activity";
+    
+    const now = new Date();
+    const then = new Date(lastActive);
+    const diffMs = now - then;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 5) return "Active now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return then.toLocaleDateString();
+  };
 
   return (
-    <tr style={{ borderBottom: "1px solid #f1f5f9", transition: "background 0.15s" }}
-      onMouseEnter={e => e.currentTarget.style.background = "#fafbfd"}
-      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-      <td style={{ padding: "14px 16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: `linear-gradient(135deg, ${company.status === "active" ? "#3b82f6" : "#94a3b8"} 0%, ${company.status === "active" ? "#1d4ed8" : "#64748b"} 100%)`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontWeight: 700, fontSize: 14, flexShrink: 0,
-          }}>
-            {(company.name || "?")[0].toUpperCase()}
-          </div>
-          <div>
-            <div style={{ fontWeight: 600, color: "#0f172a", fontSize: 14 }}>{company.name}</div>
-            <div style={{ fontSize: 11, color: "#94a3b8" }}>{company.slug}</div>
-          </div>
+    <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf1", overflow: "hidden" }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", background: "#f8fafc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 15 }}>📋 Company Status</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>{companies.length} total companies</div>
         </div>
-      </td>
-      <td style={{ padding: "14px 16px" }}><StatusPill status={company.status} /></td>
-      <td style={{ padding: "14px 16px", textAlign: "center" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-          <span style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>{company.device_count}</span>
-          <div style={{ display: "flex", gap: 6, fontSize: 11 }}>
-            <span style={{ color: "#16a34a" }}>● {company.devices_online}</span>
-            <span style={{ color: "#94a3b8" }}>● {company.devices_offline}</span>
-          </div>
-          <MiniBar value={company.device_count} max={maxDevices} color="#3b82f6" />
-        </div>
-      </td>
-      <td style={{ padding: "14px 16px", textAlign: "center" }}>
-        <span style={{ fontWeight: 600, color: "#0f172a" }}>{company.user_count}</span>
-      </td>
-      <td style={{ padding: "14px 16px", textAlign: "center" }}>
-        <span style={{ fontWeight: 600, color: "#0f172a" }}>{company.video_count}</span>
-      </td>
-      <td style={{ padding: "14px 16px", textAlign: "center" }}>
-        <span style={{ fontWeight: 600, color: "#0f172a" }}>{company.ad_count}</span>
-      </td>
-      <td style={{ padding: "14px 16px", textAlign: "center" }}>
-        <span style={{ fontWeight: 600, color: "#0f172a" }}>{company.group_count}</span>
-      </td>
-      <td style={{ padding: "14px 16px", textAlign: "center" }}>
-        {company.device_count > 0 ? (
-          <span style={{
-            padding: "3px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-            background: onlineRate >= 75 ? "#dcfce7" : onlineRate >= 40 ? "#fef3c7" : "#fee2e2",
-            color: onlineRate >= 75 ? "#15803d" : onlineRate >= 40 ? "#d97706" : "#dc2626",
-          }}>
-            {onlineRate}%
-          </span>
+      </div>
+      
+      {/* Header */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", padding: "10px 20px", background: "#f8fafc", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase" }}>
+        <div>Company</div>
+        <div style={{ textAlign: "center" }}>Status</div>
+        <div style={{ textAlign: "center" }}>Expires</div>
+        <div style={{ textAlign: "center" }}>Devices</div>
+        <div style={{ textAlign: "center" }}>Last Activity</div>
+      </div>
+      
+      {/* Rows */}
+      <div style={{ maxHeight: 350, overflowY: "auto" }}>
+        {sortedCompanies.length === 0 ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>No companies found</div>
         ) : (
-          <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>
+          sortedCompanies.map((company, i) => {
+            const badge = getStatusBadge(company);
+            return (
+              <div key={company.id || i} style={{ 
+                display: "grid", 
+                gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", 
+                padding: "12px 20px", 
+                borderBottom: "1px solid #f1f5f9",
+                alignItems: "center",
+                background: company.expiration_status === "expired" ? "#fef2f2" : 
+                           company.expiration_status === "grace_period" ? "#fffbeb" : "#fff"
+              }}>
+                {/* Company Name */}
+                <div>
+                  <div style={{ fontWeight: 600, color: "#0f172a", fontSize: 13 }}>{company.name}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{company.slug}</div>
+                </div>
+                
+                {/* Status Badge */}
+                <div style={{ textAlign: "center" }}>
+                  <span style={{ 
+                    padding: "4px 10px", 
+                    borderRadius: 6, 
+                    fontSize: 10, 
+                    fontWeight: 700,
+                    background: badge.bg,
+                    color: badge.text
+                  }}>
+                    {badge.label}
+                  </span>
+                </div>
+                
+                {/* Expiration Date */}
+                <div style={{ textAlign: "center", fontSize: 12, color: "#64748b" }}>
+                  {company.expires_at ? new Date(company.expires_at).toLocaleDateString() : "∞ Never"}
+                </div>
+                
+                {/* Devices */}
+                <div style={{ textAlign: "center" }}>
+                  <span style={{ fontWeight: 600, color: "#0f172a" }}>{company.device_count || 0}</span>
+                  {company.devices_online > 0 && (
+                    <span style={{ fontSize: 10, color: "#16a34a", marginLeft: 4 }}>({company.devices_online} on)</span>
+                  )}
+                </div>
+                
+                {/* Last Activity */}
+                <div style={{ textAlign: "center", fontSize: 12, color: "#64748b" }}>
+                  {formatLastActivity(company)}
+                </div>
+              </div>
+            );
+          })
         )}
-      </td>
-    </tr>
+      </div>
+    </div>
+  );
+}
+
+// ─── Announcement Manager Modal ───
+function AnnouncementModal({ isOpen, onClose, currentAnnouncement, onSave }) {
+  const [text, setText] = useState(currentAnnouncement?.text || "");
+  const [type, setType] = useState(currentAnnouncement?.type || "info");
+  
+  useEffect(() => {
+    setText(currentAnnouncement?.text || "");
+    setType(currentAnnouncement?.type || "info");
+  }, [currentAnnouncement, isOpen]);
+  
+  if (!isOpen) return null;
+  
+  const handleSave = () => {
+    onSave({ text: text.trim(), type });
+    onClose();
+  };
+  
+  const handleClear = () => {
+    onSave({ text: "", type: "info" });
+    onClose();
+  };
+  
+  return (
+    <>
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000 }} onClick={onClose} />
+      <div style={{ 
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+        background: "#fff", borderRadius: 16, padding: 24, width: 500, maxWidth: "90vw",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.3)", zIndex: 1001
+      }}>
+        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+          📢 Publish Announcement
+        </div>
+        
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: 13, color: "#374151" }}>
+            Announcement Text
+          </label>
+          <textarea 
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Enter your announcement message... (e.g., Scheduled maintenance on Sunday 2AM-4AM)"
+            style={{ 
+              width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", 
+              fontSize: 14, minHeight: 80, resize: "vertical", boxSizing: "border-box"
+            }}
+          />
+        </div>
+        
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: 13, color: "#374151" }}>
+            Banner Type
+          </label>
+          <div style={{ display: "flex", gap: 10 }}>
+            {[
+              { value: "info", label: "ℹ️ Info", color: "#3b82f6" },
+              { value: "warning", label: "⚠️ Warning", color: "#f59e0b" },
+              { value: "error", label: "🚨 Critical", color: "#dc2626" },
+            ].map(t => (
+              <button 
+                key={t.value}
+                onClick={() => setType(t.value)}
+                style={{ 
+                  flex: 1, padding: "10px 16px", borderRadius: 8, 
+                  border: type === t.value ? `2px solid ${t.color}` : "1px solid #e5e7eb",
+                  background: type === t.value ? `${t.color}15` : "#fff",
+                  cursor: "pointer", fontWeight: 600, fontSize: 13,
+                  color: type === t.value ? t.color : "#64748b"
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        {/* Preview */}
+        {text && (
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: 13, color: "#374151" }}>
+              Preview
+            </label>
+            <SlidingBanner text={text} type={type} />
+          </div>
+        )}
+        
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          {currentAnnouncement?.text && (
+            <button onClick={handleClear} style={{ 
+              padding: "10px 20px", background: "#fee2e2", color: "#dc2626", 
+              border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" 
+            }}>
+              Clear Announcement
+            </button>
+          )}
+          <button onClick={onClose} style={{ 
+            padding: "10px 20px", background: "#f1f5f9", color: "#64748b", 
+            border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" 
+          }}>
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={!text.trim()} style={{ 
+            padding: "10px 20px", background: text.trim() ? "#3b82f6" : "#e5e7eb", 
+            color: text.trim() ? "#fff" : "#9ca3af", 
+            border: "none", borderRadius: 8, fontWeight: 600, cursor: text.trim() ? "pointer" : "not-allowed" 
+          }}>
+            Publish
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -340,12 +490,14 @@ function CompanyRow({ company, maxDevices, onNavigate }) {
 // ═══════════════════════════════════════════════════════
 export default function PlatformDashboard() {
   const [data, setData] = useState(null);
-  const [activity, setActivity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [companyFilter, setCompanyFilter] = useState("");
-  const [activeTab, setActiveTab] = useState("overview"); // overview | activity
-  const [activityDays, setActivityDays] = useState(7);
+  const [announcement, setAnnouncement] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("digix_announcement")) || { text: "", type: "info" };
+    } catch { return { text: "", type: "info" }; }
+  });
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -362,26 +514,18 @@ export default function PlatformDashboard() {
     }
   }, []);
 
-  const loadActivity = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/platform/user-activity?days=${activityDays}&limit=200`, { headers: authHeaders() });
-      if (!res.ok) return;
-      const d = await res.json();
-      setActivity(d);
-    } catch (err) { /* silent */ }
-  }, [activityDays]);
-
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (activeTab === "activity") loadActivity(); }, [activeTab, loadActivity]);
 
   // Auto-refresh every 30s
   useEffect(() => {
-    const timer = setInterval(() => {
-      load();
-      if (activeTab === "activity") loadActivity();
-    }, 30000);
+    const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
-  }, [load, loadActivity, activeTab]);
+  }, [load]);
+
+  const handleSaveAnnouncement = (ann) => {
+    setAnnouncement(ann);
+    localStorage.setItem("digix_announcement", JSON.stringify(ann));
+  };
 
   if (loading && !data) {
     return (
@@ -409,70 +553,68 @@ export default function PlatformDashboard() {
   if (!data) return null;
 
   const companies = data.companies || [];
-  const filteredCompanies = companyFilter
-    ? companies.filter(c => c.name.toLowerCase().includes(companyFilter.toLowerCase()) || c.slug.toLowerCase().includes(companyFilter.toLowerCase()))
-    : companies;
-
-  const maxDevicesInCompany = Math.max(...companies.map(c => c.device_count), 1);
-
-  // Calculate aggregates from actual expiration status
-  const activeCompanies = data.active_companies || 0;
-  const companiesWithOnlineDevices = companies.filter(c => c.devices_online > 0).length;
-  
-  // Notifications
-  const notifications = data.notifications || [];
+  const expiredCompanies = data.expired_companies_list || [];
+  const expiringCompanies = data.expiring_companies || [];
   const expiredCount = data.expired_companies || 0;
-  const expiringSoonCount = data.expiring_soon_companies || 0;
-  const totalAlerts = expiredCount + expiringSoonCount;
+  const activeCompanies = data.active_companies || 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {/* ─── Critical Alert Sliding Banner ─── */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      
+      {/* ─── Custom Announcement Banner (Super Admin Published) ─── */}
+      {announcement.text && (
+        <SlidingBanner 
+          text={announcement.text} 
+          type={announcement.type} 
+          onClose={() => handleSaveAnnouncement({ text: "", type: "info" })}
+        />
+      )}
+      
+      {/* ─── Expired Companies Alert Banner ─── */}
       {expiredCount > 0 && (
         <div style={{ 
           background: "linear-gradient(90deg, #dc2626, #b91c1c)", 
-          padding: "10px 0",
-          borderRadius: 10,
-          overflow: "hidden",
-          position: "relative"
-        }}>
-          <div style={{
-            display: "flex",
-            animation: "slideText 20s linear infinite",
-            whiteSpace: "nowrap",
-            color: "#fff",
-            fontWeight: 600,
-            fontSize: 14
-          }}>
-            <span style={{ paddingRight: 100 }}>🚨 ALERT: {expiredCount} company{expiredCount > 1 ? "ies" : ""} expired! Users are blocked and devices showing enrollment screen. Take action immediately!</span>
-            <span style={{ paddingRight: 100 }}>🚨 ALERT: {expiredCount} company{expiredCount > 1 ? "ies" : ""} expired! Users are blocked and devices showing enrollment screen. Take action immediately!</span>
-          </div>
-          <style>{`
-            @keyframes slideText {
-              0% { transform: translateX(0); }
-              100% { transform: translateX(-50%); }
-            }
-          `}</style>
-        </div>
-      )}
-      
-      {/* ─── Warning Banner for Expiring Soon ─── */}
-      {expiredCount === 0 && expiringSoonCount > 0 && (
-        <div style={{ 
-          background: "linear-gradient(90deg, #f59e0b, #d97706)", 
-          padding: "12px 20px",
+          padding: "14px 20px",
           borderRadius: 10,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          color: "#0a1628"
+          color: "#fff"
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 24 }}>⏰</span>
+            <span style={{ fontSize: 28 }}>🚨</span>
             <div>
-              <div style={{ fontWeight: 700 }}>{expiringSoonCount} company{expiringSoonCount > 1 ? "ies" : ""} expiring soon</div>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>Contact companies to renew subscriptions</div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>
+                {expiredCount} Company{expiredCount > 1 ? "ies" : ""} Expired!
+              </div>
+              <div style={{ fontSize: 13, opacity: 0.9 }}>
+                Users blocked, devices showing enrollment screen. Take action now!
+              </div>
             </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {expiredCompanies.slice(0, 3).map((c, i) => (
+              <span key={i} style={{ 
+                background: "rgba(255,255,255,0.2)", 
+                padding: "4px 10px", 
+                borderRadius: 6, 
+                fontSize: 12, 
+                fontWeight: 600 
+              }}>
+                {c.company_name}
+              </span>
+            ))}
+            {expiredCount > 3 && (
+              <span style={{ 
+                background: "rgba(255,255,255,0.2)", 
+                padding: "4px 10px", 
+                borderRadius: 6, 
+                fontSize: 12, 
+                fontWeight: 600 
+              }}>
+                +{expiredCount - 3} more
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -480,652 +622,68 @@ export default function PlatformDashboard() {
       {/* ─── Header with Notification Bell ─── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.02em" }}>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f172a" }}>
             Platform Overview
           </h2>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: "#94a3b8" }}>
             Real-time analytics across all companies
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {/* Notification Bell */}
-          <NotificationBell notifications={notifications} expiredCompanies={data.expired_companies_list || []} expiringCompanies={data.expiring_companies || []} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* Publish Announcement Button */}
+          <button 
+            onClick={() => setShowAnnouncementModal(true)}
+            style={{
+              padding: "10px 16px", background: "#f8fafc", border: "1px solid #e5e7eb",
+              borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#64748b",
+              display: "flex", alignItems: "center", gap: 6
+            }}
+          >
+            📢 Announce
+          </button>
           
-          <button onClick={() => { load(); if (activeTab === "activity") loadActivity(); }} disabled={loading} style={{
-            padding: "8px 16px", background: loading ? "#e5e7eb" : "#f8fafc", border: "1px solid #e5e7eb",
+          {/* Notification Bell */}
+          <NotificationBell 
+            expiredCompanies={expiredCompanies} 
+            expiringCompanies={expiringCompanies} 
+          />
+          
+          {/* Refresh Button */}
+          <button onClick={load} disabled={loading} style={{
+            padding: "10px 16px", background: loading ? "#e5e7eb" : "#f8fafc", border: "1px solid #e5e7eb",
             borderRadius: 8, cursor: loading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 500, color: "#64748b",
-            display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s",
+            display: "flex", alignItems: "center", gap: 6,
           }}>
             <span style={{ display: "inline-block", animation: loading ? "spin 1s linear infinite" : "none" }}>↻</span>
-            {loading ? "Refreshing..." : "Refresh"}
+            {loading ? "..." : "Refresh"}
           </button>
         </div>
       </div>
 
-      {/* ─── Tab Bar ─── */}
-      <div style={{ display: "flex", gap: 4, background: "#f1f5f9", borderRadius: 10, padding: 4, width: "fit-content" }}>
-        {[{ id: "overview", label: "📊 Overview" }, { id: "activity", label: "👤 User Activity" }].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-            padding: "8px 20px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer",
-            background: activeTab === tab.id ? "#fff" : "transparent",
-            color: activeTab === tab.id ? "#0f172a" : "#64748b",
-            boxShadow: activeTab === tab.id ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-            transition: "all 0.15s",
-          }}>{tab.label}</button>
-        ))}
-      </div>
-
-      {activeTab === "overview" && (<>
-      
-      {/* ─── Expiration Alerts Section ─── */}
-      {(expiredCount > 0 || expiringSoonCount > 0) && (
-        <div style={{ display: "grid", gridTemplateColumns: expiredCount > 0 && expiringSoonCount > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
-          {/* Expired Companies Card */}
-          {expiredCount > 0 && (
-            <div style={{ background: "#fff", borderRadius: 14, border: "2px solid #fecaca", overflow: "hidden" }}>
-              <div style={{ padding: "16px 20px", background: "#fef2f2", borderBottom: "1px solid #fecaca", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 24 }}>🚨</span>
-                  <div>
-                    <div style={{ fontWeight: 700, color: "#991b1b" }}>Expired Companies</div>
-                    <div style={{ fontSize: 12, color: "#dc2626" }}>Users blocked, devices showing enrollment</div>
-                  </div>
-                </div>
-                <span style={{ background: "#dc2626", color: "#fff", padding: "6px 14px", borderRadius: 20, fontWeight: 700, fontSize: 14 }}>{expiredCount}</span>
-              </div>
-              <div style={{ maxHeight: 200, overflowY: "auto" }}>
-                {(data.expired_companies_list || []).map((c, i) => (
-                  <div key={i} style={{ padding: "12px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: 600, color: "#1f2937" }}>{c.company_name}</div>
-                      <div style={{ fontSize: 11, color: "#dc2626" }}>Expired {c.days_since_expiration || 0} days ago</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Expiring Soon Companies Card */}
-          {expiringSoonCount > 0 && (
-            <div style={{ background: "#fff", borderRadius: 14, border: "2px solid #fcd34d", overflow: "hidden" }}>
-              <div style={{ padding: "16px 20px", background: "#fffbeb", borderBottom: "1px solid #fcd34d", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 24 }}>⏰</span>
-                  <div>
-                    <div style={{ fontWeight: 700, color: "#92400e" }}>Expiring Soon</div>
-                    <div style={{ fontSize: 12, color: "#b45309" }}>Contact to renew subscriptions</div>
-                  </div>
-                </div>
-                <span style={{ background: "#f59e0b", color: "#fff", padding: "6px 14px", borderRadius: 20, fontWeight: 700, fontSize: 14 }}>{expiringSoonCount}</span>
-              </div>
-              <div style={{ maxHeight: 200, overflowY: "auto" }}>
-                {(data.expiring_companies || []).slice(0, 5).map((c, i) => (
-                  <div key={i} style={{ padding: "12px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: 600, color: "#1f2937" }}>{c.company_name}</div>
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>{c.status === "grace_period" ? "In grace period" : `Expires ${c.expires_at ? new Date(c.expires_at).toLocaleDateString() : "soon"}`}</div>
-                    </div>
-                    <span style={{ 
-                      padding: "4px 10px", 
-                      borderRadius: 8, 
-                      fontSize: 12, 
-                      fontWeight: 700,
-                      background: c.days_until_expiration <= 7 ? "#fef2f2" : "#fffbeb",
-                      color: c.days_until_expiration <= 7 ? "#dc2626" : "#b45309"
-                    }}>
-                      {c.days_until_expiration}d left
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ─── Top Metric Cards ─── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
         <MetricCard icon="🏢" label="Total Companies" value={data.total_companies} sub={`${activeCompanies} active`} color="#3b82f6" />
-        <MetricCard icon="📱" label="Total Devices" value={data.total_devices} sub={`${data.online_devices} online · ${data.offline_devices} offline`} color="#8b5cf6" />
-        <MetricCard icon="👤" label="Company Users" value={data.total_users} sub={`Across ${activeCompanies} companies`} color="#06b6d4" />
+        <MetricCard icon="📱" label="Total Devices" value={data.total_devices} sub={`${data.online_devices} online`} color="#8b5cf6" />
+        <MetricCard icon="👤" label="Users" value={data.total_users} color="#06b6d4" />
         <MetricCard icon="🎬" label="Videos" value={data.total_videos} color="#f59e0b" />
-        <MetricCard icon="🖼️" label="Advertisements" value={data.total_advertisements} color="#ec4899" />
-        <MetricCard icon="📦" label="Est. Storage" value={`${data.total_storage_used_mb >= 1024 ? (data.total_storage_used_mb / 1024).toFixed(1) + " GB" : data.total_storage_used_mb + " MB"}`} sub={`${data.total_videos + data.total_advertisements} files`} color="#10b981" />
+        <MetricCard icon="🖼️" label="Ads" value={data.total_advertisements} color="#ec4899" />
+        {expiredCount > 0 && (
+          <MetricCard icon="🚨" label="Expired" value={expiredCount} sub="Needs attention!" color="#dc2626" />
+        )}
       </div>
 
-      {/* ─── Charts Row ─── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
-        {/* Device Status Donut */}
-        <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #e8ecf1", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 20 }}>Device Status</div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <DonutChart
-              size={150} strokeWidth={20}
-              centerValue={data.total_devices}
-              centerLabel="Devices"
-              segments={[
-                { value: data.online_devices, color: "#22c55e" },
-                { value: data.offline_devices, color: "#e2e8f0" },
-              ]}
-            />
-          </div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 16, fontSize: 12 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e" }} />
-              Online: <strong>{data.online_devices}</strong>
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#e2e8f0" }} />
-              Offline: <strong>{data.offline_devices}</strong>
-            </span>
-          </div>
-        </div>
+      {/* ─── Company Status List ─── */}
+      <CompanyStatusCard companies={companies} />
 
-        {/* Company Status - Updated with Expired */}
-        <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #e8ecf1", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 20 }}>Company Status</div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <DonutChart
-              size={150} strokeWidth={20}
-              centerValue={data.total_companies}
-              centerLabel="Companies"
-              segments={[
-                { value: data.active_companies || 0, color: "#22c55e" },
-                { value: data.trial_companies || 0, color: "#f59e0b" },
-                { value: data.grace_period_companies || 0, color: "#fb923c" },
-                { value: data.expired_companies || 0, color: "#ef4444" },
-                { value: data.suspended_companies || 0, color: "#6b7280" },
-              ]}
-            />
-          </div>
-          {/* List format */}
-          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#f0fdf4", borderRadius: 8 }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#166534" }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e" }} />
-                Active
-              </span>
-              <strong style={{ color: "#166534" }}>{data.active_companies || 0}</strong>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#fef3c7", borderRadius: 8 }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#92400e" }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#f59e0b" }} />
-                Trial
-              </span>
-              <strong style={{ color: "#92400e" }}>{data.trial_companies || 0}</strong>
-            </div>
-            {(data.grace_period_companies || 0) > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#fff7ed", borderRadius: 8 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#c2410c" }}>
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fb923c" }} />
-                  Grace Period
-                </span>
-                <strong style={{ color: "#c2410c" }}>{data.grace_period_companies}</strong>
-              </div>
-            )}
-            {(data.expired_companies || 0) > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#dc2626", fontWeight: 600 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} />
-                  🚨 Expired
-                </span>
-                <strong style={{ color: "#dc2626" }}>{data.expired_companies}</strong>
-              </div>
-            )}
-            {(data.suspended_companies || 0) > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "#f3f4f6", borderRadius: 8 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#4b5563" }}>
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#6b7280" }} />
-                  Suspended
-                </span>
-                <strong style={{ color: "#4b5563" }}>{data.suspended_companies}</strong>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Content Distribution */}
-        <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #e8ecf1", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 20 }}>Content Distribution</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginBottom: 6 }}>
-                <span>Videos</span><strong style={{ color: "#0f172a" }}>{data.total_videos}</strong>
-              </div>
-              <MiniBar value={data.total_videos} max={Math.max(data.total_videos, data.total_advertisements, data.total_groups, data.total_shops, 1)} color="#f59e0b" height={10} />
-            </div>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginBottom: 6 }}>
-                <span>Advertisements</span><strong style={{ color: "#0f172a" }}>{data.total_advertisements}</strong>
-              </div>
-              <MiniBar value={data.total_advertisements} max={Math.max(data.total_videos, data.total_advertisements, data.total_groups, data.total_shops, 1)} color="#ec4899" height={10} />
-            </div>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginBottom: 6 }}>
-                <span>Groups</span><strong style={{ color: "#0f172a" }}>{data.total_groups}</strong>
-              </div>
-              <MiniBar value={data.total_groups} max={Math.max(data.total_videos, data.total_advertisements, data.total_groups, data.total_shops, 1)} color="#8b5cf6" height={10} />
-            </div>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748b", marginBottom: 6 }}>
-                <span>Shops</span><strong style={{ color: "#0f172a" }}>{data.total_shops}</strong>
-              </div>
-              <MiniBar value={data.total_shops} max={Math.max(data.total_videos, data.total_advertisements, data.total_groups, data.total_shops, 1)} color="#06b6d4" height={10} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Device Distribution Bar ─── */}
-      {data.total_devices > 0 && (
-        <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #e8ecf1", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>Devices by Company</div>
-          <StackedBar segments={
-            companies
-              .filter(c => c.device_count > 0)
-              .map((c, i) => {
-                const colors = ["#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#06b6d4", "#ef4444", "#84cc16"];
-                return { label: c.name, value: c.device_count, color: colors[i % colors.length] };
-              })
-          } height={32} />
-        </div>
-      )}
-
-      {/* ─── Company Table ─── */}
-      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf1", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-        <div style={{ padding: "20px 24px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Companies</div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>{companies.length} total · {companiesWithOnlineDevices} with active devices</div>
-          </div>
-          <input
-            type="text" placeholder="Search companies..."
-            value={companyFilter} onChange={e => setCompanyFilter(e.target.value)}
-            style={{
-              padding: "8px 14px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13,
-              width: 220, outline: "none", color: "#0f172a", background: "#f8fafc",
-            }}
-          />
-        </div>
-
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb" }}>
-                <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Company</th>
-                <th style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Status</th>
-                <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Devices</th>
-                <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Users</th>
-                <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Videos</th>
-                <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Ads</th>
-                <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Groups</th>
-                <th style={{ padding: "12px 16px", textAlign: "center", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>Health</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCompanies.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>
-                  {companyFilter ? "No companies match your search" : "No companies found"}
-                </td></tr>
-              ) : (
-                filteredCompanies.map(c => (
-                  <CompanyRow key={c.id} company={c} maxDevices={maxDevicesInCompany} />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      </>)}
-
-      {/* ═══ USER ACTIVITY TAB ═══ */}
-      {activeTab === "activity" && (
-        <UserActivityTab activity={activity} days={activityDays} setDays={setActivityDays} onRefresh={loadActivity} />
-      )}
-    </div>
-  );
-}
-
-// ─── Helper: format duration ───
-function fmtDuration(sec) {
-  if (!sec || sec <= 0) return "—";
-  if (sec < 60) return `${sec}s`;
-  if (sec < 3600) return `${Math.floor(sec / 60)}m ${sec % 60}s`;
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  return `${h}h ${m}m`;
-}
-
-function fmtTimeAgo(isoStr) {
-  if (!isoStr) return "—";
-  const diff = (Date.now() - new Date(isoStr).getTime()) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
-// ═══════════════════════════════════════════════════════
-// PAGE VISITS DRILL-DOWN: Company → User → Pages
-// ═══════════════════════════════════════════════════════
-const PAGE_ICONS = { dashboard: "📊", devices: "📱", videos: "🎬", groups: "👥", shops: "🏪", links: "🔗", reports: "📈", platform: "🏢", users: "👤", advertisements: "🖼️" };
-
-function PageVisitsDrillDown({ pageStats }) {
-  const [expandedCompany, setExpandedCompany] = useState(null);
-  const [expandedUser, setExpandedUser] = useState(null);
-
-  const toggleCompany = (slug) => {
-    if (expandedCompany === slug) { setExpandedCompany(null); setExpandedUser(null); }
-    else { setExpandedCompany(slug); setExpandedUser(null); }
-  };
-  const toggleUser = (key) => {
-    setExpandedUser(expandedUser === key ? null : key);
-  };
-
-  const maxCompanyVisits = Math.max(...pageStats.map(c => c.total_visits), 1);
-
-  return (
-    <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf1", overflow: "hidden" }}>
-      <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9" }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Page Visits</div>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Click company → user → see page breakdown</div>
-      </div>
-
-      <div style={{ padding: 0 }}>
-        {pageStats.map((company) => {
-          const isCompanyOpen = expandedCompany === company.company_slug;
-          return (
-            <div key={company.company_slug}>
-              {/* Company Row */}
-              <div
-                onClick={() => toggleCompany(company.company_slug)}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "14px 24px", cursor: "pointer", borderBottom: "1px solid #f1f5f9",
-                  background: isCompanyOpen ? "#f8fafc" : "transparent", transition: "background 0.15s",
-                }}
-                onMouseEnter={e => { if (!isCompanyOpen) e.currentTarget.style.background = "#fafbfd"; }}
-                onMouseLeave={e => { if (!isCompanyOpen) e.currentTarget.style.background = "transparent"; }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{
-                    display: "inline-block", fontSize: 11, transition: "transform 0.2s", transform: isCompanyOpen ? "rotate(90deg)" : "rotate(0deg)", color: "#94a3b8",
-                  }}>▶</span>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: 8,
-                    background: company.company_slug === "_platform" ? "linear-gradient(135deg, #f59e0b, #d97706)" : "linear-gradient(135deg, #3b82f6, #1d4ed8)",
-                    display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 13, flexShrink: 0,
-                  }}>
-                    {company.company_name[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, color: "#0f172a", fontSize: 14 }}>{company.company_name}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8" }}>{company.users.length} user{company.users.length !== 1 ? "s" : ""}</div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <MiniBar value={company.total_visits} max={maxCompanyVisits} color={company.company_slug === "_platform" ? "#f59e0b" : "#3b82f6"} height={6} />
-                  <span style={{ fontWeight: 700, color: "#0f172a", fontSize: 14, minWidth: 36, textAlign: "right" }}>{company.total_visits}</span>
-                  <span style={{ fontSize: 11, color: "#94a3b8" }}>visits</span>
-                </div>
-              </div>
-
-              {/* Expanded: Users */}
-              {isCompanyOpen && company.users.map((user) => {
-                const userKey = `${company.company_slug}::${user.username}`;
-                const isUserOpen = expandedUser === userKey;
-                return (
-                  <div key={userKey}>
-                    {/* User Row */}
-                    <div
-                      onClick={() => toggleUser(userKey)}
-                      style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "12px 24px 12px 64px", cursor: "pointer", borderBottom: "1px solid #f8fafc",
-                        background: isUserOpen ? "#f0f9ff" : "#f8fafc", transition: "background 0.15s",
-                      }}
-                      onMouseEnter={e => { if (!isUserOpen) e.currentTarget.style.background = "#f0f4f8"; }}
-                      onMouseLeave={e => { if (!isUserOpen) e.currentTarget.style.background = isUserOpen ? "#f0f9ff" : "#f8fafc"; }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{
-                          display: "inline-block", fontSize: 10, transition: "transform 0.2s", transform: isUserOpen ? "rotate(90deg)" : "rotate(0deg)", color: "#94a3b8",
-                        }}>▶</span>
-                        <div style={{
-                          width: 26, height: 26, borderRadius: 20, background: "#e2e8f0",
-                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#475569",
-                        }}>
-                          {user.username[0].toUpperCase()}
-                        </div>
-                        <span style={{ fontWeight: 600, color: "#1e293b", fontSize: 13 }}>{user.username}</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontWeight: 600, color: "#0f172a", fontSize: 13 }}>{user.total_visits}</span>
-                        <span style={{ fontSize: 11, color: "#94a3b8" }}>visits</span>
-                      </div>
-                    </div>
-
-                    {/* Expanded: Page Details */}
-                    {isUserOpen && (
-                      <div style={{ background: "#f0f9ff", borderBottom: "1px solid #e0f2fe" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                          <thead>
-                            <tr style={{ borderBottom: "1px solid #bae6fd" }}>
-                              <th style={{ padding: "8px 24px 8px 96px", textAlign: "left", fontWeight: 600, color: "#0369a1", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Page</th>
-                              <th style={{ padding: "8px 16px", textAlign: "center", fontWeight: 600, color: "#0369a1", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Visits</th>
-                              <th style={{ padding: "8px 24px 8px 16px", textAlign: "center", fontWeight: 600, color: "#0369a1", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>Avg Time</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {user.pages.map((pg, pi) => (
-                              <tr key={pi} style={{ borderBottom: "1px solid #e0f2fe" }}>
-                                <td style={{ padding: "8px 24px 8px 96px" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                    <span style={{ fontSize: 14 }}>{PAGE_ICONS[pg.page] || "📄"}</span>
-                                    <span style={{ fontWeight: 500, color: "#0f172a", textTransform: "capitalize" }}>{pg.page}</span>
-                                  </div>
-                                </td>
-                                <td style={{ padding: "8px 16px", textAlign: "center", fontWeight: 600, color: "#0f172a" }}>{pg.visits}</td>
-                                <td style={{ padding: "8px 24px 8px 16px", textAlign: "center", color: "#64748b" }}>{pg.avg_duration_sec ? fmtDuration(Math.round(pg.avg_duration_sec)) : "—"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// USER ACTIVITY TAB
-// ═══════════════════════════════════════════════════════
-function UserActivityTab({ activity, days, setDays, onRefresh }) {
-  if (!activity) {
-    return (
-      <div style={{ padding: 60, textAlign: "center", color: "#94a3b8" }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
-        Loading user activity data...
-      </div>
-    );
-  }
-
-  const { active_users, user_summaries, page_stats, sessions, daily_logins } = activity;
-  const maxLogins = Math.max(...(daily_logins || []).map(d => d.logins), 1);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-      {/* Period selector */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <span style={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>Period:</span>
-        {[7, 14, 30].map(d => (
-          <button key={d} onClick={() => setDays(d)} style={{
-            padding: "5px 14px", borderRadius: 6, border: "1px solid #e5e7eb", fontSize: 12, fontWeight: 600, cursor: "pointer",
-            background: days === d ? "#0f172a" : "#fff", color: days === d ? "#fff" : "#64748b", transition: "all 0.15s",
-          }}>{d}d</button>
-        ))}
-      </div>
-
-      {/* Active Now + Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-        <MetricCard icon="🟢" label="Users Online Now" value={active_users?.length || 0} color="#22c55e" />
-        <MetricCard icon="🔑" label={`Sessions (${days}d)`} value={sessions?.length || 0} color="#3b82f6" />
-        <MetricCard icon="📄" label="Pages Tracked" value={page_stats?.length || 0} color="#8b5cf6" />
-      </div>
-
-      {/* Daily Login Chart */}
-      {daily_logins && daily_logins.length > 0 && (
-        <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #e8ecf1" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>Daily Logins</div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 120 }}>
-            {daily_logins.map((d, i) => {
-              const pct = (d.logins / maxLogins) * 100;
-              const dayLabel = new Date(d.date + "T00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
-              return (
-                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#0f172a" }}>{d.logins}</span>
-                  <div style={{
-                    width: "100%", maxWidth: 32, height: `${Math.max(pct, 4)}%`,
-                    background: "linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%)", borderRadius: "4px 4px 0 0",
-                    transition: "height 0.5s ease",
-                  }} title={`${d.date}: ${d.logins} logins, ${d.unique_users} unique`} />
-                  <span style={{ fontSize: 9, color: "#94a3b8", whiteSpace: "nowrap" }}>{dayLabel}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Currently Online */}
-      {active_users && active_users.length > 0 && (
-        <div style={{ background: "#fff", borderRadius: 14, padding: 24, border: "1px solid #e8ecf1" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>
-            🟢 Currently Online ({active_users.length})
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {active_users.map((u, i) => (
-              <div key={i} style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "8px 14px",
-                background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10,
-              }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{u.username}</div>
-                  <div style={{ fontSize: 10, color: "#64748b" }}>{u.company_name || "Platform"} · {fmtTimeAgo(u.login_at)}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* User Summary Table */}
-      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf1", overflow: "hidden" }}>
-        <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9" }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>User Activity Summary</div>
-          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Last {days} days</div>
-        </div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb" }}>
-              {["User", "Company", "Sessions", "Total Time", "Last Login", "Status"].map(h => (
-                <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {(!user_summaries || user_summaries.length === 0) ? (
-              <tr><td colSpan={6} style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>No activity recorded yet</td></tr>
-            ) : (
-              user_summaries.map((u, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "12px 16px", fontWeight: 600, color: "#0f172a" }}>{u.username}</td>
-                  <td style={{ padding: "12px 16px", color: "#64748b" }}>
-                    {u.company_name ? (
-                      <span style={{ background: "#dbeafe", color: "#1e40af", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{u.company_name}</span>
-                    ) : (
-                      <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600 }}>Platform</span>
-                    )}
-                  </td>
-                  <td style={{ padding: "12px 16px", fontWeight: 600 }}>{u.total_sessions}</td>
-                  <td style={{ padding: "12px 16px", color: "#0f172a" }}>{fmtDuration(u.total_duration_sec)}</td>
-                  <td style={{ padding: "12px 16px", color: "#64748b", fontSize: 12 }}>{fmtTimeAgo(u.last_login)}</td>
-                  <td style={{ padding: "12px 16px" }}>
-                    {u.is_online ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 20, background: "#dcfce7", color: "#15803d", fontSize: 11, fontWeight: 600 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} />Online
-                      </span>
-                    ) : (
-                      <span style={{ color: "#94a3b8", fontSize: 12 }}>Offline</span>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Page Stats Drill-Down */}
-      {page_stats && page_stats.length > 0 && (
-        <PageVisitsDrillDown pageStats={page_stats} />
-      )}
-
-      {/* Recent Sessions Log */}
-      <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e8ecf1", overflow: "hidden" }}>
-        <div style={{ padding: "18px 24px", borderBottom: "1px solid #f1f5f9" }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>Recent Sessions</div>
-          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>Login/logout history</div>
-        </div>
-        <div style={{ maxHeight: 400, overflow: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e5e7eb", position: "sticky", top: 0 }}>
-                {["User", "Company", "Login", "Logout", "Duration", "Status"].map(h => (
-                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", background: "#f8fafc" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(!sessions || sessions.length === 0) ? (
-                <tr><td colSpan={6} style={{ padding: 32, textAlign: "center", color: "#94a3b8" }}>No sessions recorded yet</td></tr>
-              ) : (
-                sessions.slice(0, 50).map((s, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    <td style={{ padding: "10px 16px", fontWeight: 600, color: "#0f172a" }}>{s.username}</td>
-                    <td style={{ padding: "10px 16px", color: "#64748b", fontSize: 12 }}>{s.company_name || "Platform"}</td>
-                    <td style={{ padding: "10px 16px", fontSize: 12, color: "#64748b" }}>
-                      {s.login_at ? new Date(s.login_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
-                    </td>
-                    <td style={{ padding: "10px 16px", fontSize: 12, color: "#64748b" }}>
-                      {s.logout_at ? new Date(s.logout_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
-                    </td>
-                    <td style={{ padding: "10px 16px", fontSize: 12 }}>{fmtDuration(s.duration_sec)}</td>
-                    <td style={{ padding: "10px 16px" }}>
-                      {s.is_active ? (
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "inline-block", boxShadow: "0 0 6px #22c55e" }} title="Active" />
-                      ) : (
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#d1d5db", display: "inline-block" }} title="Ended" />
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* ─── Announcement Modal ─── */}
+      <AnnouncementModal 
+        isOpen={showAnnouncementModal}
+        onClose={() => setShowAnnouncementModal(false)}
+        currentAnnouncement={announcement}
+        onSave={handleSaveAnnouncement}
+      />
+      
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
