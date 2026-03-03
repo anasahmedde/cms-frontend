@@ -62,15 +62,79 @@ function StatusBadge({ status }) {
   );
 }
 
+// Single media item: renders a playable <video> or <img> with name label
+function MediaItem({ name, s3Link, contentType }) {
+  const isVideo = (contentType || "").toLowerCase().includes("video") ||
+    /\.(mp4|webm|mov|avi|mkv)$/i.test(name);
+
+  return (
+    <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb", background: "#0f172a" }}>
+      {s3Link ? (
+        isVideo ? (
+          <video
+            src={s3Link}
+            controls
+            style={{ width: "100%", maxHeight: 200, display: "block", background: "#000" }}
+          />
+        ) : (
+          <img
+            src={s3Link}
+            alt={name}
+            style={{ width: "100%", maxHeight: 200, objectFit: "contain", display: "block", background: "#0f172a" }}
+          />
+        )
+      ) : (
+        <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 13 }}>
+          {isVideo ? "🎬" : "🖼️"} Preview unavailable
+        </div>
+      )}
+      <div style={{ padding: "6px 10px", background: "#1e293b" }}>
+        <div style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+      </div>
+    </div>
+  );
+}
+
 // Human-readable preview of change_data based on request type
 function ChangeDataPreview({ requestType, changeData }) {
+  const [mediaMap, setMediaMap] = useState({}); // name → { s3Link, contentType }
+  const [loadingMedia, setLoadingMedia] = useState(false);
+
+  const videoNames = changeData?.video_names || [];
+  const adNames = changeData?.ad_names || [];
+  const allNames = [...videoNames, ...adNames];
+
+  useEffect(() => {
+    if (!allNames.length) return;
+    if (requestType !== "link_content" && requestType !== "video_assign" && requestType !== "video_remove") return;
+
+    setLoadingMedia(true);
+    const token = localStorage.getItem("digix_token");
+    fetch(`${API_BASE}/content-changes/media-preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ video_names: videoNames, ad_names: adNames }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        const map = {};
+        (data.videos || []).forEach(v => { map[v.name] = { s3Link: v.s3_link, contentType: v.content_type }; });
+        (data.ads || []).forEach(a => { map[a.name] = { s3Link: a.s3_link, contentType: a.content_type }; });
+        setMediaMap(map);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMedia(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestType, JSON.stringify(allNames)]);
+
   if (!changeData) return null;
 
   // link_content: { gname, video_names, ad_names }
   if (requestType === "link_content") {
     const { gname, video_names = [], ad_names = [] } = changeData;
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {gname && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, border: "1px solid #bbf7d0" }}>
             <span style={{ fontSize: 16 }}>👥</span>
@@ -80,36 +144,47 @@ function ChangeDataPreview({ requestType, changeData }) {
             </div>
           </div>
         )}
+
+        {loadingMedia && (
+          <div style={{ fontSize: 12, color: "#6b7280", padding: "6px 0" }}>Loading previews...</div>
+        )}
+
         {video_names.length > 0 && (
-          <div style={{ padding: "10px 12px", background: "#eff6ff", borderRadius: 8, border: "1px solid #bfdbfe" }}>
-            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8, fontWeight: 600 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#1e40af", marginBottom: 8 }}>
               🎬 Videos to link ({video_names.length})
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8 }}>
               {video_names.map((v, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#fff", borderRadius: 6, border: "1px solid #e0e7ff", fontSize: 13 }}>
-                  <span style={{ color: "#3b82f6", fontSize: 15 }}>▶</span>
-                  <span style={{ fontWeight: 500, color: "#1e40af" }}>{v}</span>
-                </div>
+                <MediaItem
+                  key={i}
+                  name={v}
+                  s3Link={mediaMap[v]?.s3Link}
+                  contentType={mediaMap[v]?.contentType || "video"}
+                />
               ))}
             </div>
           </div>
         )}
+
         {ad_names.length > 0 && (
-          <div style={{ padding: "10px 12px", background: "#f0fdf4", borderRadius: 8, border: "1px solid #bbf7d0" }}>
-            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8, fontWeight: 600 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#065f46", marginBottom: 8 }}>
               🖼️ Advertisements to link ({ad_names.length})
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8 }}>
               {ad_names.map((a, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#fff", borderRadius: 6, border: "1px solid #d1fae5", fontSize: 13 }}>
-                  <span style={{ color: "#10b981", fontSize: 15 }}>🖼</span>
-                  <span style={{ fontWeight: 500, color: "#065f46" }}>{a}</span>
-                </div>
+                <MediaItem
+                  key={i}
+                  name={a}
+                  s3Link={mediaMap[a]?.s3Link}
+                  contentType={mediaMap[a]?.contentType || "image"}
+                />
               ))}
             </div>
           </div>
         )}
+
         {video_names.length === 0 && ad_names.length === 0 && (
           <div style={{ padding: "10px 12px", background: "#fef9c3", borderRadius: 8, fontSize: 13, color: "#92400e" }}>
             ⚠️ No videos or advertisements selected.
@@ -122,29 +197,22 @@ function ChangeDataPreview({ requestType, changeData }) {
   // video_assign / video_remove: { video_ids, video_names }
   if (requestType === "video_assign" || requestType === "video_remove") {
     const { video_names = [], video_ids = [] } = changeData;
-    const icon = requestType === "video_assign" ? "➕" : "➖";
-    const color = requestType === "video_assign" ? "#166534" : "#991b1b";
-    const bg = requestType === "video_assign" ? "#dcfce7" : "#fef2f2";
-    const border = requestType === "video_assign" ? "#bbf7d0" : "#fecaca";
     const names = video_names.length > 0 ? video_names : video_ids.map(id => `Video #${id}`);
+    const label = requestType === "video_assign" ? "➕ Videos to assign" : "➖ Videos to remove";
     return (
-      <div style={{ padding: "10px 12px", background: bg, borderRadius: 8, border: `1px solid ${border}` }}>
-        <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8, fontWeight: 600 }}>
-          {icon} Videos ({names.length})
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8 }}>{label} ({names.length})</div>
+        {loadingMedia && <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>Loading previews...</div>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8 }}>
           {names.map((v, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#fff", borderRadius: 6, fontSize: 13 }}>
-              <span style={{ color, fontSize: 15 }}>▶</span>
-              <span style={{ fontWeight: 500, color }}>{v}</span>
-            </div>
+            <MediaItem key={i} name={v} s3Link={mediaMap[v]?.s3Link} contentType={mediaMap[v]?.contentType || "video"} />
           ))}
         </div>
       </div>
     );
   }
 
-  // Fallback: show a clean key-value list instead of raw JSON
+  // Fallback: clean key-value list
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {Object.entries(changeData).map(([key, val]) => (
