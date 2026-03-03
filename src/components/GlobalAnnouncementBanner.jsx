@@ -194,13 +194,16 @@ export default function GlobalAnnouncementBanner() {
       background: c.bg, padding: "12px 20px", overflow: "hidden",
       position: "relative", display: "flex", alignItems: "center", zIndex: 100,
     }}>
-      <div style={{ flex: 1, overflow: "hidden" }}>
+      <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
         <div style={{
-          display: "inline-block",
-          animation: "slideTextGlobal 25s linear infinite",
-          whiteSpace: "nowrap", color: c.text, fontWeight: 600, fontSize: 14, paddingLeft: "100%"
+          display: "inline-flex",
+          animation: "slideTextGlobal 30s linear infinite",
+          whiteSpace: "nowrap", color: c.text, fontWeight: 600, fontSize: 14,
+          willChange: "transform",
         }}>
-          📢 {announcement.message} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 📢 {announcement.message}
+          {/* Two identical copies — when the first scrolls out, the second seamlessly takes over */}
+          <span style={{ paddingRight: 80 }}>📢 &nbsp;{announcement.message}</span>
+          <span style={{ paddingRight: 80 }}>📢 &nbsp;{announcement.message}</span>
         </div>
       </div>
 
@@ -208,7 +211,7 @@ export default function GlobalAnnouncementBanner() {
 
       <button
         onClick={handleDismiss}
-        title="Dismiss — will reappear in 15 minutes"
+        title="Dismiss — will reappear in 20 seconds"
         style={{
           background: "rgba(255,255,255,0.2)", border: "none", color: c.text,
           padding: "4px 10px", borderRadius: 6, cursor: "pointer",
