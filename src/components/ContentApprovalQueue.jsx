@@ -24,7 +24,8 @@ const REQUEST_TYPE_LABELS = {
   group_change: "Change Group",
   content_update: "Update Content",
   device_settings: "Device Settings",
-  advertisement_change: "Advertisement Change"
+  advertisement_change: "Advertisement Change",
+  link_content: "Link Content to Group",
 };
 
 // Target type labels
@@ -61,7 +62,7 @@ function StatusBadge({ status }) {
   );
 }
 
-export default function ContentApprovalQueue() {
+export default function ContentApprovalQueue({ onApprovalAction }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -139,6 +140,7 @@ export default function ContentApprovalQueue() {
         setSelectedRequest(null);
         setReviewNote("");
         fetchRequests();
+        if (onApprovalAction) onApprovalAction(action);
       } else {
         const errData = await res.json();
         setError(errData.detail || `Failed to ${action} request`);
@@ -351,7 +353,7 @@ export default function ContentApprovalQueue() {
                   </td>
                   <td style={{ padding: 12 }}>
                     <div style={{ fontWeight: 500 }}>{req.requested_by_name || "Unknown"}</div>
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>{req.requested_by_role}</div>
+                    {req.requested_by_role && <div style={{ fontSize: 12, color: "#6b7280", textTransform: "capitalize" }}>{req.requested_by_role}</div>}
                   </td>
                   <td style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>
                     {formatDate(req.created_at)}

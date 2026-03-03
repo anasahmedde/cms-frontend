@@ -1,11 +1,23 @@
 // src/components/GroupLinkedVideo.js - Enhanced UI with Videos and Advertisements
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { listVideoNames } from "../api/video";
 import { listGroupNames } from "../api/group";
 import { setGroupVideosByNames, listGroupVideoNames } from "../api/dvsg";
 import axios from "axios";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
+
+function authHeaders() {
+  const token = localStorage.getItem("digix_token");
+  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+}
+
+// Roles that can link content directly without approval
+const AUTO_APPROVE_ROLES = new Set(["admin", "manager", "company_admin", "content_manager"]);
+
+function getStoredUser() {
+  try { return JSON.parse(localStorage.getItem("digix_user") || "{}"); } catch { return {}; }
+}
 
 const NO_GROUP_LABEL = "— No group —";
 const NO_GROUP_VALUE = "_none";
@@ -37,8 +49,31 @@ export default function GroupLinkedVideo({ onDone }) {
   const [initialLoading, setInitialLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  // Load groups, videos, and advertisements
+  // Approval workflow state
+  const [approvalRequired, setApprovalRequired] = useState(false);
+  const [requestNote, setRequestNote] = useState("");
+  const [showNoteInput, setShowNoteInput] = useState(false);
+
+  const currentUser = getStoredUser();
+  const userRole = currentUser?.role || "";
+  const userType = currentUser?.user_type || "";
+  // Platform users (including impersonation) and high-privilege roles bypass approval
+  const needsApproval = approvalRequired && userType !== "platform" && !AUTO_APPROVE_ROLES.has(userRole);
+
+  // Fetch approval settings on mount
+  const fetchApprovalSettings = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/company/approval-settings`, { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setApprovalRequired(data.require_content_approval || false);
+      }
+    } catch (_) {}
+  }, []);
+
+  // Load groups, videos, advertisements, and approval settings
   useEffect(() => {
+    fetchApprovalSettings();
     (async () => {
       setInitialLoading(true);
       try {
@@ -148,41 +183,72 @@ export default function GroupLinkedVideo({ onDone }) {
 
   const canSubmit = gvalue && (selectedVideos.length > 0 || selectedAds.length > 0) && !loading;
 
+  const submitDirect = async () => {
+    let videoMsg = "";
+    let adMsg = "";
+
+    // Link videos if any selected
+    if (selectedVideos.length > 0) {
+      const res = await setGroupVideosByNames(gvalue, selectedVideos);
+      const data = res?.data || res || {};
+      const okInserted = data.inserted_count ?? 0;
+      const okDeleted = data.deleted_count ?? 0;
+      videoMsg = `Linked ${selectedVideos.length} video(s) (+${okInserted} new, -${okDeleted} removed)`;
+    }
+
+    // Link advertisements if any selected
+    if (selectedAds.length > 0) {
+      const adRes = await axios.post(`${API_BASE}/group/${encodeURIComponent(gvalue)}/advertisements`, {
+        ad_names: selectedAds
+      });
+      const adData = adRes?.data || {};
+      const adInserted = adData.inserted_count ?? 0;
+      const adDeleted = adData.deleted_count ?? 0;
+      adMsg = `Linked ${selectedAds.length} image(s) (+${adInserted} new, -${adDeleted} removed)`;
+    }
+
+    const combinedMsg = [videoMsg, adMsg].filter(Boolean).join(". ");
+    setMessage(`✅ ${combinedMsg}`);
+    onDone && onDone({ gname: gvalue, videos: selectedVideos, advertisements: selectedAds });
+  };
+
+  const submitApprovalRequest = async () => {
+    const res = await fetch(`${API_BASE}/content-changes`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        request_type: "link_content",
+        target_type: "group",
+        target_id: 0, // resolved by name on backend
+        change_data: {
+          gname: gvalue,
+          video_names: selectedVideos,
+          ad_names: selectedAds,
+        },
+        request_note: requestNote.trim() || null,
+        expires_in_hours: 72,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to submit approval request");
+    }
+    setMessage("⏳ Your request has been submitted for approval. An admin or manager will review it shortly.");
+    setRequestNote("");
+    setShowNoteInput(false);
+    onDone && onDone(null);
+  };
+
   const submit = async () => {
     if (!canSubmit) return;
     setLoading(true);
     setMessage("");
-    
-    let videoMsg = "";
-    let adMsg = "";
-    
     try {
-      // Link videos if any selected
-      if (selectedVideos.length > 0) {
-        const res = await setGroupVideosByNames(gvalue, selectedVideos);
-        const data = res?.data || res || {};
-        const okInserted = data.inserted_count ?? 0;
-        const okUpdated = data.updated_count ?? 0;
-        const okDeleted = data.deleted_count ?? 0;
-        videoMsg = `Linked ${selectedVideos.length} video(s) (+${okInserted} new, -${okDeleted} removed)`;
+      if (needsApproval) {
+        await submitApprovalRequest();
+      } else {
+        await submitDirect();
       }
-      
-      // Link advertisements if any selected
-      if (selectedAds.length > 0) {
-        const adRes = await axios.post(`${API_BASE}/group/${encodeURIComponent(gvalue)}/advertisements`, {
-          ad_names: selectedAds
-        });
-        const adData = adRes?.data || {};
-        const adInserted = adData.inserted_count ?? 0;
-        const adDeleted = adData.deleted_count ?? 0;
-        adMsg = `Linked ${selectedAds.length} image(s) (+${adInserted} new, -${adDeleted} removed)`;
-      }
-      
-      // Combine messages
-      const combinedMsg = [videoMsg, adMsg].filter(Boolean).join(". ");
-      setMessage(`✅ ${combinedMsg}`);
-      
-      onDone && onDone({ gname: gvalue, videos: selectedVideos, advertisements: selectedAds });
     } catch (e) {
       const err = e?.response?.data?.detail || e?.message || "Update failed.";
       setMessage(`❌ ${err}`);
@@ -347,6 +413,27 @@ export default function GroupLinkedVideo({ onDone }) {
         </div>
       )}
 
+      {/* Approval notice for lower-role users */}
+      {needsApproval && canSubmit && (
+        <div style={{ padding: "12px 16px", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, fontSize: 13, color: "#92400e" }}>
+          <strong>⚠️ Approval Required</strong> — Your role requires a manager or admin to approve this content change before it goes live.
+          <button
+            onClick={() => setShowNoteInput(v => !v)}
+            style={{ marginLeft: 12, fontSize: 12, padding: "3px 10px", border: "1px solid #f59e0b", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#92400e", fontWeight: 600 }}
+          >
+            {showNoteInput ? "Hide note" : "Add a note"}
+          </button>
+          {showNoteInput && (
+            <textarea
+              value={requestNote}
+              onChange={e => setRequestNote(e.target.value)}
+              placeholder="Optional: explain why you're making this change..."
+              style={{ display: "block", width: "100%", marginTop: 10, padding: 10, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, resize: "vertical", minHeight: 60, boxSizing: "border-box" }}
+            />
+          )}
+        </div>
+      )}
+
       {/* Submit Button */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
         <button
@@ -356,13 +443,17 @@ export default function GroupLinkedVideo({ onDone }) {
             padding: "16px 32px",
             borderRadius: 12,
             border: "none",
-            background: canSubmit ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" : "#e5e7eb",
+            background: canSubmit
+              ? needsApproval
+                ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+              : "#e5e7eb",
             color: canSubmit ? "#fff" : "#9ca3af",
             fontSize: 16,
             fontWeight: 600,
             cursor: canSubmit ? "pointer" : "not-allowed",
             transition: "all 0.2s",
-            boxShadow: canSubmit ? "0 4px 14px 0 rgba(102, 126, 234, 0.4)" : "none",
+            boxShadow: canSubmit ? (needsApproval ? "0 4px 14px 0 rgba(245,158,11,0.4)" : "0 4px 14px 0 rgba(102,126,234,0.4)") : "none",
             display: "flex",
             alignItems: "center",
             gap: 8,
@@ -371,8 +462,10 @@ export default function GroupLinkedVideo({ onDone }) {
           {loading ? (
             <>
               <span style={{ width: 18, height: 18, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-              Saving...
+              {needsApproval ? "Submitting..." : "Saving..."}
             </>
+          ) : needsApproval ? (
+            <>📋 Submit for Approval</>
           ) : (
             <>🔗 Link Content</>
           )}
@@ -384,9 +477,9 @@ export default function GroupLinkedVideo({ onDone }) {
         <div style={{
           padding: "14px 18px",
           borderRadius: 12,
-          background: message.startsWith("✅") ? "#ecfdf5" : message.startsWith("❌") ? "#fef2f2" : "#f0f9ff",
-          border: `1px solid ${message.startsWith("✅") ? "#a7f3d0" : message.startsWith("❌") ? "#fecaca" : "#bae6fd"}`,
-          color: message.startsWith("✅") ? "#065f46" : message.startsWith("❌") ? "#991b1b" : "#0369a1",
+          background: message.startsWith("✅") ? "#ecfdf5" : message.startsWith("❌") ? "#fef2f2" : "#fffbeb",
+          border: `1px solid ${message.startsWith("✅") ? "#a7f3d0" : message.startsWith("❌") ? "#fecaca" : "#fcd34d"}`,
+          color: message.startsWith("✅") ? "#065f46" : message.startsWith("❌") ? "#991b1b" : "#92400e",
           fontSize: 14,
           lineHeight: 1.5,
         }}>

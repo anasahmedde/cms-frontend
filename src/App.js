@@ -12,6 +12,7 @@ import PlatformAdmin from "./components/PlatformAdmin";
 import PlatformDashboard from "./components/PlatformDashboard";
 import GlobalAnnouncementBanner from "./components/GlobalAnnouncementBanner";
 import { ExpirationBanner, NotificationBell, CompanyStatusTimer } from "./components/ExpirationNotificationBanner";
+import ContentApprovalQueue from "./components/ContentApprovalQueue";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
 
@@ -418,7 +419,7 @@ function ChangePasswordModal({ open, onClose }) {
 }
 
 /* ======================== Sidebar ======================== */
-function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword, hasPermission, isDark, toggleTheme, impersonating }) {
+function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword, hasPermission, isDark, toggleTheme, impersonating, pendingApprovals = 0 }) {
   const menuItems = [];
   const isPlatformUser = user?.user_type === "platform";
   const isImpersonating = !!impersonating;
@@ -457,6 +458,11 @@ function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword
     if (hasPermission("view_reports")) {
       menuItems.push({ id: "reports", icon: "📈", label: "Reports" });
     }
+    // Approvals: visible to admins and managers (roles that can approve)
+    const canApprove = ["admin", "manager", "company_admin", "content_manager"].includes(user?.role) || user?.user_type === "platform";
+    if (canApprove) {
+      menuItems.push({ id: "approvals", icon: "✅", label: "Approvals", badge: pendingApprovals || 0 });
+    }
   }
   
   if (hasPermission("manage_users")) {
@@ -491,7 +497,13 @@ function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword
       <nav style={{ flex: 1, padding: "16px 12px" }}>
         {menuItems.map((item) => (
           <button key={item.id} onClick={() => setCurrentPage(item.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", marginBottom: 4, border: "none", borderRadius: 10, background: currentPage === item.id ? "rgba(245,158,11,0.2)" : "transparent", color: currentPage === item.id ? "#f59e0b" : "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: 14, fontWeight: currentPage === item.id ? 600 : 500, textAlign: "left", transition: "all 0.2s", borderLeft: currentPage === item.id ? "3px solid #f59e0b" : "3px solid transparent" }}>
-            <span style={{ fontSize: 18 }}>{item.icon}</span>{item.label}
+            <span style={{ fontSize: 18 }}>{item.icon}</span>
+            <span style={{ flex: 1 }}>{item.label}</span>
+            {item.badge > 0 && (
+              <span style={{ background: "#ef4444", color: "#fff", fontSize: 11, fontWeight: 700, minWidth: 20, height: 20, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
+                {item.badge}
+              </span>
+            )}
           </button>
         ))}
       </nav>
@@ -514,6 +526,9 @@ function Dashboard({ user, onLogout }) {
   
   // Company expiration warning state
   const [companyExpiration, setCompanyExpiration] = useState(null);
+
+  // Pending approval count (for admin/manager badge)
+  const [pendingApprovals, setPendingApprovals] = useState(0);
 
   const toggleTheme = useCallback(() => {
     setIsDark(prev => {
@@ -662,11 +677,32 @@ function Dashboard({ user, onLogout }) {
     return () => clearInterval(interval);
   }, [onLogout]);
 
+  // Poll pending approval count for admin/manager roles
+  useEffect(() => {
+    const canApprove = ["admin", "manager", "company_admin", "content_manager"].includes(user?.role) || user?.user_type === "platform";
+    if (!canApprove) return;
+    const fetchPending = async () => {
+      try {
+        const token = localStorage.getItem("digix_token");
+        const res = await fetch(`${API_BASE}/content-changes?status=pending&limit=1`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPendingApprovals(data.pending_count || 0);
+        }
+      } catch (_) {}
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 30000);
+    return () => clearInterval(interval);
+  }, [user?.role, user?.user_type]);
+
   return (
     <AuthContext.Provider value={{ user, hasPermission }}>
       <ThemeContext.Provider value={{ isDark, toggle: toggleTheme, theme }}>
       <div style={{ display: "flex", minHeight: "100vh", background: theme.bg, overflow: "hidden" }}>
-        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={onLogout} onChangePassword={() => setShowChangePassword(true)} hasPermission={hasPermission} isDark={isDark} toggleTheme={toggleTheme} impersonating={impersonating} />
+        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={onLogout} onChangePassword={() => setShowChangePassword(true)} hasPermission={hasPermission} isDark={isDark} toggleTheme={toggleTheme} impersonating={impersonating} pendingApprovals={pendingApprovals} />
         <div style={{ flex: 1, marginLeft: 260, minWidth: 0, width: "calc(100vw - 260px)", overflowX: "hidden" }}>
           {/* Global Platform Announcement Banner - visible to ALL users */}
           <GlobalAnnouncementBanner />
@@ -691,7 +727,7 @@ function Dashboard({ user, onLogout }) {
           )}
           <header style={{ background: theme.headerBg, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${theme.border}`, position: "sticky", top: 0, zIndex: 100 }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: theme.text }}>
-              {currentPage === "dashboard" ? "Dashboard" : currentPage === "devices" ? "Devices" : currentPage === "videos" ? "Videos" : currentPage === "advertisements" ? "Advertisements" : currentPage === "groups" ? "Groups" : currentPage === "shops" ? "Shops" : currentPage === "links" ? "Link Content" : currentPage === "reports" ? "Reports" : currentPage === "users" ? "User Management" : currentPage === "platform" ? "Platform Administration" : "Dashboard"}
+              {currentPage === "dashboard" ? "Dashboard" : currentPage === "devices" ? "Devices" : currentPage === "videos" ? "Videos" : currentPage === "advertisements" ? "Advertisements" : currentPage === "groups" ? "Groups" : currentPage === "shops" ? "Shops" : currentPage === "links" ? "Link Content" : currentPage === "reports" ? "Reports" : currentPage === "users" ? "User Management" : currentPage === "platform" ? "Platform Administration" : currentPage === "approvals" ? "Content Approvals" : "Dashboard"}
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               {/* Subscription Timer for company users */}
@@ -748,6 +784,7 @@ function Dashboard({ user, onLogout }) {
             {currentPage === "reports" && !hasPermission("view_reports") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to view reports.</div>}
             {currentPage === "users" && hasPermission("manage_users") && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><UserManagement onUserDeactivated={onLogout} /></div>}
             {currentPage === "users" && !hasPermission("manage_users") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to manage users.</div>}
+            {currentPage === "approvals" && <ContentApprovalQueue onApprovalAction={() => setPendingApprovals(p => Math.max(0, p - 1))} />}
           </main>
         </div>
         {hasPermission("manage_devices") && <Modal open={openModal === "device"} title="📱 Device Management" onClose={() => setOpenModal(null)}><Device onChanged={() => setLinksRefresh((x) => x + 1)} /></Modal>}
