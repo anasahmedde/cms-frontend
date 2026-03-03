@@ -811,7 +811,7 @@ export default function PlatformDashboard() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 24 }}>🚨</span>
             <div>
-              <div style={{ fontWeight: 700 }}>ALERT: {expiredCount} company{expiredCount > 1 ? "ies" : ""} expired!</div>
+              <div style={{ fontWeight: 700 }}>ALERT: {expiredCount} {expiredCount === 1 ? "company" : "companies"} expired!</div>
               <div style={{ fontSize: 12, opacity: 0.9 }}>
                 Users blocked, devices showing enrollment screen. Companies: {(data.expired_companies_list || []).map(c => c.company_name).join(", ")}
               </div>
@@ -834,7 +834,7 @@ export default function PlatformDashboard() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 24 }}>⏰</span>
             <div>
-              <div style={{ fontWeight: 700 }}>{expiringSoonCount} company{expiringSoonCount > 1 ? "ies" : ""} expiring soon</div>
+              <div style={{ fontWeight: 700 }}>{expiringSoonCount} {expiringSoonCount === 1 ? "company" : "companies"} expiring soon</div>
               <div style={{ fontSize: 12, opacity: 0.8 }}>Contact companies to renew subscriptions</div>
             </div>
           </div>
