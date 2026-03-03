@@ -262,11 +262,18 @@ export default function GroupLinkedVideo({ onDone }) {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      // 409 = duplicate pending request
+      if (res.status === 409) {
+        throw new Error(`⏳ Already under review — ${err.detail || "a pending approval request for this group already exists."}`);
+      }
       throw new Error(err.detail || "Failed to submit approval request");
     }
     setMessage("⏳ Your request has been submitted for approval. An admin or manager will review it shortly.");
     setRequestNote("");
     setShowNoteInput(false);
+    // Reset original state so the button disables — prevents re-submitting the same change
+    setOriginalVideos(selectedVideos);
+    setOriginalAds(selectedAds);
     onDone && onDone(null);
   };
 
@@ -283,7 +290,8 @@ export default function GroupLinkedVideo({ onDone }) {
       }
     } catch (e) {
       const err = e?.response?.data?.detail || e?.message || "Update failed.";
-      setMessage(`❌ ${err}`);
+      // Don't double-prefix if the error already has an emoji indicator
+      setMessage(err.startsWith("⏳") || err.startsWith("✅") ? err : `❌ ${err}`);
     } finally {
       setLoading(false);
     }
