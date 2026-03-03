@@ -148,10 +148,12 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, pu
               overflow: "hidden", position: "relative"
             }}>
               <div style={{
-                display: "inline-block", animation: "slideText 15s linear infinite",
-                whiteSpace: "nowrap", color: typeColors[type].text, fontWeight: 600, fontSize: 14, paddingLeft: "100%"
+                display: "inline-flex", animation: "slideText 20s linear infinite",
+                whiteSpace: "nowrap", color: typeColors[type].text, fontWeight: 600, fontSize: 14,
+                willChange: "transform",
               }}>
-                📢 {message} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 📢 {message}
+                <span style={{ paddingRight: 80 }}>📢 &nbsp;{message}</span>
+                <span style={{ paddingRight: 80 }}>📢 &nbsp;{message}</span>
               </div>
             </div>
           </div>
@@ -190,10 +192,12 @@ function SlidingAnnouncementBanner({ announcement, onClear }) {
     }}>
       <div style={{ flex: 1, overflow: "hidden" }}>
         <div style={{
-          display: "inline-block", animation: "slideText 25s linear infinite",
-          whiteSpace: "nowrap", color: c.text, fontWeight: 600, fontSize: 14, paddingLeft: "100%"
+          display: "inline-flex", animation: "slideText 30s linear infinite",
+          whiteSpace: "nowrap", color: c.text, fontWeight: 600, fontSize: 14,
+          willChange: "transform",
         }}>
-          📢 {announcement.message} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 📢 {announcement.message}
+          <span style={{ paddingRight: 80 }}>📢 &nbsp;{announcement.message}</span>
+          <span style={{ paddingRight: 80 }}>📢 &nbsp;{announcement.message}</span>
         </div>
       </div>
       {onClear && (
@@ -204,7 +208,7 @@ function SlidingAnnouncementBanner({ announcement, onClear }) {
       )}
       <style>{`
         @keyframes slideText {
-          0% { transform: translateX(0); }
+          0%   { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
       `}</style>
