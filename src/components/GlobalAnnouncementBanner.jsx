@@ -18,7 +18,7 @@ const WS_BASE = process.env.REACT_APP_WS_BASE_URL || (() => {
   return `${wsProto}//${window.location.hostname}:8005`;
 })();
 
-const REDISMISS_DELAY_MS = 15 * 60 * 1000; // 15 minutes
+const REDISMISS_DELAY_MS = 20 * 1000; // 20 seconds
 
 function authHeaders() {
   const token = localStorage.getItem("digix_token");

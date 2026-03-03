@@ -105,29 +105,40 @@ function TimeUnit({ value, label }) {
   );
 }
 
+const EXPIRY_REDISMISS_MS = 20 * 1000; // 20 seconds
+const EXPIRY_DISMISS_KEY = "expiration_banner_dismissed_until";
+
 // ─── Expiration Warning Banner ───
 export function ExpirationBanner({ companyStatus, onDismiss }) {
-  const [dismissed, setDismissed] = useState(false);
-  
-  // Don't show if no expiration info at all
+  const [dismissedUntil, setDismissedUntil] = useState(() => {
+    const stored = sessionStorage.getItem(EXPIRY_DISMISS_KEY);
+    return stored ? parseInt(stored, 10) : 0;
+  });
+
+  // Re-show timer: when dismissedUntil passes, clear it
+  useEffect(() => {
+    if (!dismissedUntil) return;
+    const remaining = dismissedUntil - Date.now();
+    if (remaining <= 0) { setDismissedUntil(0); return; }
+    const t = setTimeout(() => setDismissedUntil(0), remaining);
+    return () => clearTimeout(t);
+  }, [dismissedUntil]);
+
   if (!companyStatus) return null;
-  
+
   const { expires_at, expiration_status, days_until_expiration, grace_period_days } = companyStatus;
   const days = days_until_expiration;
-  
+
   // Always show for expired/suspended/grace_period regardless of expires_at
   const isUrgent = expiration_status === 'expired' || expiration_status === 'suspended' || expiration_status === 'grace_period';
-  
-  // For active status: only show if expires_at is set (otherwise nothing to warn about)
   if (!isUrgent && !expires_at) return null;
-  
-  // Don't show if dismissed this session
-  const dismissKey = `expiration_dismissed_${new Date().toDateString()}`;
-  if (dismissed || sessionStorage.getItem(dismissKey)) return null;
-  
+
+  // Hide if currently dismissed
+  if (dismissedUntil > Date.now()) return null;
+
   // Determine severity and styling
   let bgColor, textColor, borderColor, icon, message;
-  
+
   if (expiration_status === 'expired') {
     bgColor = "#dc2626"; textColor = "#fff"; borderColor = "#b91c1c";
     icon = "🚫";
@@ -157,26 +168,21 @@ export function ExpirationBanner({ companyStatus, onDismiss }) {
     icon = "🟢";
     message = `Your subscription expires in ${days ?? '?'} days.`;
   }
-  
+
   const handleDismiss = () => {
-    sessionStorage.setItem(dismissKey, "true");
-    setDismissed(true);
+    const until = Date.now() + EXPIRY_REDISMISS_MS;
+    sessionStorage.setItem(EXPIRY_DISMISS_KEY, String(until));
+    setDismissedUntil(until);
     if (onDismiss) onDismiss();
   };
-  
+
   const showCountdown = expires_at && expiration_status !== 'expired' && expiration_status !== 'suspended';
 
   return (
     <div style={{
-      background: bgColor,
-      color: textColor,
-      padding: "12px 20px",
-      borderBottom: `2px solid ${borderColor}`,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      fontSize: 14,
-      position: "relative"
+      background: bgColor, color: textColor, padding: "12px 20px",
+      borderBottom: `2px solid ${borderColor}`, display: "flex",
+      alignItems: "center", justifyContent: "space-between", fontSize: 14,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 20 }}>{icon}</span>
@@ -189,16 +195,15 @@ export function ExpirationBanner({ companyStatus, onDismiss }) {
           )}
         </div>
       </div>
-      
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         {showCountdown && <CountdownTimer expiresAt={expires_at} compact />}
         <button
           onClick={handleDismiss}
+          title="Dismiss — reappears in 20 seconds"
           style={{
             background: "transparent", border: "none", color: textColor,
             cursor: "pointer", fontSize: 18, padding: 4, opacity: 0.7
           }}
-          title="Dismiss for today"
         >
           ✕
         </button>
