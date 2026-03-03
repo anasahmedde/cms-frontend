@@ -677,10 +677,12 @@ function Dashboard({ user, onLogout }) {
     return () => clearInterval(interval);
   }, [onLogout]);
 
-  // Poll pending approval count for admin/manager roles
+  // Pending approvals: one fetch on mount, then real-time via WebSocket
   useEffect(() => {
     const canApprove = ["admin", "manager", "company_admin", "content_manager"].includes(user?.role) || user?.user_type === "platform";
     if (!canApprove) return;
+
+    // Initial fetch so the badge is correct on first load
     const fetchPending = async () => {
       try {
         const token = localStorage.getItem("digix_token");
@@ -694,8 +696,45 @@ function Dashboard({ user, onLogout }) {
       } catch (_) {}
     };
     fetchPending();
-    const interval = setInterval(fetchPending, 30000);
-    return () => clearInterval(interval);
+
+    // WebSocket: listen for server-pushed pending_approvals updates
+    const WS_BASE = process.env.REACT_APP_WS_BASE_URL || (() => {
+      const apiBase = process.env.REACT_APP_API_BASE_URL || "";
+      if (apiBase.startsWith("https://")) return "wss://" + apiBase.slice(8);
+      if (apiBase.startsWith("http://")) return "ws://" + apiBase.slice(7);
+      return `ws://${window.location.hostname}:8005`;
+    })();
+
+    const token = localStorage.getItem("digix_token");
+    let ws;
+    let reconnectTimeout;
+    let unmounted = false;
+
+    const connect = () => {
+      if (unmounted) return;
+      try {
+        ws = new WebSocket(`${WS_BASE}/ws/devices?token=${token}`);
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === "pending_approvals" && typeof msg.data?.pending_count === "number") {
+              setPendingApprovals(msg.data.pending_count);
+            }
+          } catch (_) {}
+        };
+        ws.onclose = () => {
+          if (!unmounted) reconnectTimeout = setTimeout(connect, 5000);
+        };
+        ws.onerror = () => { try { ws.close(); } catch (_) {} };
+      } catch (_) {}
+    };
+    connect();
+
+    return () => {
+      unmounted = true;
+      clearTimeout(reconnectTimeout);
+      try { ws?.close(); } catch (_) {}
+    };
   }, [user?.role, user?.user_type]);
 
   return (
