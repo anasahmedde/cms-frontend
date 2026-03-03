@@ -665,9 +665,9 @@ function Dashboard({ user, onLogout }) {
   return (
     <AuthContext.Provider value={{ user, hasPermission }}>
       <ThemeContext.Provider value={{ isDark, toggle: toggleTheme, theme }}>
-      <div style={{ display: "flex", minHeight: "100vh", background: theme.bg }}>
+      <div style={{ display: "flex", minHeight: "100vh", background: theme.bg, overflow: "hidden" }}>
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={onLogout} onChangePassword={() => setShowChangePassword(true)} hasPermission={hasPermission} isDark={isDark} toggleTheme={toggleTheme} impersonating={impersonating} />
-        <div style={{ flex: 1, marginLeft: 260 }}>
+        <div style={{ flex: 1, marginLeft: 260, minWidth: 0, width: "calc(100vw - 260px)", overflowX: "hidden" }}>
           {/* Global Platform Announcement Banner - visible to ALL users */}
           <GlobalAnnouncementBanner />
           
