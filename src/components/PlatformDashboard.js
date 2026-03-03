@@ -16,13 +16,29 @@ function authHeaders() {
 // Announcements are stored in the database and visible to ALL users
 // ═══════════════════════════════════════════════════════
 
+// Duration presets: label → minutes (null = never expires)
+const DURATION_PRESETS = [
+  { label: "No expiry", minutes: null },
+  { label: "15 min", minutes: 15 },
+  { label: "30 min", minutes: 30 },
+  { label: "1 hour", minutes: 60 },
+  { label: "3 hours", minutes: 180 },
+  { label: "6 hours", minutes: 360 },
+  { label: "12 hours", minutes: 720 },
+  { label: "1 day", minutes: 1440 },
+  { label: "3 days", minutes: 4320 },
+  { label: "7 days", minutes: 10080 },
+];
+
 function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, publishing }) {
   const [message, setMessage] = useState(currentAnnouncement?.message || "");
   const [type, setType] = useState(currentAnnouncement?.type || "info");
+  const [durationMinutes, setDurationMinutes] = useState(null); // null = never
 
   useEffect(() => {
     setMessage(currentAnnouncement?.message || "");
     setType(currentAnnouncement?.type || "info");
+    setDurationMinutes(null);
   }, [currentAnnouncement, isOpen]);
 
   if (!isOpen) return null;
@@ -34,18 +50,23 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, pu
   };
 
   const handlePublish = () => {
-    if (message.trim()) {
-      onPublish({ message: message.trim(), type });
+    if (!message.trim()) return;
+    let expires_at = null;
+    if (durationMinutes !== null) {
+      expires_at = new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
     }
+    onPublish({ message: message.trim(), type, expires_at });
   };
+
+  const selectedPreset = DURATION_PRESETS.find(p => p.minutes === durationMinutes);
 
   return (
     <>
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000 }} onClick={onClose} />
       <div style={{
         position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-        background: "#fff", borderRadius: 16, padding: 24, width: 500, maxWidth: "90vw",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.3)", zIndex: 1001
+        background: "#fff", borderRadius: 16, padding: 24, width: 520, maxWidth: "90vw",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.3)", zIndex: 1001, maxHeight: "90vh", overflowY: "auto"
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>📢 Create Announcement</h3>
@@ -53,9 +74,10 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, pu
         </div>
 
         <div style={{ padding: "10px 12px", background: "#eff6ff", borderRadius: 8, marginBottom: 16, fontSize: 12, color: "#1e40af" }}>
-          💡 This announcement will be visible to <strong>ALL company users</strong> across the platform.
+          💡 This announcement will be visible to <strong>ALL company users</strong> across the platform instantly.
         </div>
 
+        {/* Message */}
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Message</label>
           <textarea
@@ -69,7 +91,8 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, pu
           />
         </div>
 
-        <div style={{ marginBottom: 20 }}>
+        {/* Banner Type */}
+        <div style={{ marginBottom: 16 }}>
           <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>Banner Type</label>
           <div style={{ display: "flex", gap: 8 }}>
             {Object.entries(typeColors).map(([key, val]) => (
@@ -80,6 +103,40 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, pu
               }}>{val.label}</button>
             ))}
           </div>
+        </div>
+
+        {/* Duration / Auto-expire */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
+            ⏱ Auto-dismiss after
+          </label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {DURATION_PRESETS.map(p => (
+              <button
+                key={String(p.minutes)}
+                onClick={() => setDurationMinutes(p.minutes)}
+                style={{
+                  padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  border: durationMinutes === p.minutes ? "2px solid #0f172a" : "1px solid #e5e7eb",
+                  background: durationMinutes === p.minutes ? "#0f172a" : "#f8fafc",
+                  color: durationMinutes === p.minutes ? "#fff" : "#374151",
+                  transition: "all 0.15s"
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {durationMinutes !== null && (
+            <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
+              ✅ Announcement will automatically disappear from all dashboards after <strong>{selectedPreset?.label}</strong>.
+            </div>
+          )}
+          {durationMinutes === null && (
+            <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
+              ℹ️ Announcement will stay visible until you manually clear it.
+            </div>
+          )}
         </div>
 
         {/* Preview */}
@@ -518,7 +575,7 @@ export default function PlatformDashboard() {
       const res = await fetch(`${API_BASE}/platform/announcement`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ message: ann.message, type: ann.type, is_active: true })
+        body: JSON.stringify({ message: ann.message, type: ann.type, is_active: true, expires_at: ann.expires_at || null })
       });
       if (res.ok) {
         const data = await res.json();
