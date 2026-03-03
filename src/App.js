@@ -694,7 +694,7 @@ function Dashboard({ user, onLogout }) {
       } catch (_) {}
     };
     fetchPending();
-    const interval = setInterval(fetchPending, 120000); // 2 min — approvals aren't second-critical
+    const interval = setInterval(fetchPending, 60000);
     return () => clearInterval(interval);
   }, [user?.role, user?.user_type]);
 
