@@ -1,11 +1,23 @@
 // src/components/GroupLinkedVideo.js - Enhanced UI with Videos and Advertisements
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { listVideoNames } from "../api/video";
 import { listGroupNames } from "../api/group";
 import { setGroupVideosByNames, listGroupVideoNames } from "../api/dvsg";
 import axios from "axios";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
+
+function authHeaders() {
+  const token = localStorage.getItem("digix_token");
+  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+}
+
+// Roles that can link content directly without approval
+const AUTO_APPROVE_ROLES = new Set(["admin", "manager", "company_admin", "content_manager"]);
+
+function getStoredUser() {
+  try { return JSON.parse(localStorage.getItem("digix_user") || "{}"); } catch { return {}; }
+}
 
 const NO_GROUP_LABEL = "— No group —";
 const NO_GROUP_VALUE = "_none";
@@ -37,8 +49,43 @@ export default function GroupLinkedVideo({ onDone }) {
   const [initialLoading, setInitialLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  // Load groups, videos, and advertisements
+  // Approval workflow state
+  const [approvalRequired, setApprovalRequired] = useState(false);
+  const [requestNote, setRequestNote] = useState("");
+  const [showNoteInput, setShowNoteInput] = useState(false);
+
+  // Track what was already linked when the group was loaded
+  const [originalVideos, setOriginalVideos] = useState([]);
+  const [originalAds, setOriginalAds] = useState([]);
+
+  const currentUser = getStoredUser();
+  const userRole = currentUser?.role || "";
+  const userType = currentUser?.user_type || "";
+  // Platform users (including impersonation) and high-privilege roles bypass approval
+  const baseNeedsApproval = approvalRequired && userType !== "platform" && !AUTO_APPROVE_ROLES.has(userRole);
+
+  // Only newly added items (not in original set) need approval
+  const newlyAddedVideos = selectedVideos.filter(v => !originalVideos.includes(v));
+  const newlyAddedAds = selectedAds.filter(a => !originalAds.includes(a));
+  const hasNewAdditions = newlyAddedVideos.length > 0 || newlyAddedAds.length > 0;
+
+  // Approval is only needed when the user is adding new content (not just removing)
+  const needsApproval = baseNeedsApproval && hasNewAdditions;
+
+  // Fetch approval settings on mount
+  const fetchApprovalSettings = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/company/approval-settings`, { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setApprovalRequired(data.require_content_approval || false);
+      }
+    } catch (_) {}
+  }, []);
+
+  // Load groups, videos, advertisements, and approval settings
   useEffect(() => {
+    fetchApprovalSettings();
     (async () => {
       setInitialLoading(true);
       try {
@@ -82,6 +129,8 @@ export default function GroupLinkedVideo({ onDone }) {
     if (!gvalue) {
       setSelectedVideos([]);
       setSelectedAds([]);
+      setOriginalVideos([]);
+      setOriginalAds([]);
       return;
     }
     (async () => {
@@ -90,24 +139,31 @@ export default function GroupLinkedVideo({ onDone }) {
         // Fetch videos
         const videoRes = await listGroupVideoNames(gvalue);
         const videoNames = videoRes?.data?.video_names || videoRes?.video_names || ensureArray(videoRes);
-        setSelectedVideos(Array.isArray(videoNames) ? videoNames : []);
-        
+        const safeVideoNames = Array.isArray(videoNames) ? videoNames : [];
+        setSelectedVideos(safeVideoNames);
+        setOriginalVideos(safeVideoNames); // snapshot for delta tracking
+
         // Fetch advertisements
         try {
           const adRes = await axios.get(`${API_BASE}/group/${encodeURIComponent(gvalue)}/advertisements`);
           const adNames = adRes?.data?.ad_names || [];
-          setSelectedAds(Array.isArray(adNames) ? adNames : []);
+          const safeAdNames = Array.isArray(adNames) ? adNames : [];
+          setSelectedAds(safeAdNames);
+          setOriginalAds(safeAdNames); // snapshot for delta tracking
         } catch (adErr) {
           console.log("No advertisements linked or endpoint not ready:", adErr);
           setSelectedAds([]);
+          setOriginalAds([]);
         }
-        
+
         const hasContent = (Array.isArray(videoNames) && videoNames.length > 0);
         setMessage(hasContent ? "" : "No content linked yet. Add videos or images below!");
       } catch (e) {
         console.error("Failed to load group content:", e);
         setSelectedVideos([]);
         setSelectedAds([]);
+        setOriginalVideos([]);
+        setOriginalAds([]);
         setMessage("No content linked yet. Add videos or images below!");
       }
     })();
@@ -146,46 +202,96 @@ export default function GroupLinkedVideo({ onDone }) {
   const clearVideos = () => setSelectedVideos([]);
   const clearAds = () => setSelectedAds([]);
 
-  const canSubmit = gvalue && (selectedVideos.length > 0 || selectedAds.length > 0) && !loading;
+  // Can submit if group selected and content has changed from original
+  const hasChanges = gvalue && (
+    selectedVideos.length !== originalVideos.length ||
+    selectedAds.length !== originalAds.length ||
+    selectedVideos.some(v => !originalVideos.includes(v)) ||
+    selectedAds.some(a => !originalAds.includes(a)) ||
+    originalVideos.some(v => !selectedVideos.includes(v)) ||
+    originalAds.some(a => !selectedAds.includes(a))
+  );
+  const canSubmit = hasChanges && !loading;
+
+  const submitDirect = async () => {
+    let videoMsg = "";
+    let adMsg = "";
+
+    // Link videos if any selected
+    if (selectedVideos.length > 0) {
+      const res = await setGroupVideosByNames(gvalue, selectedVideos);
+      const data = res?.data || res || {};
+      const okInserted = data.inserted_count ?? 0;
+      const okDeleted = data.deleted_count ?? 0;
+      videoMsg = `Linked ${selectedVideos.length} video(s) (+${okInserted} new, -${okDeleted} removed)`;
+    }
+
+    // Link advertisements if any selected
+    if (selectedAds.length > 0) {
+      const adRes = await axios.post(`${API_BASE}/group/${encodeURIComponent(gvalue)}/advertisements`, {
+        ad_names: selectedAds
+      });
+      const adData = adRes?.data || {};
+      const adInserted = adData.inserted_count ?? 0;
+      const adDeleted = adData.deleted_count ?? 0;
+      adMsg = `Linked ${selectedAds.length} image(s) (+${adInserted} new, -${adDeleted} removed)`;
+    }
+
+    const combinedMsg = [videoMsg, adMsg].filter(Boolean).join(". ");
+    setMessage(`✅ ${combinedMsg}`);
+    onDone && onDone({ gname: gvalue, videos: selectedVideos, advertisements: selectedAds });
+  };
+
+  const submitApprovalRequest = async () => {
+    // Only send the newly added items — not the full current list
+    const res = await fetch(`${API_BASE}/content-changes`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        request_type: "link_content",
+        target_type: "group",
+        target_id: 0, // resolved by name on backend
+        change_data: {
+          gname: gvalue,
+          video_names: newlyAddedVideos,
+          ad_names: newlyAddedAds,
+        },
+        request_note: requestNote.trim() || null,
+        expires_in_hours: 72,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      // 409 = duplicate pending request
+      if (res.status === 409) {
+        throw new Error(`⏳ Already under review — ${err.detail || "a pending approval request for this group already exists."}`);
+      }
+      throw new Error(err.detail || "Failed to submit approval request");
+    }
+    setMessage("⏳ Your request has been submitted for approval. An admin or manager will review it shortly.");
+    setRequestNote("");
+    setShowNoteInput(false);
+    // Reset original state so the button disables — prevents re-submitting the same change
+    setOriginalVideos(selectedVideos);
+    setOriginalAds(selectedAds);
+    onDone && onDone(null);
+  };
 
   const submit = async () => {
     if (!canSubmit) return;
     setLoading(true);
     setMessage("");
-    
-    let videoMsg = "";
-    let adMsg = "";
-    
     try {
-      // Link videos if any selected
-      if (selectedVideos.length > 0) {
-        const res = await setGroupVideosByNames(gvalue, selectedVideos);
-        const data = res?.data || res || {};
-        const okInserted = data.inserted_count ?? 0;
-        const okUpdated = data.updated_count ?? 0;
-        const okDeleted = data.deleted_count ?? 0;
-        videoMsg = `Linked ${selectedVideos.length} video(s) (+${okInserted} new, -${okDeleted} removed)`;
+      // Approval only applies when adding new content; removals always go direct
+      if (needsApproval && hasNewAdditions) {
+        await submitApprovalRequest();
+      } else {
+        await submitDirect();
       }
-      
-      // Link advertisements if any selected
-      if (selectedAds.length > 0) {
-        const adRes = await axios.post(`${API_BASE}/group/${encodeURIComponent(gvalue)}/advertisements`, {
-          ad_names: selectedAds
-        });
-        const adData = adRes?.data || {};
-        const adInserted = adData.inserted_count ?? 0;
-        const adDeleted = adData.deleted_count ?? 0;
-        adMsg = `Linked ${selectedAds.length} image(s) (+${adInserted} new, -${adDeleted} removed)`;
-      }
-      
-      // Combine messages
-      const combinedMsg = [videoMsg, adMsg].filter(Boolean).join(". ");
-      setMessage(`✅ ${combinedMsg}`);
-      
-      onDone && onDone({ gname: gvalue, videos: selectedVideos, advertisements: selectedAds });
     } catch (e) {
       const err = e?.response?.data?.detail || e?.message || "Update failed.";
-      setMessage(`❌ ${err}`);
+      // Don't double-prefix if the error already has an emoji indicator
+      setMessage(err.startsWith("⏳") || err.startsWith("✅") ? err : `❌ ${err}`);
     } finally {
       setLoading(false);
     }
@@ -347,6 +453,27 @@ export default function GroupLinkedVideo({ onDone }) {
         </div>
       )}
 
+      {/* Approval notice — only shown when user is adding new content */}
+      {baseNeedsApproval && hasNewAdditions && canSubmit && (
+        <div style={{ padding: "12px 16px", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, fontSize: 13, color: "#92400e" }}>
+          <strong>⚠️ Approval Required</strong> — Adding {newlyAddedVideos.length > 0 ? `${newlyAddedVideos.length} new video(s)` : ""}{newlyAddedVideos.length > 0 && newlyAddedAds.length > 0 ? " and " : ""}{newlyAddedAds.length > 0 ? `${newlyAddedAds.length} new image(s)` : ""} requires manager or admin approval before going live.
+          <button
+            onClick={() => setShowNoteInput(v => !v)}
+            style={{ marginLeft: 12, fontSize: 12, padding: "3px 10px", border: "1px solid #f59e0b", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#92400e", fontWeight: 600 }}
+          >
+            {showNoteInput ? "Hide note" : "Add a note"}
+          </button>
+          {showNoteInput && (
+            <textarea
+              value={requestNote}
+              onChange={e => setRequestNote(e.target.value)}
+              placeholder="Optional: explain why you're making this change..."
+              style={{ display: "block", width: "100%", marginTop: 10, padding: 10, border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, resize: "vertical", minHeight: 60, boxSizing: "border-box" }}
+            />
+          )}
+        </div>
+      )}
+
       {/* Submit Button */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
         <button
@@ -356,13 +483,17 @@ export default function GroupLinkedVideo({ onDone }) {
             padding: "16px 32px",
             borderRadius: 12,
             border: "none",
-            background: canSubmit ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" : "#e5e7eb",
+            background: canSubmit
+              ? needsApproval
+                ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+              : "#e5e7eb",
             color: canSubmit ? "#fff" : "#9ca3af",
             fontSize: 16,
             fontWeight: 600,
             cursor: canSubmit ? "pointer" : "not-allowed",
             transition: "all 0.2s",
-            boxShadow: canSubmit ? "0 4px 14px 0 rgba(102, 126, 234, 0.4)" : "none",
+            boxShadow: canSubmit ? (needsApproval ? "0 4px 14px 0 rgba(245,158,11,0.4)" : "0 4px 14px 0 rgba(102,126,234,0.4)") : "none",
             display: "flex",
             alignItems: "center",
             gap: 8,
@@ -371,10 +502,14 @@ export default function GroupLinkedVideo({ onDone }) {
           {loading ? (
             <>
               <span style={{ width: 18, height: 18, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-              Saving...
+              {needsApproval ? "Submitting..." : "Saving..."}
             </>
-          ) : (
+          ) : needsApproval ? (
+            <>📋 Submit for Approval</>
+          ) : hasNewAdditions ? (
             <>🔗 Link Content</>
+          ) : (
+            <>💾 Save Changes</>
           )}
         </button>
       </div>
@@ -384,9 +519,9 @@ export default function GroupLinkedVideo({ onDone }) {
         <div style={{
           padding: "14px 18px",
           borderRadius: 12,
-          background: message.startsWith("✅") ? "#ecfdf5" : message.startsWith("❌") ? "#fef2f2" : "#f0f9ff",
-          border: `1px solid ${message.startsWith("✅") ? "#a7f3d0" : message.startsWith("❌") ? "#fecaca" : "#bae6fd"}`,
-          color: message.startsWith("✅") ? "#065f46" : message.startsWith("❌") ? "#991b1b" : "#0369a1",
+          background: message.startsWith("✅") ? "#ecfdf5" : message.startsWith("❌") ? "#fef2f2" : "#fffbeb",
+          border: `1px solid ${message.startsWith("✅") ? "#a7f3d0" : message.startsWith("❌") ? "#fecaca" : "#fcd34d"}`,
+          color: message.startsWith("✅") ? "#065f46" : message.startsWith("❌") ? "#991b1b" : "#92400e",
           fontSize: 14,
           lineHeight: 1.5,
         }}>

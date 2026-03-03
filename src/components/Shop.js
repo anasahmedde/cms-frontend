@@ -171,9 +171,10 @@ export default function Shop() {
     setExpandedShop(shopName);
     setLoadingDevices(true);
     try {
-      // Use port 8005 (main API) for the shop devices endpoint
+      // Use main API for the shop devices endpoint
+      const apiBase = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
       const res = await fetch(
-        `${window.location.protocol}//${window.location.hostname}:8005/shop/${encodeURIComponent(shopName)}/devices`
+        `${apiBase}/shop/${encodeURIComponent(shopName)}/devices`
       );
       if (res.ok) {
         const data = await res.json();

@@ -12,6 +12,7 @@ const dvsgApi = axios.create({
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
+dvsgApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 
 function Modal({ open, title, onClose, children, footer, width = "720px" }) {
   useEffect(() => {
@@ -388,7 +389,21 @@ export default function Advertisement() {
       await dvsgApi.delete(`/advertisement/${encodeURIComponent(name)}`);
       load();
     } catch (e) {
-      alert(e?.response?.data?.detail || "Delete failed");
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+      if (status === 409 && detail?.linked) {
+        const parts = Object.entries(detail.linked).map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`);
+        if (window.confirm(`Advertisement "${name}" is linked to: ${parts.join(', ')}.\n\nUnlink everything and delete?`)) {
+          try {
+            await dvsgApi.delete(`/advertisement/${encodeURIComponent(name)}?force=true`);
+            load();
+          } catch (e2) {
+            alert(e2?.response?.data?.detail || "Force delete failed");
+          }
+        }
+      } else {
+        alert(typeof detail === 'string' ? detail : detail?.message || "Delete failed");
+      }
     }
   };
 
@@ -632,7 +647,10 @@ export default function Advertisement() {
                       }}>▶</span>
                       <div>
                         <div style={{ fontWeight: 600 }}>{it.ad_name}</div>
-                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>ID: {it.id}</div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                          ID: {it.id}
+                          {it.company_name && <span style={{ marginLeft: 8, background: "#dbeafe", color: "#1e40af", padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600 }}>{it.company_name}</span>}
+                        </div>
                       </div>
                     </div>
                   </td>

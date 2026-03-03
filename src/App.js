@@ -8,6 +8,11 @@ import Advertisement from "./components/Advertisement";
 import RecentLinks from "./components/RecentLinks";
 import GroupLinkedVideo from "./components/GroupLinkedVideo";
 import Reports from "./components/Reports";
+import PlatformAdmin from "./components/PlatformAdmin";
+import PlatformDashboard from "./components/PlatformDashboard";
+import GlobalAnnouncementBanner from "./components/GlobalAnnouncementBanner";
+import { ExpirationBanner, NotificationBell, CompanyStatusTimer } from "./components/ExpirationNotificationBanner";
+import ContentApprovalQueue from "./components/ContentApprovalQueue";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
 
@@ -131,7 +136,10 @@ function LoginPage({ onLogin }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Login failed");
       localStorage.setItem("digix_token", data.token);
+      localStorage.setItem("token", data.token); // httpFactory uses "token"
       localStorage.setItem("digix_user", JSON.stringify(data));
+      if (data.session_id) localStorage.setItem("digix_session_id", data.session_id);
+      if (data.company) localStorage.setItem("digix_tenant", JSON.stringify(data.company));
       onLogin(data);
     } catch (err) {
       setError(err.message);
@@ -182,9 +190,14 @@ function UserManagement({ onUserDeactivated }) {
   const [showCreate, setShowCreate] = useState(false);
   const [editUser, setEditUser] = useState(null);
   const [resetPasswordUser, setResetPasswordUser] = useState(null);
-  const [form, setForm] = useState({ username: "", password: "", email: "", full_name: "", role: "viewer" });
+  const [form, setForm] = useState({ username: "", password: "", email: "", full_name: "", role: "viewer", company_slug: "" });
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
+  const [companies, setCompanies] = useState([]);
+
+  // Detect if current user is platform admin
+  const currentUser = JSON.parse(localStorage.getItem("digix_user") || "{}");
+  const isPlatform = currentUser?.user_type === "platform";
 
   const loadUsers = async () => {
     try {
@@ -200,17 +213,33 @@ function UserManagement({ onUserDeactivated }) {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { loadUsers(); }, []);
+  const loadCompanies = async () => {
+    if (!isPlatform) return;
+    try {
+      const token = localStorage.getItem("digix_token");
+      const res = await fetch(`${API_BASE}/platform/companies?limit=200`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setCompanies(data.items || []);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  useEffect(() => { loadUsers(); loadCompanies(); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setError("");
     try {
       const token = localStorage.getItem("digix_token");
-      const res = await fetch(`${API_BASE}/users`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(form) });
+      const payload = { username: form.username, password: form.password, email: form.email || undefined, full_name: form.full_name || undefined, role: form.role };
+      if (isPlatform && form.company_slug) {
+        payload.company_slug = form.company_slug;
+      }
+      const res = await fetch(`${API_BASE}/users`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.detail || "Failed"); }
       setShowCreate(false);
-      setForm({ username: "", password: "", email: "", full_name: "", role: "viewer" });
+      setForm({ username: "", password: "", email: "", full_name: "", role: "viewer", company_slug: "" });
       loadUsers();
     } catch (err) { setError(err.message); }
   };
@@ -260,12 +289,13 @@ function UserManagement({ onUserDeactivated }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <h3 style={{ margin: 0 }}>Users ({users.length})</h3>
-        <button onClick={() => setShowCreate(true)} style={{ padding: "10px 20px", background: BRAND.gradient, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>+ Add User</button>
+        <button onClick={() => { setShowCreate(true); setError(""); }} style={{ padding: "10px 20px", background: BRAND.gradient, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>+ Add User</button>
       </div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead><tr style={{ background: "#f8fafc" }}>
           <th style={{ padding: 12, textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>Username</th>
           <th style={{ padding: 12, textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>Name</th>
+          {isPlatform && <th style={{ padding: 12, textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>Company</th>}
           <th style={{ padding: 12, textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>Role</th>
           <th style={{ padding: 12, textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>Status</th>
           <th style={{ padding: 12, textAlign: "right", borderBottom: "2px solid #e5e7eb" }}>Actions</th>
@@ -274,12 +304,21 @@ function UserManagement({ onUserDeactivated }) {
           {users.map((u) => (
             <tr key={u.id}>
               <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}><strong>{u.username}</strong><br/><span style={{ color: "#64748b", fontSize: 12 }}>{u.email}</span></td>
-              <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}>{u.full_name || "—"}</td>
+              <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}>{u.full_name || "\u2014"}</td>
+              {isPlatform && <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}>
+                {u.company_name ? (
+                  <span style={{ padding: "4px 10px", borderRadius: 20, background: "#eff6ff", color: "#1e40af", fontSize: 12, fontWeight: 600 }}>{u.company_name}</span>
+                ) : u.user_type === "platform" ? (
+                  <span style={{ padding: "4px 10px", borderRadius: 20, background: "#fef3c7", color: "#92400e", fontSize: 12, fontWeight: 600 }}>Platform</span>
+                ) : (
+                  <span style={{ color: "#9ca3af", fontSize: 12 }}>\u2014</span>
+                )}
+              </td>}
               <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}><span style={{ padding: "4px 10px", borderRadius: 20, background: u.role === "admin" ? "#fef3c7" : u.role === "manager" ? "#dbeafe" : u.role === "editor" ? "#d1fae5" : "#f3f4f6", color: u.role === "admin" ? "#92400e" : u.role === "manager" ? "#1e40af" : u.role === "editor" ? "#065f46" : "#374151", fontSize: 12, fontWeight: 600 }}>{u.role}</span></td>
               <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}><span style={{ padding: "4px 10px", borderRadius: 20, background: u.is_active ? "#dcfce7" : "#fee2e2", color: u.is_active ? "#166534" : "#dc2626", fontSize: 12, fontWeight: 600 }}>{u.is_active ? "Active" : "Inactive"}</span></td>
               <td style={{ padding: 12, borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
                 <button onClick={() => { setEditUser(u); setForm({ email: u.email || "", full_name: u.full_name || "", role: u.role, is_active: u.is_active }); setError(""); }} style={{ padding: "6px 12px", background: "#f1f5f9", border: "none", borderRadius: 6, cursor: "pointer", marginRight: 8 }}>Edit</button>
-                <button onClick={() => { setResetPasswordUser(u); setNewPassword(""); setError(""); }} style={{ padding: "6px 12px", background: "#fef3c7", color: "#92400e", border: "none", borderRadius: 6, cursor: "pointer", marginRight: 8 }}>🔑 Reset</button>
+                <button onClick={() => { setResetPasswordUser(u); setNewPassword(""); setError(""); }} style={{ padding: "6px 12px", background: "#fef3c7", color: "#92400e", border: "none", borderRadius: 6, cursor: "pointer", marginRight: 8 }}>Reset</button>
                 {u.username !== "admin" && <button onClick={() => handleDelete(u.id)} style={{ padding: "6px 12px", background: "#fee2e2", color: "#dc2626", border: "none", borderRadius: 6, cursor: "pointer" }}>Delete</button>}
               </td>
             </tr>
@@ -288,6 +327,16 @@ function UserManagement({ onUserDeactivated }) {
       </table>
       <Modal open={showCreate} title="Create User" onClose={() => setShowCreate(false)} size="sm">
         <form onSubmit={handleCreate}>
+          {isPlatform && companies.length > 0 && (
+            <div style={{ marginBottom: 16, padding: 12, background: "#eff6ff", borderRadius: 8, border: "1px solid #bfdbfe" }}>
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 600, color: "#1e40af", fontSize: 13 }}>Assign to Company</label>
+              <select value={form.company_slug} onChange={(e) => setForm({ ...form, company_slug: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }}>
+                <option value="">Platform User (no company)</option>
+                {companies.map(c => <option key={c.slug} value={c.slug}>{c.name} ({c.slug})</option>)}
+              </select>
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>Same username can exist in different companies</div>
+            </div>
+          )}
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Username *</label><input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} /></div>
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Password *</label><input required type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} /></div>
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Email</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} /></div>
@@ -299,6 +348,11 @@ function UserManagement({ onUserDeactivated }) {
       </Modal>
       <Modal open={!!editUser} title="Edit User" onClose={() => setEditUser(null)} size="sm">
         <form onSubmit={handleUpdate}>
+          {isPlatform && editUser && (
+            <div style={{ marginBottom: 16, padding: 10, background: "#f9fafb", borderRadius: 8, fontSize: 13 }}>
+              <strong>Company:</strong> {editUser.company_name ? <span style={{ color: "#1e40af" }}>{editUser.company_name}</span> : editUser.user_type === "platform" ? <span style={{ color: "#92400e" }}>Platform</span> : <span style={{ color: "#9ca3af" }}>None</span>}
+            </div>
+          )}
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Email</label><input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} /></div>
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Full Name</label><input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }} /></div>
           <div style={{ marginBottom: 16 }}><label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>Role</label><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxSizing: "border-box" }}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
@@ -365,34 +419,52 @@ function ChangePasswordModal({ open, onClose }) {
 }
 
 /* ======================== Sidebar ======================== */
-function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword, hasPermission, isDark, toggleTheme }) {
+function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword, hasPermission, isDark, toggleTheme, impersonating, pendingApprovals = 0 }) {
   const menuItems = [];
+  const isPlatformUser = user?.user_type === "platform";
+  const isImpersonating = !!impersonating;
+  
+  // Platform admin menu (DIGIX staff only)
+  if (isPlatformUser) {
+    menuItems.push({ id: "platform", icon: "🏢", label: "Platform Admin" });
+  }
   
   // Always show dashboard
   menuItems.push({ id: "dashboard", icon: "📊", label: "Dashboard" });
   
-  // Show based on permissions
-  if (hasPermission("manage_devices")) {
-    menuItems.push({ id: "devices", icon: "📱", label: "Devices" });
+  // Company-specific tabs: only show for company users OR platform users who are impersonating
+  const showCompanyTabs = !isPlatformUser || isImpersonating;
+  
+  if (showCompanyTabs) {
+    // Show based on permissions
+    if (hasPermission("manage_devices")) {
+      menuItems.push({ id: "devices", icon: "📱", label: "Devices" });
+    }
+    if (hasPermission("manage_videos") || hasPermission("upload_videos")) {
+      menuItems.push({ id: "videos", icon: "🎬", label: "Videos" });
+    }
+    if (hasPermission("manage_videos") || hasPermission("upload_videos")) {
+      menuItems.push({ id: "advertisements", icon: "🖼️", label: "Advertisements" });
+    }
+    if (hasPermission("manage_groups")) {
+      menuItems.push({ id: "groups", icon: "👥", label: "Groups" });
+    }
+    if (hasPermission("manage_shops")) {
+      menuItems.push({ id: "shops", icon: "🏪", label: "Shops" });
+    }
+    if (hasPermission("manage_links")) {
+      menuItems.push({ id: "links", icon: "🔗", label: "Link Content" });
+    }
+    if (hasPermission("view_reports")) {
+      menuItems.push({ id: "reports", icon: "📈", label: "Reports" });
+    }
+    // Approvals: visible to admins and managers (roles that can approve)
+    const canApprove = ["admin", "manager", "company_admin", "content_manager"].includes(user?.role) || user?.user_type === "platform";
+    if (canApprove) {
+      menuItems.push({ id: "approvals", icon: "✅", label: "Approvals", badge: pendingApprovals || 0 });
+    }
   }
-  if (hasPermission("manage_videos") || hasPermission("upload_videos")) {
-    menuItems.push({ id: "videos", icon: "🎬", label: "Videos" });
-  }
-  if (hasPermission("manage_videos") || hasPermission("upload_videos")) {
-    menuItems.push({ id: "advertisements", icon: "🖼️", label: "Advertisements" });
-  }
-  if (hasPermission("manage_groups")) {
-    menuItems.push({ id: "groups", icon: "👥", label: "Groups" });
-  }
-  if (hasPermission("manage_shops")) {
-    menuItems.push({ id: "shops", icon: "🏪", label: "Shops" });
-  }
-  if (hasPermission("manage_links")) {
-    menuItems.push({ id: "links", icon: "🔗", label: "Link Content" });
-  }
-  if (hasPermission("view_reports")) {
-    menuItems.push({ id: "reports", icon: "📈", label: "Reports" });
-  }
+  
   if (hasPermission("manage_users")) {
     menuItems.push({ id: "users", icon: "👤", label: "Users" });
   }
@@ -412,7 +484,7 @@ function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword
           <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>{(user?.full_name || user?.username || "U")[0].toUpperCase()}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: "#fff", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.full_name || user?.username}</div>
-            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textTransform: "capitalize" }}>{user?.role}</div>
+            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, textTransform: "capitalize" }}>{user?.role}{user?.company?.name ? ` · ${user.company.name}` : isPlatformUser ? " · Platform" : ""}</div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -425,7 +497,13 @@ function Sidebar({ currentPage, setCurrentPage, user, onLogout, onChangePassword
       <nav style={{ flex: 1, padding: "16px 12px" }}>
         {menuItems.map((item) => (
           <button key={item.id} onClick={() => setCurrentPage(item.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", marginBottom: 4, border: "none", borderRadius: 10, background: currentPage === item.id ? "rgba(245,158,11,0.2)" : "transparent", color: currentPage === item.id ? "#f59e0b" : "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: 14, fontWeight: currentPage === item.id ? 600 : 500, textAlign: "left", transition: "all 0.2s", borderLeft: currentPage === item.id ? "3px solid #f59e0b" : "3px solid transparent" }}>
-            <span style={{ fontSize: 18 }}>{item.icon}</span>{item.label}
+            <span style={{ fontSize: 18 }}>{item.icon}</span>
+            <span style={{ flex: 1 }}>{item.label}</span>
+            {item.badge > 0 && (
+              <span style={{ background: "#ef4444", color: "#fff", fontSize: 11, fontWeight: 700, minWidth: 20, height: 20, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px" }}>
+                {item.badge}
+              </span>
+            )}
           </button>
         ))}
       </nav>
@@ -444,6 +522,13 @@ function Dashboard({ user, onLogout }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [isDark, setIsDark] = useState(() => localStorage.getItem("digix_theme") === "dark");
+  const [impersonating, setImpersonating] = useState(null); // { slug, name }
+  
+  // Company expiration warning state
+  const [companyExpiration, setCompanyExpiration] = useState(null);
+
+  // Pending approval count (for admin/manager badge)
+  const [pendingApprovals, setPendingApprovals] = useState(0);
 
   const toggleTheme = useCallback(() => {
     setIsDark(prev => {
@@ -457,11 +542,123 @@ function Dashboard({ user, onLogout }) {
 
   useEffect(() => { const timer = setInterval(() => setCurrentTime(new Date()), 1000); return () => clearInterval(timer); }, []);
 
-  // Calculate permissions based on role
-  const userPermissions = ROLE_PERMISSIONS[user?.role] || [];
+  // ── Fetch company expiration status for company users ──
+  useEffect(() => {
+    const fetchExpiration = async () => {
+      // Only check for company users (not platform users)
+      // Login response stores tenant_id inside company.id, not at top level
+      const isCompanyUser = user?.user_type !== "platform" && (user?.company?.id || user?.tenant_id);
+      if (!isCompanyUser) return;
+
+      try {
+        const token = localStorage.getItem("digix_token");
+        const res = await fetch(`${API_BASE}/company/expiration-status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCompanyExpiration({
+            expires_at: data.expires_at,
+            expiration_status: data.status,       // 'active', 'grace_period', 'expired', 'suspended'
+            days_until_expiration: data.days_remaining,
+            grace_period_days: data.days_remaining,
+            company_name: data.company_name
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch expiration status:", err);
+      }
+    };
+
+    fetchExpiration();
+    const interval = setInterval(fetchExpiration, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // ── Activity tracking: page visits ──
+  const prevPageRef = React.useRef(null);
+  const pageEnteredRef = React.useRef(Date.now());
+  useEffect(() => {
+    const token = localStorage.getItem("digix_token");
+    if (!token) return;
+    const sessionId = localStorage.getItem("digix_session_id");
+    const prevPage = prevPageRef.current;
+    const prevDuration = prevPage ? Math.round((Date.now() - pageEnteredRef.current) / 1000) : null;
+    prevPageRef.current = currentPage;
+    pageEnteredRef.current = Date.now();
+    fetch(`${API_BASE}/track/page`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ page: currentPage, session_id: sessionId ? parseInt(sessionId) : null, prev_page: prevPage, prev_duration_sec: prevDuration }),
+    }).catch(() => {});
+  }, [currentPage]);
+
+  // ── Heartbeat every 60s (+ immediate on mount to re-activate session after reload) ──
+  useEffect(() => {
+    const token = localStorage.getItem("digix_token");
+    if (!token) return;
+    const sendHB = () => fetch(`${API_BASE}/track/heartbeat`, {
+      method: "POST", headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {});
+    sendHB(); // immediate
+    const hb = setInterval(sendHB, 60000);
+    return () => clearInterval(hb);
+  }, []);
+
+  // ── Mark session inactive on tab close (without killing auth token) ──
+  useEffect(() => {
+    const handleUnload = () => {
+      const token = localStorage.getItem("digix_token");
+      if (!token) return;
+      // Use dedicated endpoint that marks session inactive but does NOT delete the auth token
+      // This way page reload still works with the same token
+      try {
+        fetch(`${API_BASE}/track/unload`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          keepalive: true,
+        });
+      } catch (e) { /* best effort */ }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, []);
+
+  // Calculate permissions - use server-provided permissions (multi-tenant), fallback to legacy ROLE_PERMISSIONS
+  const serverPermissions = user?.permissions || [];
+  const legacyPermissions = ROLE_PERMISSIONS[user?.role] || [];
+  const effectivePermissions = serverPermissions.length > 0 ? serverPermissions : legacyPermissions;
+  const isPlatformUser = user?.user_type === "platform";
+
   const hasPermission = useCallback((perm) => {
-    return user?.role === "admin" || userPermissions.includes(perm);
-  }, [user?.role, userPermissions]);
+    // Platform super admins with company.full_access bypass all
+    if (isPlatformUser && effectivePermissions.includes("company.full_access")) return true;
+    return user?.role === "admin" || effectivePermissions.includes(perm);
+  }, [user?.role, effectivePermissions, isPlatformUser]);
+
+  // Impersonation handlers
+  const handleImpersonate = useCallback(async (slug, name) => {
+    try {
+      const token = localStorage.getItem("digix_token");
+      const res = await fetch(`${API_BASE}/platform/impersonate`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ company_slug: slug }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail); }
+      setImpersonating({ slug, name });
+    } catch (err) { alert("Impersonation failed: " + err.message); }
+  }, []);
+
+  const handleStopImpersonate = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("digix_token");
+      await fetch(`${API_BASE}/platform/stop-impersonate`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` },
+      });
+      setImpersonating(null);
+      setCurrentPage("dashboard"); // Return to platform dashboard
+    } catch (err) { alert("Failed to stop impersonation: " + err.message); }
+  }, []);
 
   // Session validation - check every 30 seconds
   useEffect(() => {
@@ -480,22 +677,77 @@ function Dashboard({ user, onLogout }) {
     return () => clearInterval(interval);
   }, [onLogout]);
 
+  // Poll pending approval count for admin/manager roles
+  useEffect(() => {
+    const canApprove = ["admin", "manager", "company_admin", "content_manager"].includes(user?.role) || user?.user_type === "platform";
+    if (!canApprove) return;
+    const fetchPending = async () => {
+      try {
+        const token = localStorage.getItem("digix_token");
+        const res = await fetch(`${API_BASE}/content-changes?status=pending&limit=1`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPendingApprovals(data.pending_count || 0);
+        }
+      } catch (_) {}
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 30000);
+    return () => clearInterval(interval);
+  }, [user?.role, user?.user_type]);
+
   return (
     <AuthContext.Provider value={{ user, hasPermission }}>
       <ThemeContext.Provider value={{ isDark, toggle: toggleTheme, theme }}>
-      <div style={{ display: "flex", minHeight: "100vh", background: theme.bg }}>
-        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={onLogout} onChangePassword={() => setShowChangePassword(true)} hasPermission={hasPermission} isDark={isDark} toggleTheme={toggleTheme} />
-        <div style={{ flex: 1, marginLeft: 260 }}>
+      <div style={{ display: "flex", minHeight: "100vh", background: theme.bg, overflow: "hidden" }}>
+        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={onLogout} onChangePassword={() => setShowChangePassword(true)} hasPermission={hasPermission} isDark={isDark} toggleTheme={toggleTheme} impersonating={impersonating} pendingApprovals={pendingApprovals} />
+        <div style={{ flex: 1, marginLeft: 260, minWidth: 0, width: "calc(100vw - 260px)", overflowX: "hidden" }}>
+          {/* Global Platform Announcement Banner - visible to ALL users */}
+          <GlobalAnnouncementBanner />
+          
+          {/* Impersonation Banner */}
+          {impersonating && (
+            <div style={{ background: "linear-gradient(90deg, #f59e0b, #d97706)", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "#0a1628", zIndex: 200 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 18 }}>👁️</span>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>Impersonating: {impersonating.name}</span>
+                <span style={{ fontSize: 12, opacity: 0.8 }}>({impersonating.slug})</span>
+              </div>
+              <button onClick={handleStopImpersonate} style={{ padding: "6px 16px", background: "#0a1628", color: "#f59e0b", border: "none", borderRadius: 6, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+                ✕ Exit Impersonation
+              </button>
+            </div>
+          )}
+          
+          {/* Company Expiration Warning Banner with Countdown Timer - for company users */}
+          {!isPlatformUser && companyExpiration && (
+            <ExpirationBanner companyStatus={companyExpiration} />
+          )}
           <header style={{ background: theme.headerBg, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${theme.border}`, position: "sticky", top: 0, zIndex: 100 }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: theme.text }}>
-              {currentPage === "dashboard" ? "Dashboard" : currentPage === "devices" ? "Devices" : currentPage === "videos" ? "Videos" : currentPage === "advertisements" ? "Advertisements" : currentPage === "groups" ? "Groups" : currentPage === "shops" ? "Shops" : currentPage === "links" ? "Link Content" : currentPage === "reports" ? "Reports" : currentPage === "users" ? "User Management" : "Dashboard"}
+              {currentPage === "dashboard" ? "Dashboard" : currentPage === "devices" ? "Devices" : currentPage === "videos" ? "Videos" : currentPage === "advertisements" ? "Advertisements" : currentPage === "groups" ? "Groups" : currentPage === "shops" ? "Shops" : currentPage === "links" ? "Link Content" : currentPage === "reports" ? "Reports" : currentPage === "users" ? "User Management" : currentPage === "platform" ? "Platform Administration" : currentPage === "approvals" ? "Content Approvals" : "Dashboard"}
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              {/* Subscription Timer for company users */}
+              {!isPlatformUser && companyExpiration && (
+                <CompanyStatusTimer companyStatus={companyExpiration} />
+              )}
+              {/* Notification Bell for company users */}
+              {!isPlatformUser && (
+                <NotificationBell companyStatus={companyExpiration} />
+              )}
               <div style={{ textAlign: "right" }}><div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{currentTime.toLocaleTimeString()}</div><div style={{ fontSize: 12, color: theme.textSecondary }}>{currentTime.toLocaleDateString()}</div></div>
             </div>
           </header>
           <main style={{ padding: 24 }}>
-            {currentPage === "dashboard" && (
+            {currentPage === "dashboard" && isPlatformUser && !impersonating && (
+              <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                <PlatformDashboard />
+              </div>
+            )}
+            {currentPage === "dashboard" && (!isPlatformUser || impersonating) && (
               <div>
                 {/* Quick Action Cards - Only show based on permissions */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
@@ -515,6 +767,7 @@ function Dashboard({ user, onLogout }) {
                 <div style={{ background: theme.card, borderRadius: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.1)", overflow: "hidden" }}><RecentLinks refreshKey={linksRefresh} isDark={isDark} /></div>
               </div>
             )}
+            {currentPage === "platform" && isPlatformUser && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><PlatformAdmin onImpersonate={handleImpersonate} /></div>}
             {currentPage === "devices" && hasPermission("manage_devices") && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><Device onChanged={() => setLinksRefresh((x) => x + 1)} /></div>}
             {currentPage === "devices" && !hasPermission("manage_devices") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to manage devices.</div>}
             {currentPage === "videos" && (hasPermission("manage_videos") || hasPermission("upload_videos")) && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><Video /></div>}
@@ -531,6 +784,7 @@ function Dashboard({ user, onLogout }) {
             {currentPage === "reports" && !hasPermission("view_reports") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to view reports.</div>}
             {currentPage === "users" && hasPermission("manage_users") && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><UserManagement onUserDeactivated={onLogout} /></div>}
             {currentPage === "users" && !hasPermission("manage_users") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to manage users.</div>}
+            {currentPage === "approvals" && <ContentApprovalQueue onApprovalAction={() => setPendingApprovals(p => Math.max(0, p - 1))} />}
           </main>
         </div>
         {hasPermission("manage_devices") && <Modal open={openModal === "device"} title="📱 Device Management" onClose={() => setOpenModal(null)}><Device onChanged={() => setLinksRefresh((x) => x + 1)} /></Modal>}
@@ -573,6 +827,8 @@ export default function App() {
     if (token) fetch(`${API_BASE}/auth/logout`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
     localStorage.removeItem("digix_token");
     localStorage.removeItem("digix_user");
+    localStorage.removeItem("digix_tenant");
+    localStorage.removeItem("token");
     setUser(null);
   }, []);
 

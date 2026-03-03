@@ -17,6 +17,7 @@ const dvsgApi = axios.create({
   timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
+dvsgApi.interceptors.request.use((c) => { const t = localStorage.getItem("digix_token") || localStorage.getItem("token"); if (t) c.headers.Authorization = `Bearer ${t}`; return c; });
 
 // Simple toast notification
 const toast = (message) => {
@@ -829,7 +830,7 @@ export default function Device() {
     const loadVideos = async () => {
       try {
         // Video API is on port 8003
-        const VIDEO_BASE = `${window.location.protocol}//${window.location.hostname}:8003`;
+        const VIDEO_BASE = DVSG_BASE;
         const res = await axios.get(`${VIDEO_BASE}/videos`, { params: { limit: 500 } });
         const data = res.data;
         // Handle both array and {items: [...]} or {data: [...]} response formats
@@ -885,18 +886,21 @@ export default function Device() {
     await loadPage(page, pageSize, qApplied);
   };
 
-  const onDelete = async (row) => {
+  const onDelete = async (row, forceDelete = false) => {
     const mid = row?.mobile_id;
     if (!mid) return;
 
-    const ok = window.confirm(`Delete device "${mid}"?`);
-    if (!ok) return;
+    if (!forceDelete) {
+      const ok = window.confirm(`Delete device "${mid}"?`);
+      if (!ok) return;
+    }
 
     setErrText("");
     setFkDetail(null);
 
-    const r = await deleteDevice(mid);
+    const r = await deleteDevice(mid, forceDelete);
     if (r.ok) {
+      toast(`Device "${mid}" deleted${r.data?.unlinked ? " (unlinked " + Object.values(r.data.unlinked).reduce((a, b) => a + b, 0) + " records)" : ""}`);
       const offset = (page - 1) * pageSize;
       const rr = await listDevices(pageSize, offset, qApplied);
       if (rr.ok) {
@@ -914,7 +918,7 @@ export default function Device() {
 
     if (r.status === 409 && r.detailObj) {
       setErrText(r.detailObj.message || "Device is linked with other records.");
-      setFkDetail(r.detailObj);
+      setFkDetail({ ...r.detailObj, _row: row });
       return;
     }
 
@@ -1255,7 +1259,61 @@ export default function Device() {
         </div>
       ) : null}
 
-      {fkDetail?.recent_links?.length ? (
+      {fkDetail?.linked ? (
+        <div style={{ marginBottom: 14, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <div style={{ fontWeight: 800, color: "#991b1b" }}>⚠️ Device "{fkDetail.mobile_id}" has linked resources</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                style={{
+                  padding: "8px 16px",
+                  background: "#dc2626",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+                onClick={async () => {
+                  const totalLinked = Object.values(fkDetail.linked).reduce((a, b) => a + b, 0);
+                  const ok = window.confirm(`Force delete device "${fkDetail.mobile_id}"?\n\nThis will unlink and delete ${totalLinked} linked record(s):\n${Object.entries(fkDetail.linked).map(([k, v]) => `  • ${k}: ${v}`).join("\n")}`);
+                  if (!ok) return;
+                  await onDelete(fkDetail._row || { mobile_id: fkDetail.mobile_id }, true);
+                }}
+              >
+                🗑️ Force Delete
+              </button>
+              <button
+                style={{
+                  padding: "8px 16px",
+                  background: "#6b7280",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+                onClick={() => {
+                  setFkDetail(null);
+                  setErrText("");
+                }}
+              >
+                ✕ Dismiss
+              </button>
+            </div>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+            {Object.entries(fkDetail.linked).map(([key, count]) => (
+              <div key={key} style={{ padding: "6px 12px", background: "#fff", border: "1px solid #fecaca", borderRadius: 8, fontSize: 13 }}>
+                <span style={{ fontWeight: 700, color: "#991b1b" }}>{count}</span>
+                <span style={{ color: "#6b7280", marginLeft: 4 }}>{key.replace(/_/g, " ")}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : fkDetail?.recent_links?.length ? (
         <div style={{ marginBottom: 14, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <div style={{ fontWeight: 800, color: "#991b1b" }}>⚠️ Device has {fkDetail.linked_count || fkDetail.recent_links.length} linked record(s)</div>
@@ -1345,12 +1403,12 @@ export default function Device() {
               <tr style={{ background: "#f9fafb", textAlign: "left" }}>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Device Name</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Mobile ID</th>
+                <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Status</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Group</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Resolution</th>
-                <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Downloaded</th>
-                <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Created</th>
+                <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Content</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Updated</th>
-                <th style={{ padding: 12, fontSize: 12, color: "#6b7280", width: 320, textAlign: "right" }}>
+                <th style={{ padding: 12, fontSize: 12, color: "#6b7280", width: 280, textAlign: "right" }}>
                   Actions
                 </th>
               </tr>
@@ -1380,6 +1438,31 @@ export default function Device() {
                       )}
                     </td>
                     <td style={{ padding: 12, fontFamily: "monospace", fontSize: 12, color: "#6b7280" }}>{d.mobile_id}</td>
+                    {/* Online/Offline Status with colored indicator */}
+                    <td style={{ padding: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          background: d.is_online ? "#22c55e" : "#ef4444",
+                          display: "inline-block",
+                          boxShadow: d.is_online ? "0 0 6px rgba(34, 197, 94, 0.5)" : "none",
+                        }} />
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: d.is_online ? "#16a34a" : "#dc2626",
+                        }}>
+                          {d.is_online ? "Online" : "Offline"}
+                        </span>
+                      </div>
+                      {d.temperature !== null && d.temperature !== undefined && (
+                        <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>
+                          🌡️ {d.temperature.toFixed(1)}°C
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: 12 }}>
                       {d.group_name ? (
                         <span style={{
@@ -1422,8 +1505,49 @@ export default function Device() {
                         <span style={{ color: "#9ca3af", fontSize: 12 }}>Auto</span>
                       )}
                     </td>
-                    <td style={{ padding: 12 }}>{d.download_status ? "Yes" : "No"}</td>
-                    <td style={{ padding: 12 }}>{fmtDate(d.created_at)}</td>
+                    {/* Content Status with colored indicator */}
+                    <td style={{ padding: 12 }}>
+                      {(() => {
+                        const status = d.content_status || (d.download_status ? "synced" : "pending");
+                        const videoCount = d.video_count || 0;
+                        
+                        const statusConfig = {
+                          synced: { color: "#22c55e", bg: "#dcfce7", label: "Synced", icon: "🟢" },
+                          syncing: { color: "#f59e0b", bg: "#fef3c7", label: "Syncing", icon: "🟡" },
+                          pending: { color: "#ef4444", bg: "#fee2e2", label: "Pending", icon: "🔴" },
+                          no_content: { color: "#6b7280", bg: "#f3f4f6", label: "No Content", icon: "⚪" },
+                        };
+                        
+                        const cfg = statusConfig[status] || statusConfig.pending;
+                        
+                        return (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: "50%",
+                                background: cfg.color,
+                                display: "inline-block",
+                                boxShadow: status === "synced" ? `0 0 6px ${cfg.color}50` : "none",
+                              }} />
+                              <span style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: cfg.color,
+                              }}>
+                                {cfg.label}
+                              </span>
+                            </div>
+                            {videoCount > 0 && (
+                              <span style={{ fontSize: 10, color: "#6b7280" }}>
+                                {videoCount} video{videoCount !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td style={{ padding: 12 }}>{fmtDate(d.updated_at)}</td>
                     <td style={{ padding: 12, textAlign: "right" }}>
                       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
