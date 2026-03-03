@@ -12,10 +12,11 @@ function authHeaders() {
 }
 
 // ═══════════════════════════════════════════════════════
-// NEW: CUSTOM ANNOUNCEMENT SYSTEM
+// CUSTOM ANNOUNCEMENT SYSTEM (Backend-powered)
+// Announcements are stored in the database and visible to ALL users
 // ═══════════════════════════════════════════════════════
 
-function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement }) {
+function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, publishing }) {
   const [message, setMessage] = useState(currentAnnouncement?.message || "");
   const [type, setType] = useState(currentAnnouncement?.type || "info");
 
@@ -34,8 +35,7 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement }) 
 
   const handlePublish = () => {
     if (message.trim()) {
-      onPublish({ message: message.trim(), type, publishedAt: new Date().toISOString() });
-      onClose();
+      onPublish({ message: message.trim(), type });
     }
   };
 
@@ -52,6 +52,10 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement }) 
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#94a3b8" }}>✕</button>
         </div>
 
+        <div style={{ padding: "10px 12px", background: "#eff6ff", borderRadius: 8, marginBottom: 16, fontSize: 12, color: "#1e40af" }}>
+          💡 This announcement will be visible to <strong>ALL company users</strong> across the platform.
+        </div>
+
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Message</label>
           <textarea
@@ -60,7 +64,7 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement }) 
             placeholder="e.g., Scheduled maintenance Sunday 2AM-4AM EST"
             style={{
               width: "100%", minHeight: 80, padding: 12, border: "1px solid #e5e7eb", borderRadius: 8,
-              fontSize: 14, resize: "vertical", outline: "none", fontFamily: "inherit"
+              fontSize: 14, resize: "vertical", outline: "none", fontFamily: "inherit", boxSizing: "border-box"
             }}
           />
         </div>
@@ -90,7 +94,7 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement }) 
                 display: "inline-block", animation: "slideText 15s linear infinite",
                 whiteSpace: "nowrap", color: typeColors[type].text, fontWeight: 600, fontSize: 14, paddingLeft: "100%"
               }}>
-                {message} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {message}
+                📢 {message} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 📢 {message}
               </div>
             </div>
           </div>
@@ -101,10 +105,10 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement }) 
             padding: "10px 20px", background: "#f1f5f9", border: "none", borderRadius: 8,
             fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#64748b"
           }}>Cancel</button>
-          <button onClick={handlePublish} disabled={!message.trim()} style={{
-            padding: "10px 24px", background: message.trim() ? "#0f172a" : "#e5e7eb", border: "none", borderRadius: 8,
-            fontSize: 13, fontWeight: 600, cursor: message.trim() ? "pointer" : "not-allowed", color: "#fff"
-          }}>Publish Announcement</button>
+          <button onClick={handlePublish} disabled={!message.trim() || publishing} style={{
+            padding: "10px 24px", background: message.trim() && !publishing ? "#0f172a" : "#e5e7eb", border: "none", borderRadius: 8,
+            fontSize: 13, fontWeight: 600, cursor: message.trim() && !publishing ? "pointer" : "not-allowed", color: "#fff"
+          }}>{publishing ? "Publishing..." : "Publish to All Users"}</button>
         </div>
       </div>
     </>
@@ -489,23 +493,61 @@ export default function PlatformDashboard() {
   const [activeTab, setActiveTab] = useState("overview"); // overview | activity
   const [activityDays, setActivityDays] = useState(7);
 
-  // NEW: Announcement system
+  // Announcement system (backend-powered)
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
-  const [announcement, setAnnouncement] = useState(() => {
-    try {
-      const saved = localStorage.getItem("digix_platform_announcement");
-      return saved ? JSON.parse(saved) : null;
-    } catch { return null; }
-  });
+  const [announcement, setAnnouncement] = useState(null);
+  const [publishingAnnouncement, setPublishingAnnouncement] = useState(false);
 
-  const publishAnnouncement = (ann) => {
-    setAnnouncement(ann);
-    localStorage.setItem("digix_platform_announcement", JSON.stringify(ann));
+  // Fetch active announcement from backend
+  const fetchAnnouncement = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/announcement/active`, { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setAnnouncement(data.announcement);
+      }
+    } catch (err) {
+      console.error("Failed to fetch announcement:", err);
+    }
+  }, []);
+
+  // Publish announcement to backend
+  const publishAnnouncement = async (ann) => {
+    setPublishingAnnouncement(true);
+    try {
+      const res = await fetch(`${API_BASE}/platform/announcement`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ message: ann.message, type: ann.type, is_active: true })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAnnouncement(data);
+        setShowAnnouncementModal(false);
+      } else {
+        const err = await res.json();
+        alert(`Failed to publish: ${err.detail || "Unknown error"}`);
+      }
+    } catch (err) {
+      alert(`Failed to publish: ${err.message}`);
+    } finally {
+      setPublishingAnnouncement(false);
+    }
   };
 
-  const clearAnnouncement = () => {
-    setAnnouncement(null);
-    localStorage.removeItem("digix_platform_announcement");
+  // Clear announcement from backend
+  const clearAnnouncement = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/platform/announcement`, {
+        method: "DELETE",
+        headers: authHeaders()
+      });
+      if (res.ok) {
+        setAnnouncement(null);
+      }
+    } catch (err) {
+      console.error("Failed to clear announcement:", err);
+    }
   };
 
   const load = useCallback(async () => {
@@ -532,17 +574,18 @@ export default function PlatformDashboard() {
     } catch (err) { /* silent */ }
   }, [activityDays]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); fetchAnnouncement(); }, [load, fetchAnnouncement]);
   useEffect(() => { if (activeTab === "activity") loadActivity(); }, [activeTab, loadActivity]);
 
   // Auto-refresh every 30s
   useEffect(() => {
     const timer = setInterval(() => {
       load();
+      fetchAnnouncement();
       if (activeTab === "activity") loadActivity();
     }, 30000);
     return () => clearInterval(timer);
-  }, [load, loadActivity, activeTab]);
+  }, [load, loadActivity, fetchAnnouncement, activeTab]);
 
   if (loading && !data) {
     return (
@@ -676,6 +719,7 @@ export default function PlatformDashboard() {
         onClose={() => setShowAnnouncementModal(false)}
         onPublish={publishAnnouncement}
         currentAnnouncement={announcement}
+        publishing={publishingAnnouncement}
       />
 
       {/* ─── Tab Bar ─── */}
