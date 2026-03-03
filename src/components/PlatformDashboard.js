@@ -30,15 +30,21 @@ const DURATION_PRESETS = [
   { label: "7 days", minutes: 10080 },
 ];
 
-function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, publishing }) {
+function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, publishing, companies = [] }) {
   const [message, setMessage] = useState(currentAnnouncement?.message || "");
   const [type, setType] = useState(currentAnnouncement?.type || "info");
   const [durationMinutes, setDurationMinutes] = useState(null); // null = never
+  const [targetType, setTargetType] = useState("all"); // 'all' | 'company'
+  const [targetCompanyId, setTargetCompanyId] = useState(null);
+  const [companySearch, setCompanySearch] = useState("");
 
   useEffect(() => {
     setMessage(currentAnnouncement?.message || "");
     setType(currentAnnouncement?.type || "info");
     setDurationMinutes(null);
+    setTargetType("all");
+    setTargetCompanyId(null);
+    setCompanySearch("");
   }, [currentAnnouncement, isOpen]);
 
   if (!isOpen) return null;
@@ -51,21 +57,31 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, pu
 
   const handlePublish = () => {
     if (!message.trim()) return;
+    if (targetType === "company" && !targetCompanyId) return;
     let expires_at = null;
     if (durationMinutes !== null) {
       expires_at = new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
     }
-    onPublish({ message: message.trim(), type, expires_at });
+    onPublish({ message: message.trim(), type, expires_at, target_type: targetType, target_company_id: targetCompanyId });
   };
 
   const selectedPreset = DURATION_PRESETS.find(p => p.minutes === durationMinutes);
+  const selectedCompany = companies.find(c => c.id === targetCompanyId);
+  const filteredCompanies = companySearch.trim()
+    ? companies.filter(c =>
+        c.name.toLowerCase().includes(companySearch.toLowerCase()) ||
+        (c.slug || "").toLowerCase().includes(companySearch.toLowerCase())
+      )
+    : companies;
+
+  const canPublish = message.trim() && !publishing && (targetType === "all" || targetCompanyId);
 
   return (
     <>
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000 }} onClick={onClose} />
       <div style={{
         position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-        background: "#fff", borderRadius: 16, padding: 24, width: 520, maxWidth: "90vw",
+        background: "#fff", borderRadius: 16, padding: 24, width: 540, maxWidth: "90vw",
         boxShadow: "0 20px 60px rgba(0,0,0,0.3)", zIndex: 1001, maxHeight: "90vh", overflowY: "auto"
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
@@ -73,8 +89,78 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, pu
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#94a3b8" }}>✕</button>
         </div>
 
-        <div style={{ padding: "10px 12px", background: "#eff6ff", borderRadius: 8, marginBottom: 16, fontSize: 12, color: "#1e40af" }}>
-          💡 This announcement will be visible to <strong>ALL company users</strong> across the platform instantly.
+        {/* Target Audience */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>🎯 Target Audience</label>
+          <div style={{ display: "flex", gap: 8, marginBottom: targetType === "company" ? 10 : 0 }}>
+            <button
+              onClick={() => { setTargetType("all"); setTargetCompanyId(null); setCompanySearch(""); }}
+              style={{
+                flex: 1, padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600,
+                border: targetType === "all" ? "2px solid #0f172a" : "1px solid #e5e7eb",
+                background: targetType === "all" ? "#0f172a" : "#f8fafc",
+                color: targetType === "all" ? "#fff" : "#374151", transition: "all 0.15s"
+              }}
+            >🌐 All Companies</button>
+            <button
+              onClick={() => setTargetType("company")}
+              style={{
+                flex: 1, padding: "10px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600,
+                border: targetType === "company" ? "2px solid #3b82f6" : "1px solid #e5e7eb",
+                background: targetType === "company" ? "#eff6ff" : "#f8fafc",
+                color: targetType === "company" ? "#1d4ed8" : "#374151", transition: "all 0.15s"
+              }}
+            >🏢 Specific Company</button>
+          </div>
+
+          {/* Company picker */}
+          {targetType === "company" && (
+            <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+              <div style={{ padding: "8px 12px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
+                <input
+                  autoFocus
+                  value={companySearch}
+                  onChange={e => setCompanySearch(e.target.value)}
+                  placeholder="Search companies..."
+                  style={{
+                    width: "100%", border: "none", background: "transparent", outline: "none",
+                    fontSize: 13, color: "#0f172a"
+                  }}
+                />
+              </div>
+              <div style={{ maxHeight: 180, overflowY: "auto" }}>
+                {filteredCompanies.length === 0 ? (
+                  <div style={{ padding: "12px 16px", fontSize: 13, color: "#94a3b8", textAlign: "center" }}>No companies found</div>
+                ) : filteredCompanies.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => { setTargetCompanyId(c.id); setCompanySearch(""); }}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "10px 16px", border: "none", borderBottom: "1px solid #f8fafc",
+                      background: targetCompanyId === c.id ? "#eff6ff" : "#fff",
+                      cursor: "pointer", textAlign: "left", transition: "background 0.1s"
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{c.name}</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>{c.slug}</div>
+                    </div>
+                    {targetCompanyId === c.id && <span style={{ color: "#3b82f6", fontSize: 16 }}>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Info hint */}
+          <div style={{ padding: "8px 12px", background: targetType === "all" ? "#eff6ff" : "#f0fdf4", borderRadius: 8, marginTop: 10, fontSize: 12, color: targetType === "all" ? "#1e40af" : "#166534" }}>
+            {targetType === "all"
+              ? "💡 This announcement will be visible to ALL company users across the platform instantly."
+              : selectedCompany
+                ? `💡 This announcement will be visible only to users of "${selectedCompany.name}".`
+                : "⚠️ Please select a company above."}
+          </div>
         </div>
 
         {/* Message */}
@@ -164,10 +250,10 @@ function AnnouncementModal({ isOpen, onClose, onPublish, currentAnnouncement, pu
             padding: "10px 20px", background: "#f1f5f9", border: "none", borderRadius: 8,
             fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#64748b"
           }}>Cancel</button>
-          <button onClick={handlePublish} disabled={!message.trim() || publishing} style={{
-            padding: "10px 24px", background: message.trim() && !publishing ? "#0f172a" : "#e5e7eb", border: "none", borderRadius: 8,
-            fontSize: 13, fontWeight: 600, cursor: message.trim() && !publishing ? "pointer" : "not-allowed", color: "#fff"
-          }}>{publishing ? "Publishing..." : "Publish to All Users"}</button>
+          <button onClick={handlePublish} disabled={!canPublish} style={{
+            padding: "10px 24px", background: canPublish ? "#0f172a" : "#e5e7eb", border: "none", borderRadius: 8,
+            fontSize: 13, fontWeight: 600, cursor: canPublish ? "pointer" : "not-allowed", color: "#fff"
+          }}>{publishing ? "Publishing..." : targetType === "company" && selectedCompany ? `Publish to ${selectedCompany.name}` : "Publish to All Users"}</button>
         </div>
       </div>
     </>
@@ -184,12 +270,20 @@ function SlidingAnnouncementBanner({ announcement, onClear }) {
     critical: { bg: "linear-gradient(90deg, #dc2626, #b91c1c)", text: "#fff" },
   };
   const c = typeColors[announcement.type] || typeColors.info;
+  const isPrivate = announcement.target_type === "company";
 
   return (
     <div style={{
       background: c.bg, padding: "12px 20px", borderRadius: 10,
       overflow: "hidden", position: "relative", display: "flex", alignItems: "center"
     }}>
+      {isPrivate && (
+        <span style={{
+          flexShrink: 0, marginRight: 10, fontSize: 11, fontWeight: 700,
+          background: "rgba(0,0,0,0.25)", color: c.text,
+          padding: "2px 8px", borderRadius: 4, letterSpacing: "0.04em"
+        }}>🏢 PRIVATE</span>
+      )}
       <div style={{ flex: 1, overflow: "hidden", minWidth: 0 }}>
         <div style={{
           display: "inline-flex", animation: "slideText 30s linear infinite",
@@ -579,7 +673,14 @@ export default function PlatformDashboard() {
       const res = await fetch(`${API_BASE}/platform/announcement`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ message: ann.message, type: ann.type, is_active: true, expires_at: ann.expires_at || null })
+        body: JSON.stringify({
+          message: ann.message,
+          type: ann.type,
+          is_active: true,
+          expires_at: ann.expires_at || null,
+          target_type: ann.target_type || "all",
+          target_company_id: ann.target_company_id || null,
+        })
       });
       if (res.ok) {
         const data = await res.json();
@@ -781,6 +882,7 @@ export default function PlatformDashboard() {
         onPublish={publishAnnouncement}
         currentAnnouncement={announcement}
         publishing={publishingAnnouncement}
+        companies={companies}
       />
 
       {/* ─── Tab Bar ─── */}
