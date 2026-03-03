@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { listLinks, deleteLink, createLink, getDeviceOnlineStatus } from "../api/link";
 import { listVideoNames } from "../api/video";
+import { listGroupVideoNames } from "../api/dvsg";
 import axios from "axios";
 import GridLayoutEditor from "./GridLayoutEditor";
 
@@ -1698,11 +1699,18 @@ function EditContentModal({ open, onClose, row, onSaved }) {
     setMsg("");
     setTab("videos");
     
-    // Load videos
+    // Load videos — if device belongs to a group, only show videos linked to that group
     (async () => {
       try {
-        const names = await listVideoNames();
-        setAllVideoNames(Array.isArray(names) ? names : []);
+        const gname = (row?.gname || "").trim();
+        if (gname && gname.toLowerCase() !== "— no group —" && gname !== "_none") {
+          const result = await listGroupVideoNames(gname);
+          const names = result?.video_names || result?.data?.video_names || [];
+          setAllVideoNames(Array.isArray(names) ? names : []);
+        } else {
+          const names = await listVideoNames();
+          setAllVideoNames(Array.isArray(names) ? names : []);
+        }
       } catch {
         setAllVideoNames([]);
       }
@@ -1724,7 +1732,12 @@ function EditContentModal({ open, onClose, row, onSaved }) {
     const v = (typedVideo || "").trim();
     if (!v) return;
     if (!allVideoNames.includes(v)) {
-      setMsg(`"${v}" is not in the video list.`);
+      const gname = (row?.gname || "").trim();
+      const inGroup = gname && gname.toLowerCase() !== "— no group —" && gname !== "_none";
+      setMsg(inGroup
+        ? `"${v}" is not linked to group "${gname}". Add it to the group's linked content first.`
+        : `"${v}" is not in the video list.`
+      );
       return;
     }
     if (!videoList.includes(v)) setVideoList([...videoList, v]);
