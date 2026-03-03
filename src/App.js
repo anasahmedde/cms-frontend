@@ -11,6 +11,7 @@ import Reports from "./components/Reports";
 import PlatformAdmin from "./components/PlatformAdmin";
 import PlatformDashboard from "./components/PlatformDashboard";
 import GlobalAnnouncementBanner from "./components/GlobalAnnouncementBanner";
+import { ExpirationBanner, NotificationBell, CompanyStatusTimer } from "./components/ExpirationNotificationBanner";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
 
@@ -513,7 +514,6 @@ function Dashboard({ user, onLogout }) {
   
   // Company expiration warning state
   const [companyExpiration, setCompanyExpiration] = useState(null);
-  const [expirationDismissed, setExpirationDismissed] = useState(false);
 
   const toggleTheme = useCallback(() => {
     setIsDark(prev => {
@@ -540,7 +540,14 @@ function Dashboard({ user, onLogout }) {
         });
         if (res.ok) {
           const data = await res.json();
-          setCompanyExpiration(data);
+          // Transform to match ExpirationBanner expected format
+          setCompanyExpiration({
+            expires_at: data.expires_at,
+            expiration_status: data.status, // 'active', 'grace_period', 'expired', 'suspended'
+            days_until_expiration: data.days_remaining, // Used by ExpirationBanner
+            grace_period_days: data.days_remaining, // For grace period, this is the remaining days
+            company_name: data.company_name
+          });
         }
       } catch (err) {
         console.error("Failed to fetch expiration status:", err);
@@ -548,8 +555,8 @@ function Dashboard({ user, onLogout }) {
     };
     
     fetchExpiration();
-    // Check every 5 minutes
-    const interval = setInterval(fetchExpiration, 300000);
+    // Check every minute for more accurate countdown
+    const interval = setInterval(fetchExpiration, 60000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -678,100 +685,23 @@ function Dashboard({ user, onLogout }) {
             </div>
           )}
           
-          {/* Company Expiration Warning Banner - for company users */}
-          {companyExpiration && !expirationDismissed && companyExpiration.status !== "active" && (
-            <div style={{ 
-              background: companyExpiration.status === "grace_period" 
-                ? "linear-gradient(90deg, #f59e0b, #d97706)" 
-                : "linear-gradient(90deg, #dc2626, #b91c1c)", 
-              padding: "12px 24px", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "space-between", 
-              color: companyExpiration.status === "grace_period" ? "#0a1628" : "#fff",
-              zIndex: 199 
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 24 }}>{companyExpiration.status === "grace_period" ? "⏰" : "🚨"}</span>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 15 }}>
-                    {companyExpiration.status === "grace_period" 
-                      ? `Subscription Expired - Grace Period Ends in ${companyExpiration.days_remaining} days` 
-                      : "Subscription Expired"}
-                  </div>
-                  <div style={{ fontSize: 13, opacity: 0.9 }}>
-                    {companyExpiration.status === "grace_period"
-                      ? "Please contact your administrator to renew the subscription to continue using all features."
-                      : "Your company subscription has expired. Contact your administrator immediately."}
-                  </div>
-                </div>
-              </div>
-              {companyExpiration.status === "grace_period" && (
-                <button 
-                  onClick={() => setExpirationDismissed(true)} 
-                  style={{ 
-                    padding: "6px 16px", 
-                    background: "rgba(0,0,0,0.2)", 
-                    color: "inherit", 
-                    border: "none", 
-                    borderRadius: 6, 
-                    fontWeight: 600, 
-                    cursor: "pointer", 
-                    fontSize: 12 
-                  }}
-                >
-                  Dismiss
-                </button>
-              )}
-            </div>
-          )}
-          
-          {/* Expiring Soon Warning Banner - show when less than 14 days left */}
-          {companyExpiration && !expirationDismissed && companyExpiration.status === "active" && companyExpiration.days_remaining !== null && companyExpiration.days_remaining <= 14 && (
-            <div style={{ 
-              background: companyExpiration.days_remaining <= 7 
-                ? "linear-gradient(90deg, #dc2626, #b91c1c)" 
-                : "linear-gradient(90deg, #f59e0b, #d97706)", 
-              padding: "10px 24px", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "space-between", 
-              color: companyExpiration.days_remaining <= 7 ? "#fff" : "#0a1628",
-              zIndex: 199 
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 20 }}>⚠️</span>
-                <div>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>
-                    Subscription expires in {companyExpiration.days_remaining} day{companyExpiration.days_remaining !== 1 ? "s" : ""}
-                  </span>
-                  <span style={{ marginLeft: 8, fontSize: 13, opacity: 0.9 }}>
-                    — Contact your administrator to renew
-                  </span>
-                </div>
-              </div>
-              <button 
-                onClick={() => setExpirationDismissed(true)} 
-                style={{ 
-                  padding: "6px 16px", 
-                  background: "rgba(0,0,0,0.2)", 
-                  color: "inherit", 
-                  border: "none", 
-                  borderRadius: 6, 
-                  fontWeight: 600, 
-                  cursor: "pointer", 
-                  fontSize: 12 
-                }}
-              >
-                Dismiss
-              </button>
-            </div>
+          {/* Company Expiration Warning Banner with Countdown Timer - for company users */}
+          {!isPlatformUser && companyExpiration && (
+            <ExpirationBanner companyStatus={companyExpiration} />
           )}
           <header style={{ background: theme.headerBg, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${theme.border}`, position: "sticky", top: 0, zIndex: 100 }}>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: theme.text }}>
               {currentPage === "dashboard" ? "Dashboard" : currentPage === "devices" ? "Devices" : currentPage === "videos" ? "Videos" : currentPage === "advertisements" ? "Advertisements" : currentPage === "groups" ? "Groups" : currentPage === "shops" ? "Shops" : currentPage === "links" ? "Link Content" : currentPage === "reports" ? "Reports" : currentPage === "users" ? "User Management" : currentPage === "platform" ? "Platform Administration" : "Dashboard"}
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              {/* Subscription Timer for company users */}
+              {!isPlatformUser && companyExpiration && companyExpiration.expires_at && (
+                <CompanyStatusTimer companyStatus={companyExpiration} />
+              )}
+              {/* Notification Bell for company users */}
+              {!isPlatformUser && (
+                <NotificationBell companyStatus={companyExpiration} />
+              )}
               <div style={{ textAlign: "right" }}><div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{currentTime.toLocaleTimeString()}</div><div style={{ fontSize: 12, color: theme.textSecondary }}>{currentTime.toLocaleDateString()}</div></div>
             </div>
           </header>
