@@ -109,57 +109,53 @@ function TimeUnit({ value, label }) {
 export function ExpirationBanner({ companyStatus, onDismiss }) {
   const [dismissed, setDismissed] = useState(false);
   
-  // Don't show if no expiration info
-  if (!companyStatus || !companyStatus.expires_at) return null;
+  // Don't show if no expiration info at all
+  if (!companyStatus) return null;
+  
+  const { expires_at, expiration_status, days_until_expiration, grace_period_days } = companyStatus;
+  const days = days_until_expiration;
+  
+  // Always show for expired/suspended/grace_period regardless of expires_at
+  const isUrgent = expiration_status === 'expired' || expiration_status === 'suspended' || expiration_status === 'grace_period';
+  
+  // For active status: only show if expires_at is set (otherwise nothing to warn about)
+  if (!isUrgent && !expires_at) return null;
   
   // Don't show if dismissed this session
   const dismissKey = `expiration_dismissed_${new Date().toDateString()}`;
   if (dismissed || sessionStorage.getItem(dismissKey)) return null;
   
-  const { expires_at, expiration_status, days_until_expiration, grace_period_days } = companyStatus;
-  
-  // Only show if expiring within 30 days or already expired/grace
-  if (expiration_status === 'active' && days_until_expiration > 30) return null;
-  
   // Determine severity and styling
   let bgColor, textColor, borderColor, icon, message;
   
   if (expiration_status === 'expired') {
-    bgColor = "#dc2626";
-    textColor = "#fff";
-    borderColor = "#b91c1c";
+    bgColor = "#dc2626"; textColor = "#fff"; borderColor = "#b91c1c";
     icon = "🚫";
-    message = "Your subscription has expired. Please contact support to renew.";
+    message = "Your subscription has expired. Please contact your administrator to renew.";
   } else if (expiration_status === 'suspended') {
-    bgColor = "#7f1d1d";
-    textColor = "#fff";
-    borderColor = "#450a0a";
+    bgColor = "#7f1d1d"; textColor = "#fff"; borderColor = "#450a0a";
     icon = "⛔";
-    message = "Your account has been suspended. Please contact support.";
+    message = "Your account has been suspended. Please contact your administrator.";
   } else if (expiration_status === 'grace_period') {
-    bgColor = "#f59e0b";
-    textColor = "#0a1628";
-    borderColor = "#d97706";
+    bgColor = "#f59e0b"; textColor = "#0a1628"; borderColor = "#d97706";
     icon = "⏳";
-    message = `Grace period active. You have ${grace_period_days} days to renew before full suspension.`;
-  } else if (days_until_expiration <= 7) {
-    bgColor = "#fef2f2";
-    textColor = "#dc2626";
-    borderColor = "#fecaca";
+    message = `Grace period active. You have ${grace_period_days ?? days ?? '?'} days to renew before full suspension.`;
+  } else if (days !== null && days !== undefined && days <= 3) {
+    bgColor = "#dc2626"; textColor = "#fff"; borderColor = "#b91c1c";
+    icon = "🚨";
+    message = `Subscription expires in ${days} day${days !== 1 ? 's' : ''}! Contact your administrator immediately.`;
+  } else if (days !== null && days !== undefined && days <= 7) {
+    bgColor = "#fef2f2"; textColor = "#dc2626"; borderColor = "#fecaca";
     icon = "🔴";
-    message = `Your subscription expires in ${days_until_expiration} days. Please renew soon!`;
-  } else if (days_until_expiration <= 14) {
-    bgColor = "#fef3c7";
-    textColor = "#92400e";
-    borderColor = "#fcd34d";
+    message = `Your subscription expires in ${days} days. Please renew soon!`;
+  } else if (days !== null && days !== undefined && days <= 14) {
+    bgColor = "#fef3c7"; textColor = "#92400e"; borderColor = "#fcd34d";
     icon = "🟡";
-    message = `Your subscription expires in ${days_until_expiration} days.`;
+    message = `Your subscription expires in ${days} days.`;
   } else {
-    bgColor = "#f0fdf4";
-    textColor = "#166534";
-    borderColor = "#86efac";
+    bgColor = "#f0fdf4"; textColor = "#166534"; borderColor = "#86efac";
     icon = "🟢";
-    message = `Your subscription expires in ${days_until_expiration} days.`;
+    message = `Your subscription expires in ${days ?? '?'} days.`;
   }
   
   const handleDismiss = () => {
@@ -168,6 +164,8 @@ export function ExpirationBanner({ companyStatus, onDismiss }) {
     if (onDismiss) onDismiss();
   };
   
+  const showCountdown = expires_at && expiration_status !== 'expired' && expiration_status !== 'suspended';
+
   return (
     <div style={{
       background: bgColor,
@@ -184,28 +182,21 @@ export function ExpirationBanner({ companyStatus, onDismiss }) {
         <span style={{ fontSize: 20 }}>{icon}</span>
         <div>
           <strong>{message}</strong>
-          {expires_at && expiration_status !== 'expired' && expiration_status !== 'suspended' && (
-            <span style={{ marginLeft: 12, opacity: 0.8 }}>
-              Expires: {new Date(expires_at).toLocaleDateString()}
+          {showCountdown && (
+            <span style={{ marginLeft: 12, opacity: 0.8, fontSize: 12 }}>
+              ({new Date(expires_at).toLocaleDateString()})
             </span>
           )}
         </div>
       </div>
       
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        {expires_at && expiration_status !== 'expired' && expiration_status !== 'suspended' && (
-          <CountdownTimer expiresAt={expires_at} compact />
-        )}
+        {showCountdown && <CountdownTimer expiresAt={expires_at} compact />}
         <button
           onClick={handleDismiss}
           style={{
-            background: "transparent",
-            border: "none",
-            color: textColor,
-            cursor: "pointer",
-            fontSize: 18,
-            padding: 4,
-            opacity: 0.7
+            background: "transparent", border: "none", color: textColor,
+            cursor: "pointer", fontSize: 18, padding: 4, opacity: 0.7
           }}
           title="Dismiss for today"
         >
@@ -222,38 +213,41 @@ export function NotificationBell({ companyStatus }) {
   const [notifications, setNotifications] = useState([]);
   
   useEffect(() => {
-    if (!companyStatus) return;
-    
     const notifs = [];
+    if (!companyStatus) { setNotifications([]); return; }
+    
     const { expires_at, expiration_status, days_until_expiration } = companyStatus;
+    const days = days_until_expiration;
     
     if (expiration_status === 'expired') {
       notifs.push({
         type: 'error',
         title: 'Subscription Expired',
-        message: 'Your subscription has expired. Please contact support to renew.',
+        message: 'Your subscription has expired. Please contact your administrator to renew.',
         time: 'Now'
       });
     } else if (expiration_status === 'suspended') {
       notifs.push({
         type: 'error',
         title: 'Account Suspended',
-        message: 'Your account has been suspended. Please contact support.',
+        message: 'Your account has been suspended. Please contact your administrator.',
         time: 'Now'
       });
     } else if (expiration_status === 'grace_period') {
       notifs.push({
         type: 'warning',
         title: 'Grace Period Active',
-        message: 'Your subscription is in grace period. Renew soon to avoid suspension.',
+        message: `Your subscription has expired. You have ${days ?? '?'} days left in the grace period before suspension.`,
         time: 'Active'
       });
-    } else if (expires_at && days_until_expiration <= 30) {
+    } else if (expires_at && days !== null && days !== undefined) {
+      // Show notification for ALL cases where expiry date is set
+      const urgency = days <= 3 ? 'error' : days <= 7 ? 'warning' : 'info';
       notifs.push({
-        type: days_until_expiration <= 7 ? 'warning' : 'info',
-        title: 'Subscription Expiring Soon',
-        message: `Your subscription expires in ${days_until_expiration} days on ${new Date(expires_at).toLocaleDateString()}.`,
-        time: `${days_until_expiration} days`
+        type: urgency,
+        title: days <= 7 ? '⚠️ Subscription Expiring Soon!' : 'Subscription Expiring',
+        message: `Your subscription expires in ${days} day${days !== 1 ? 's' : ''}${expires_at ? ` (${new Date(expires_at).toLocaleDateString()})` : ''}. Please contact your administrator to renew.`,
+        time: `${days}d left`
       });
     }
     
@@ -408,19 +402,27 @@ export function NotificationBell({ companyStatus }) {
 
 // ─── Company Status Timer Widget ───
 export function CompanyStatusTimer({ companyStatus }) {
-  if (!companyStatus || !companyStatus.expires_at) {
-    return null;
-  }
+  if (!companyStatus) return null;
   
   const { expires_at, expiration_status, days_until_expiration } = companyStatus;
+  const days = days_until_expiration;
   
-  // Determine color based on days remaining
-  let color;
-  if (expiration_status === 'expired' || expiration_status === 'suspended') {
-    color = "#dc2626";
-  } else if (expiration_status === 'grace_period' || days_until_expiration <= 7) {
-    color = "#dc2626";
-  } else if (days_until_expiration <= 30) {
+  // Nothing to show if no expiry and status is active
+  if (!expires_at && expiration_status === 'active' && (days === null || days === undefined)) return null;
+  
+  // Determine color based on status/days
+  let color, label, dotPulse = false;
+  if (expiration_status === 'expired') {
+    color = "#dc2626"; label = "Expired"; dotPulse = true;
+  } else if (expiration_status === 'suspended') {
+    color = "#7f1d1d"; label = "Suspended"; dotPulse = true;
+  } else if (expiration_status === 'grace_period') {
+    color = "#f59e0b"; label = `Grace: ${days ?? '?'}d`; dotPulse = true;
+  } else if (days !== null && days !== undefined && days <= 3) {
+    color = "#dc2626"; dotPulse = true;
+  } else if (days !== null && days !== undefined && days <= 7) {
+    color = "#f59e0b"; dotPulse = true;
+  } else if (days !== null && days !== undefined && days <= 30) {
     color = "#f59e0b";
   } else {
     color = "#16a34a";
@@ -428,24 +430,32 @@ export function CompanyStatusTimer({ companyStatus }) {
   
   return (
     <div style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "6px 12px",
-      background: "#f9fafb",
-      borderRadius: 8,
-      border: `1px solid ${color}30`
+      display: "flex", alignItems: "center", gap: 8,
+      padding: "6px 12px", background: "#f9fafb", borderRadius: 8,
+      border: `1px solid ${color}40`, flexShrink: 0
     }}>
       <div style={{
-        width: 8,
-        height: 8,
-        borderRadius: "50%",
-        background: color
+        width: 8, height: 8, borderRadius: "50%", background: color,
+        animation: dotPulse ? "pulse 1.5s ease-in-out infinite" : "none"
       }} />
-      <div style={{ fontSize: 12 }}>
-        <span style={{ color: "#6b7280" }}>Expires: </span>
-        <CountdownTimer expiresAt={expires_at} compact />
+      <div style={{ fontSize: 12, color: "#374151", fontWeight: 500 }}>
+        {label ? (
+          <span style={{ color }}>{label}</span>
+        ) : expires_at ? (
+          <>
+            <span style={{ color: "#6b7280" }}>Expires: </span>
+            <CountdownTimer expiresAt={expires_at} compact />
+          </>
+        ) : (
+          <span style={{ color }}>{days}d left</span>
+        )}
       </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.3); }
+        }
+      `}</style>
     </div>
   );
 }
