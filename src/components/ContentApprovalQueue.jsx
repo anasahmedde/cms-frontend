@@ -68,7 +68,7 @@ function MediaItem({ name, s3Link, contentType }) {
     /\.(mp4|webm|mov|avi|mkv)$/i.test(name);
 
   return (
-    <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb", background: "#0f172a" }}>
+    <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb", background: "#f8fafc" }}>
       {s3Link ? (
         isVideo ? (
           <video
@@ -84,12 +84,16 @@ function MediaItem({ name, s3Link, contentType }) {
           />
         )
       ) : (
-        <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 13 }}>
-          {isVideo ? "🎬" : "🖼️"} Preview unavailable
+        <div style={{ height: 72, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 13, gap: 4, background: "#f1f5f9" }}>
+          <span style={{ fontSize: 22 }}>{isVideo ? "🎬" : "🖼️"}</span>
+          <span style={{ fontSize: 11 }}>Preview unavailable</span>
         </div>
       )}
-      <div style={{ padding: "6px 10px", background: "#1e293b" }}>
-        <div style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+      {/* Name label — always visible with strong contrast */}
+      <div style={{ padding: "6px 10px", background: "#fff", borderTop: "1px solid #e5e7eb" }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#1e293b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={name}>
+          {name}
+        </div>
       </div>
     </div>
   );
