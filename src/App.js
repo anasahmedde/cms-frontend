@@ -531,8 +531,10 @@ function Dashboard({ user, onLogout }) {
   useEffect(() => {
     const fetchExpiration = async () => {
       // Only check for company users (not platform users)
-      if (user?.user_type === "platform" || !user?.tenant_id) return;
-      
+      // Login response stores tenant_id inside company.id, not at top level
+      const isCompanyUser = user?.user_type !== "platform" && (user?.company?.id || user?.tenant_id);
+      if (!isCompanyUser) return;
+
       try {
         const token = localStorage.getItem("digix_token");
         const res = await fetch(`${API_BASE}/company/expiration-status`, {
@@ -540,12 +542,11 @@ function Dashboard({ user, onLogout }) {
         });
         if (res.ok) {
           const data = await res.json();
-          // Transform to match ExpirationBanner expected format
           setCompanyExpiration({
             expires_at: data.expires_at,
-            expiration_status: data.status, // 'active', 'grace_period', 'expired', 'suspended'
-            days_until_expiration: data.days_remaining, // Used by ExpirationBanner
-            grace_period_days: data.days_remaining, // For grace period, this is the remaining days
+            expiration_status: data.status,       // 'active', 'grace_period', 'expired', 'suspended'
+            days_until_expiration: data.days_remaining,
+            grace_period_days: data.days_remaining,
             company_name: data.company_name
           });
         }
@@ -553,9 +554,8 @@ function Dashboard({ user, onLogout }) {
         console.error("Failed to fetch expiration status:", err);
       }
     };
-    
+
     fetchExpiration();
-    // Check every minute for more accurate countdown
     const interval = setInterval(fetchExpiration, 60000);
     return () => clearInterval(interval);
   }, [user]);
@@ -695,7 +695,7 @@ function Dashboard({ user, onLogout }) {
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               {/* Subscription Timer for company users */}
-              {!isPlatformUser && companyExpiration && companyExpiration.expires_at && (
+              {!isPlatformUser && companyExpiration && (
                 <CompanyStatusTimer companyStatus={companyExpiration} />
               )}
               {/* Notification Bell for company users */}
