@@ -499,8 +499,18 @@ export default function ContentApprovalQueue({ onApprovalAction }) {
                       {REQUEST_TYPE_LABELS[req.request_type] || req.request_type}
                     </div>
                     {req.request_note && (
-                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                        "{req.request_note}"
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, fontStyle: "italic" }}>
+                        📝 "{req.request_note}"
+                      </div>
+                    )}
+                    {req.review_note && req.status !== "pending" && (
+                      <div style={{
+                        fontSize: 12,
+                        marginTop: 4,
+                        fontStyle: "italic",
+                        color: req.status === "approved" ? "#166534" : "#991b1b",
+                      }}>
+                        {req.status === "approved" ? "✅" : "❌"} "{req.review_note}"
                       </div>
                     )}
                   </td>
@@ -733,25 +743,38 @@ export default function ContentApprovalQueue({ onApprovalAction }) {
             {/* View-only for non-pending */}
             {selectedRequest.status !== "pending" && (
               <>
-                {selectedRequest.reviewed_by_name && (
-                  <div style={{ 
-                    padding: 12, 
-                    background: selectedRequest.status === "approved" ? "#dcfce7" : "#fef2f2", 
-                    borderRadius: 8, 
-                    marginBottom: 16 
-                  }}>
-                    <div style={{ fontSize: 13 }}>
-                      <strong>
-                        {selectedRequest.status === "approved" ? "Approved" : "Rejected"}
-                      </strong> by {selectedRequest.reviewed_by_name} on {formatDate(selectedRequest.reviewed_at)}
-                    </div>
-                    {selectedRequest.review_note && (
-                      <div style={{ marginTop: 8, fontStyle: "italic" }}>
-                        "{selectedRequest.review_note}"
-                      </div>
+                <div style={{
+                  padding: 16,
+                  background: selectedRequest.status === "approved" ? "#dcfce7" : "#fef2f2",
+                  borderRadius: 10,
+                  marginBottom: 16,
+                  border: `1px solid ${selectedRequest.status === "approved" ? "#bbf7d0" : "#fecaca"}`,
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: selectedRequest.status === "approved" ? "#166534" : "#991b1b", marginBottom: 4 }}>
+                    {selectedRequest.status === "approved" ? "✅ Approved" : "❌ Rejected"}
+                    {selectedRequest.reviewed_by_name && (
+                      <span style={{ fontWeight: 400, color: "#374151", marginLeft: 6 }}>
+                        by <strong>{selectedRequest.reviewed_by_name}</strong> on {formatDate(selectedRequest.reviewed_at)}
+                      </span>
                     )}
                   </div>
-                )}
+                  {selectedRequest.review_note ? (
+                    <div style={{
+                      marginTop: 8,
+                      padding: "10px 12px",
+                      background: "#fff",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontStyle: "italic",
+                      color: "#374151",
+                      borderLeft: `3px solid ${selectedRequest.status === "approved" ? "#16a34a" : "#dc2626"}`,
+                    }}>
+                      "{selectedRequest.review_note}"
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>No review note provided.</div>
+                  )}
+                </div>
                 <button
                   onClick={() => setSelectedRequest(null)}
                   style={{

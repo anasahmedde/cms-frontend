@@ -54,11 +54,23 @@ export default function GroupLinkedVideo({ onDone }) {
   const [requestNote, setRequestNote] = useState("");
   const [showNoteInput, setShowNoteInput] = useState(false);
 
+  // Track what was already linked when the group was loaded
+  const [originalVideos, setOriginalVideos] = useState([]);
+  const [originalAds, setOriginalAds] = useState([]);
+
   const currentUser = getStoredUser();
   const userRole = currentUser?.role || "";
   const userType = currentUser?.user_type || "";
   // Platform users (including impersonation) and high-privilege roles bypass approval
-  const needsApproval = approvalRequired && userType !== "platform" && !AUTO_APPROVE_ROLES.has(userRole);
+  const baseNeedsApproval = approvalRequired && userType !== "platform" && !AUTO_APPROVE_ROLES.has(userRole);
+
+  // Only newly added items (not in original set) need approval
+  const newlyAddedVideos = selectedVideos.filter(v => !originalVideos.includes(v));
+  const newlyAddedAds = selectedAds.filter(a => !originalAds.includes(a));
+  const hasNewAdditions = newlyAddedVideos.length > 0 || newlyAddedAds.length > 0;
+
+  // Approval is only needed when the user is adding new content (not just removing)
+  const needsApproval = baseNeedsApproval && hasNewAdditions;
 
   // Fetch approval settings on mount
   const fetchApprovalSettings = useCallback(async () => {
@@ -117,6 +129,8 @@ export default function GroupLinkedVideo({ onDone }) {
     if (!gvalue) {
       setSelectedVideos([]);
       setSelectedAds([]);
+      setOriginalVideos([]);
+      setOriginalAds([]);
       return;
     }
     (async () => {
@@ -125,24 +139,31 @@ export default function GroupLinkedVideo({ onDone }) {
         // Fetch videos
         const videoRes = await listGroupVideoNames(gvalue);
         const videoNames = videoRes?.data?.video_names || videoRes?.video_names || ensureArray(videoRes);
-        setSelectedVideos(Array.isArray(videoNames) ? videoNames : []);
-        
+        const safeVideoNames = Array.isArray(videoNames) ? videoNames : [];
+        setSelectedVideos(safeVideoNames);
+        setOriginalVideos(safeVideoNames); // snapshot for delta tracking
+
         // Fetch advertisements
         try {
           const adRes = await axios.get(`${API_BASE}/group/${encodeURIComponent(gvalue)}/advertisements`);
           const adNames = adRes?.data?.ad_names || [];
-          setSelectedAds(Array.isArray(adNames) ? adNames : []);
+          const safeAdNames = Array.isArray(adNames) ? adNames : [];
+          setSelectedAds(safeAdNames);
+          setOriginalAds(safeAdNames); // snapshot for delta tracking
         } catch (adErr) {
           console.log("No advertisements linked or endpoint not ready:", adErr);
           setSelectedAds([]);
+          setOriginalAds([]);
         }
-        
+
         const hasContent = (Array.isArray(videoNames) && videoNames.length > 0);
         setMessage(hasContent ? "" : "No content linked yet. Add videos or images below!");
       } catch (e) {
         console.error("Failed to load group content:", e);
         setSelectedVideos([]);
         setSelectedAds([]);
+        setOriginalVideos([]);
+        setOriginalAds([]);
         setMessage("No content linked yet. Add videos or images below!");
       }
     })();
@@ -181,7 +202,16 @@ export default function GroupLinkedVideo({ onDone }) {
   const clearVideos = () => setSelectedVideos([]);
   const clearAds = () => setSelectedAds([]);
 
-  const canSubmit = gvalue && (selectedVideos.length > 0 || selectedAds.length > 0) && !loading;
+  // Can submit if group selected and content has changed from original
+  const hasChanges = gvalue && (
+    selectedVideos.length !== originalVideos.length ||
+    selectedAds.length !== originalAds.length ||
+    selectedVideos.some(v => !originalVideos.includes(v)) ||
+    selectedAds.some(a => !originalAds.includes(a)) ||
+    originalVideos.some(v => !selectedVideos.includes(v)) ||
+    originalAds.some(a => !selectedAds.includes(a))
+  );
+  const canSubmit = hasChanges && !loading;
 
   const submitDirect = async () => {
     let videoMsg = "";
@@ -213,6 +243,7 @@ export default function GroupLinkedVideo({ onDone }) {
   };
 
   const submitApprovalRequest = async () => {
+    // Only send the newly added items — not the full current list
     const res = await fetch(`${API_BASE}/content-changes`, {
       method: "POST",
       headers: authHeaders(),
@@ -222,8 +253,8 @@ export default function GroupLinkedVideo({ onDone }) {
         target_id: 0, // resolved by name on backend
         change_data: {
           gname: gvalue,
-          video_names: selectedVideos,
-          ad_names: selectedAds,
+          video_names: newlyAddedVideos,
+          ad_names: newlyAddedAds,
         },
         request_note: requestNote.trim() || null,
         expires_in_hours: 72,
@@ -244,7 +275,8 @@ export default function GroupLinkedVideo({ onDone }) {
     setLoading(true);
     setMessage("");
     try {
-      if (needsApproval) {
+      // Approval only applies when adding new content; removals always go direct
+      if (needsApproval && hasNewAdditions) {
         await submitApprovalRequest();
       } else {
         await submitDirect();
@@ -413,10 +445,10 @@ export default function GroupLinkedVideo({ onDone }) {
         </div>
       )}
 
-      {/* Approval notice for lower-role users */}
-      {needsApproval && canSubmit && (
+      {/* Approval notice — only shown when user is adding new content */}
+      {baseNeedsApproval && hasNewAdditions && canSubmit && (
         <div style={{ padding: "12px 16px", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, fontSize: 13, color: "#92400e" }}>
-          <strong>⚠️ Approval Required</strong> — Your role requires a manager or admin to approve this content change before it goes live.
+          <strong>⚠️ Approval Required</strong> — Adding {newlyAddedVideos.length > 0 ? `${newlyAddedVideos.length} new video(s)` : ""}{newlyAddedVideos.length > 0 && newlyAddedAds.length > 0 ? " and " : ""}{newlyAddedAds.length > 0 ? `${newlyAddedAds.length} new image(s)` : ""} requires manager or admin approval before going live.
           <button
             onClick={() => setShowNoteInput(v => !v)}
             style={{ marginLeft: 12, fontSize: 12, padding: "3px 10px", border: "1px solid #f59e0b", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#92400e", fontWeight: 600 }}
@@ -466,8 +498,10 @@ export default function GroupLinkedVideo({ onDone }) {
             </>
           ) : needsApproval ? (
             <>📋 Submit for Approval</>
-          ) : (
+          ) : hasNewAdditions ? (
             <>🔗 Link Content</>
+          ) : (
+            <>💾 Save Changes</>
           )}
         </button>
       </div>
