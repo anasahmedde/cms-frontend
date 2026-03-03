@@ -10,6 +10,7 @@ import GroupLinkedVideo from "./components/GroupLinkedVideo";
 import Reports from "./components/Reports";
 import PlatformAdmin from "./components/PlatformAdmin";
 import PlatformDashboard from "./components/PlatformDashboard";
+import GlobalAnnouncementBanner from "./components/GlobalAnnouncementBanner";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
 
@@ -660,6 +661,9 @@ function Dashboard({ user, onLogout }) {
       <div style={{ display: "flex", minHeight: "100vh", background: theme.bg }}>
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={onLogout} onChangePassword={() => setShowChangePassword(true)} hasPermission={hasPermission} isDark={isDark} toggleTheme={toggleTheme} impersonating={impersonating} />
         <div style={{ flex: 1, marginLeft: 260 }}>
+          {/* Global Platform Announcement Banner - visible to ALL users */}
+          <GlobalAnnouncementBanner />
+          
           {/* Impersonation Banner */}
           {impersonating && (
             <div style={{ background: "linear-gradient(90deg, #f59e0b, #d97706)", padding: "10px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", color: "#0a1628", zIndex: 200 }}>
