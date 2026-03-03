@@ -62,6 +62,105 @@ function StatusBadge({ status }) {
   );
 }
 
+// Human-readable preview of change_data based on request type
+function ChangeDataPreview({ requestType, changeData }) {
+  if (!changeData) return null;
+
+  // link_content: { gname, video_names, ad_names }
+  if (requestType === "link_content") {
+    const { gname, video_names = [], ad_names = [] } = changeData;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {gname && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "#f0fdf4", borderRadius: 8, border: "1px solid #bbf7d0" }}>
+            <span style={{ fontSize: 16 }}>👥</span>
+            <div>
+              <div style={{ fontSize: 11, color: "#6b7280" }}>Group</div>
+              <div style={{ fontWeight: 600, color: "#0f172a", fontSize: 14 }}>{gname}</div>
+            </div>
+          </div>
+        )}
+        {video_names.length > 0 && (
+          <div style={{ padding: "10px 12px", background: "#eff6ff", borderRadius: 8, border: "1px solid #bfdbfe" }}>
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8, fontWeight: 600 }}>
+              🎬 Videos to link ({video_names.length})
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {video_names.map((v, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#fff", borderRadius: 6, border: "1px solid #e0e7ff", fontSize: 13 }}>
+                  <span style={{ color: "#3b82f6", fontSize: 15 }}>▶</span>
+                  <span style={{ fontWeight: 500, color: "#1e40af" }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {ad_names.length > 0 && (
+          <div style={{ padding: "10px 12px", background: "#f0fdf4", borderRadius: 8, border: "1px solid #bbf7d0" }}>
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8, fontWeight: 600 }}>
+              🖼️ Advertisements to link ({ad_names.length})
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {ad_names.map((a, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#fff", borderRadius: 6, border: "1px solid #d1fae5", fontSize: 13 }}>
+                  <span style={{ color: "#10b981", fontSize: 15 }}>🖼</span>
+                  <span style={{ fontWeight: 500, color: "#065f46" }}>{a}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {video_names.length === 0 && ad_names.length === 0 && (
+          <div style={{ padding: "10px 12px", background: "#fef9c3", borderRadius: 8, fontSize: 13, color: "#92400e" }}>
+            ⚠️ No videos or advertisements selected.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // video_assign / video_remove: { video_ids, video_names }
+  if (requestType === "video_assign" || requestType === "video_remove") {
+    const { video_names = [], video_ids = [] } = changeData;
+    const icon = requestType === "video_assign" ? "➕" : "➖";
+    const color = requestType === "video_assign" ? "#166534" : "#991b1b";
+    const bg = requestType === "video_assign" ? "#dcfce7" : "#fef2f2";
+    const border = requestType === "video_assign" ? "#bbf7d0" : "#fecaca";
+    const names = video_names.length > 0 ? video_names : video_ids.map(id => `Video #${id}`);
+    return (
+      <div style={{ padding: "10px 12px", background: bg, borderRadius: 8, border: `1px solid ${border}` }}>
+        <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8, fontWeight: 600 }}>
+          {icon} Videos ({names.length})
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {names.map((v, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#fff", borderRadius: 6, fontSize: 13 }}>
+              <span style={{ color, fontSize: 15 }}>▶</span>
+              <span style={{ fontWeight: 500, color }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback: show a clean key-value list instead of raw JSON
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {Object.entries(changeData).map(([key, val]) => (
+        <div key={key} style={{ display: "flex", gap: 8, padding: "6px 10px", background: "#f9fafb", borderRadius: 6, fontSize: 13 }}>
+          <span style={{ color: "#6b7280", minWidth: 120, fontWeight: 500, textTransform: "capitalize" }}>
+            {key.replace(/_/g, " ")}
+          </span>
+          <span style={{ color: "#0f172a" }}>
+            {Array.isArray(val) ? val.join(", ") || "—" : String(val ?? "—")}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ContentApprovalQueue({ onApprovalAction }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -474,22 +573,14 @@ export default function ContentApprovalQueue({ onApprovalAction }) {
                 </div>
               )}
 
-              {/* Change Data */}
+              {/* Change Data — human-readable */}
               {selectedRequest.change_data && (
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #e5e7eb" }}>
-                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>Changes</div>
-                  <div style={{ 
-                    background: "#fff", 
-                    padding: 12, 
-                    borderRadius: 8, 
-                    border: "1px solid #e5e7eb",
-                    fontSize: 13,
-                    fontFamily: "monospace"
-                  }}>
-                    <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
-                      {JSON.stringify(selectedRequest.change_data, null, 2)}
-                    </pre>
-                  </div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>Requested Changes</div>
+                  <ChangeDataPreview
+                    requestType={selectedRequest.request_type}
+                    changeData={selectedRequest.change_data}
+                  />
                 </div>
               )}
             </div>
