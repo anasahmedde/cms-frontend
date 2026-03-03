@@ -190,7 +190,7 @@ function SlidingAnnouncementBanner({ announcement, onClear }) {
       background: c.bg, padding: "12px 20px", borderRadius: 10,
       overflow: "hidden", position: "relative", display: "flex", alignItems: "center"
     }}>
-      <div style={{ flex: 1, overflow: "hidden" }}>
+      <div style={{ flex: 1, overflow: "hidden", minWidth: 0 }}>
         <div style={{
           display: "inline-flex", animation: "slideText 30s linear infinite",
           whiteSpace: "nowrap", color: c.text, fontWeight: 600, fontSize: 14,

@@ -193,8 +193,9 @@ export default function GlobalAnnouncementBanner() {
     <div style={{
       background: c.bg, padding: "12px 20px", overflow: "hidden",
       position: "relative", display: "flex", alignItems: "center", zIndex: 100,
+      width: "100%", boxSizing: "border-box",
     }}>
-      <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+      <div style={{ flex: 1, overflow: "hidden", position: "relative", minWidth: 0 }}>
         <div style={{
           display: "inline-flex",
           animation: "slideTextGlobal 30s linear infinite",
