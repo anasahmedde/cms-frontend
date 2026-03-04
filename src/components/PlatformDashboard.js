@@ -476,7 +476,7 @@ function DonutChart({ segments, size = 140, strokeWidth = 18, centerLabel, cente
           const pct = total > 0 ? seg.value / total : 0;
           const dash = pct * circumference;
           const gap = circumference - dash;
-          const rot = (offset / total) * 360;
+          const rot = total > 0 ? (offset / total) * 360 : 0;
           offset += seg.value;
           return (
             <circle key={i} cx={size / 2} cy={size / 2} r={radius} fill="none"
