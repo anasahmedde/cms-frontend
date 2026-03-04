@@ -188,6 +188,10 @@ export default function PlatformAdmin({ onImpersonate }) {
   const [gracePeriod, setGracePeriod] = useState(7);
   const [settingExpiration, setSettingExpiration] = useState(false);
 
+  // Force delete modal (when company has linked resources)
+  const [forceDeleteModal, setForceDeleteModal] = useState(null);
+  const [forceDeleteChecked, setForceDeleteChecked] = useState(false);
+
   const fetchDashboard = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/platform/dashboard`, { headers: authHeaders() });
@@ -287,26 +291,44 @@ export default function PlatformAdmin({ onImpersonate }) {
     } catch (err) { setError(err.message); }
   };
 
-  const handleDelete = async (slug, name) => {
-    const confirmText = prompt(`⚠️ DELETE "${name}"?\n\nType the slug "${slug}" to confirm:`);
-    if (confirmText !== slug) {
-      if (confirmText !== null) alert("Slug did not match.");
-      return;
+  const handleDelete = async (slug, name, force = false) => {
+    if (!force) {
+      const confirmText = prompt(`⚠️ DELETE "${name}"?\n\nType the slug "${slug}" to confirm:`);
+      if (confirmText !== slug) {
+        if (confirmText !== null) alert("Slug did not match.");
+        return;
+      }
     }
     setDeleting(slug);
     try {
-      const res = await fetch(`${API_BASE}/platform/companies/${slug}`, {
-        method: "DELETE", headers: authHeaders(),
-      });
+      const url = `${API_BASE}/platform/companies/${slug}${force ? "?force=true" : ""}`;
+      const res = await fetch(url, { method: "DELETE", headers: authHeaders() });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.detail || "Failed to delete");
+        const detail = data.detail;
+        const msg = typeof detail === "object" ? (detail.message || "Failed to delete") : (detail || "Failed to delete");
+        if (res.status === 409 && typeof detail === "object" && detail.linked && !force) {
+          setForceDeleteModal({ slug, name, linked: detail.linked });
+          setForceDeleteChecked(false);
+          setDeleting(null);
+          return;
+        }
+        throw new Error(msg);
       }
       setSuccess(`Company "${name}" deleted.`);
       setSelectedCompany(null);
+      setForceDeleteModal(null);
       fetchCompanies(); fetchDashboard(); fetchExpirationData();
     } catch (err) { setError(err.message); }
     finally { setDeleting(null); }
+  };
+
+  const handleForceDeleteConfirm = async () => {
+    if (!forceDeleteModal || !forceDeleteChecked) return;
+    const { slug, name } = forceDeleteModal;
+    setForceDeleteModal(null);
+    setForceDeleteChecked(false);
+    await handleDelete(slug, name, true);
   };
 
   const handleSuspend = async (companyId, name) => {
@@ -1008,6 +1030,39 @@ export default function PlatformAdmin({ onImpersonate }) {
               <button onClick={handleSetExpiration} disabled={settingExpiration}
                 style={{ flex: 1, padding: 12, background: "#16a34a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, opacity: settingExpiration ? 0.6 : 1 }}>
                 {settingExpiration ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Force Delete Modal (company has linked resources) */}
+      {forceDeleteModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1002 }}
+          onClick={() => { setForceDeleteModal(null); setForceDeleteChecked(false); }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 420 }}
+            onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 18, color: "#991b1b" }}>⚠️ Force delete "{forceDeleteModal.name}"?</h3>
+            <p style={{ margin: "0 0 12px", fontSize: 14, color: "#374151" }}>
+              This company has linked resources:{" "}
+              {Object.entries(forceDeleteModal.linked)
+                .map(([k, v]) => `${v} ${k}${v > 1 ? "s" : ""}`)
+                .join(", ")}.
+              Deleting will permanently remove the company and all of this data.
+            </p>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 20, cursor: "pointer", fontSize: 14 }}>
+              <input type="checkbox" checked={forceDeleteChecked} onChange={e => setForceDeleteChecked(e.target.checked)}
+                style={{ marginTop: 3, width: 18, height: 18 }} />
+              <span>I understand this will permanently delete all linked users, devices, videos, and related data. This cannot be undone.</span>
+            </label>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button onClick={() => { setForceDeleteModal(null); setForceDeleteChecked(false); }}
+                style={{ flex: 1, padding: 12, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>
+                Cancel
+              </button>
+              <button onClick={handleForceDeleteConfirm} disabled={!forceDeleteChecked || deleting}
+                style={{ flex: 1, padding: 12, background: forceDeleteChecked ? "#dc2626" : "#fca5a5", color: "#fff", border: "none", borderRadius: 8, cursor: forceDeleteChecked ? "pointer" : "not-allowed", fontWeight: 600, opacity: deleting ? 0.6 : 1 }}>
+                {deleting ? "Deleting..." : "Force Delete"}
               </button>
             </div>
           </div>
