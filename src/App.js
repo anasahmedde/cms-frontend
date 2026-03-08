@@ -823,7 +823,7 @@ function Dashboard({ user, onLogout }) {
             {currentPage === "reports" && !hasPermission("view_reports") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to view reports.</div>}
             {currentPage === "users" && hasPermission("manage_users") && <div style={{ background: theme.card, borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}><UserManagement onUserDeactivated={onLogout} /></div>}
             {currentPage === "users" && !hasPermission("manage_users") && <div style={{ padding: 40, textAlign: "center", color: theme.textSecondary }}>You don't have permission to manage users.</div>}
-            {currentPage === "approvals" && <ContentApprovalQueue onApprovalAction={() => setPendingApprovals(p => Math.max(0, p - 1))} />}
+            {currentPage === "approvals" && <ContentApprovalQueue onApprovalAction={(action) => { setPendingApprovals(p => Math.max(0, p - 1)); if (action === "approve") setLinksRefresh(x => x + 1); }} />}
           </main>
         </div>
         {hasPermission("manage_devices") && <Modal open={openModal === "device"} title="📱 Device Management" onClose={() => setOpenModal(null)}><Device onChanged={() => setLinksRefresh((x) => x + 1)} /></Modal>}
