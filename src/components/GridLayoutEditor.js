@@ -176,15 +176,24 @@ function GridLayoutEditor({ open, onClose, deviceId, videos = [], advertisements
           content_type: "video",
           rotation: effectiveRotation,
         });
+      } else if (savedSlot) {
+        // Slot exists in saved config but has no video/ad — user explicitly cleared it, keep empty
+        newSlots.push({
+          position: position,
+          video: null,
+          advertisement: null,
+          content_type: "video",
+          rotation: null,
+        });
       } else {
-        // Fall back to videos by index (for backwards compatibility)
-        const existingVideo = sortedVideos[i] || null;
+        // No saved config at all — auto-fill only on first-ever open (no layout_config saved yet)
+        const existingVideo = configArray.length === 0 ? (sortedVideos[i] || null) : null;
         const effectiveRotation = existingVideo?.device_rotation ?? existingVideo?.rotation ?? null;
         newSlots.push({
           position: position,
           video: existingVideo,
           advertisement: null,
-          content_type: existingVideo ? "video" : "video",
+          content_type: "video",
           rotation: effectiveRotation,
         });
       }
