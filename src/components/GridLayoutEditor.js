@@ -43,6 +43,11 @@ function GridLayoutEditor({ open, onClose, deviceId, videos = [], advertisements
   const [loadedAds, setLoadedAds] = useState([]); // Advertisements loaded from group
   const [savedConfig, setSavedConfig] = useState(null); // Saved layout_config from backend
 
+  // Sequential playback state (single mode only)
+  const [playAllSequential, setPlayAllSequential] = useState(false);
+  const [sequentialVideos, setSequentialVideos] = useState([]); // [{video_name, order}]
+  const [seqDragIndex, setSeqDragIndex] = useState(null); // index being dragged in seq list
+
   // Parse resolution string to width/height
   const parseResolution = (resStr) => {
     if (!resStr) return { width: 1920, height: 1080 };
@@ -83,9 +88,23 @@ function GridLayoutEditor({ open, onClose, deviceId, videos = [], advertisements
               // Ensure savedLayoutConfig is always an array
               savedLayoutConfig = Array.isArray(parsed) ? parsed : [];
               setSavedConfig(savedLayoutConfig);
+
+              // Restore sequential playback settings from slot 1
+              const slot1 = savedLayoutConfig.find(s => s.position === 1);
+              if (slot1?.play_all_sequential) {
+                setPlayAllSequential(true);
+                const seqNames = slot1.sequential_videos || [];
+                setSequentialVideos(seqNames.map((name, i) => ({ video_name: name, order: i + 1 })));
+              } else {
+                setPlayAllSequential(false);
+                setSequentialVideos([]);
+              }
             } catch (e) {
               console.log("Could not parse layout_config");
             }
+          } else {
+            setPlayAllSequential(false);
+            setSequentialVideos([]);
           }
         } catch (err) {
           console.log("No existing layout, using single");
@@ -126,6 +145,15 @@ function GridLayoutEditor({ open, onClose, deviceId, videos = [], advertisements
   const videosOnlyFiltered = useMemo(() => {
     return videos.filter(v => (v.content_type || "video") !== "image");
   }, [videos]);
+
+  // Reset sequential state when editor closes
+  useEffect(() => {
+    if (!open) {
+      setPlayAllSequential(false);
+      setSequentialVideos([]);
+      setSeqDragIndex(null);
+    }
+  }, [open]);
 
   // Track if slots have been initialized to prevent re-initialization
   const slotsInitialized = useRef(false);
@@ -346,13 +374,25 @@ function GridLayoutEditor({ open, onClose, deviceId, videos = [], advertisements
   // Save layout for a single device
   const saveLayoutForDevice = async (targetDeviceId, targetVideos) => {
     // Build layout config with content type support
-    const layoutConfig = slots.map((slot, idx) => ({
+    let layoutConfig = slots.map((slot, idx) => ({
       position: idx + 1,
       video_name: slot.video?.video_name || null,
       ad_name: slot.advertisement?.ad_name || null,
       content_type: slot.content_type || "video",
       rotation: slot.rotation,
     }));
+
+    // Embed sequential playback settings into slot 1 when in single mode
+    if (layoutMode === "single" && playAllSequential) {
+      const orderedNames = [...sequentialVideos]
+        .sort((a, b) => a.order - b.order)
+        .map(v => v.video_name);
+      layoutConfig = layoutConfig.map(slot =>
+        slot.position === 1
+          ? { ...slot, play_all_sequential: true, sequential_videos: orderedNames }
+          : slot
+      );
+    }
 
     // Save layout - uses POST with layout_config as JSON string
     await axios.post(`${API_BASE}/device/${targetDeviceId}/layout`, {
@@ -605,6 +645,171 @@ function GridLayoutEditor({ open, onClose, deviceId, videos = [], advertisements
                     ))}
                   </div>
                 </div>
+
+                {/* Sequential Playback — single mode only */}
+                {layoutMode === "single" && (
+                  <div style={{
+                    marginBottom: 20,
+                    padding: 16,
+                    background: playAllSequential ? "#eff6ff" : "#f9fafb",
+                    border: `2px solid ${playAllSequential ? "#3b82f6" : "#e5e7eb"}`,
+                    borderRadius: 12,
+                  }}>
+                    {/* Toggle */}
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
+                      <div
+                        onClick={() => {
+                          const next = !playAllSequential;
+                          setPlayAllSequential(next);
+                          if (next && sequentialVideos.length === 0) {
+                            // Pre-populate with all group videos in current order
+                            setSequentialVideos(
+                              videosOnlyFiltered.map((v, i) => ({ video_name: v.video_name, order: i + 1 }))
+                            );
+                          }
+                        }}
+                        style={{
+                          width: 44,
+                          height: 24,
+                          borderRadius: 12,
+                          background: playAllSequential ? "#3b82f6" : "#d1d5db",
+                          position: "relative",
+                          transition: "background 0.2s",
+                          flexShrink: 0,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{
+                          position: "absolute",
+                          top: 3,
+                          left: playAllSequential ? 23 : 3,
+                          width: 18,
+                          height: 18,
+                          borderRadius: "50%",
+                          background: "#fff",
+                          transition: "left 0.2s",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                        }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#1e40af" }}>
+                          🔁 Play all videos in sequence
+                        </div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                          {playAllSequential
+                            ? "Device will play selected videos one by one in order, looping forever"
+                            : "Only the video assigned to the single slot will play"}
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* Video picker + ordering */}
+                    {playAllSequential && (
+                      <div style={{ marginTop: 16 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 8 }}>
+                          SELECT & ORDER VIDEOS ({sequentialVideos.length} selected)
+                        </div>
+
+                        {/* All group videos — checkboxes to add/remove */}
+                        <div style={{ marginBottom: 12 }}>
+                          {videosOnlyFiltered.map(v => {
+                            const inSeq = sequentialVideos.find(s => s.video_name === v.video_name);
+                            return (
+                              <label
+                                key={v.video_name}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                  padding: "6px 8px",
+                                  borderRadius: 6,
+                                  cursor: "pointer",
+                                  background: inSeq ? "#dbeafe" : "transparent",
+                                  marginBottom: 2,
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={!!inSeq}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setSequentialVideos(prev => [
+                                        ...prev,
+                                        { video_name: v.video_name, order: prev.length + 1 },
+                                      ]);
+                                    } else {
+                                      setSequentialVideos(prev => {
+                                        const filtered = prev.filter(s => s.video_name !== v.video_name);
+                                        return filtered.map((s, i) => ({ ...s, order: i + 1 }));
+                                      });
+                                    }
+                                  }}
+                                  style={{ accentColor: "#3b82f6", width: 15, height: 15 }}
+                                />
+                                <span style={{ fontSize: 12, color: "#374151", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  🎬 {v.video_name}
+                                </span>
+                                {inSeq && (
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8", background: "#bfdbfe", borderRadius: 4, padding: "1px 6px" }}>
+                                    #{inSeq.order}
+                                  </span>
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        {/* Drag-to-reorder list of selected videos */}
+                        {sequentialVideos.length > 0 && (
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", marginBottom: 6 }}>
+                              DRAG TO REORDER PLAYBACK SEQUENCE
+                            </div>
+                            <div style={{ border: "1px solid #bfdbfe", borderRadius: 8, overflow: "hidden" }}>
+                              {[...sequentialVideos]
+                                .sort((a, b) => a.order - b.order)
+                                .map((sv, idx) => (
+                                  <div
+                                    key={sv.video_name}
+                                    draggable
+                                    onDragStart={() => setSeqDragIndex(idx)}
+                                    onDragOver={e => e.preventDefault()}
+                                    onDrop={() => {
+                                      if (seqDragIndex === null || seqDragIndex === idx) return;
+                                      setSequentialVideos(prev => {
+                                        const sorted = [...prev].sort((a, b) => a.order - b.order);
+                                        const dragged = sorted.splice(seqDragIndex, 1)[0];
+                                        sorted.splice(idx, 0, dragged);
+                                        return sorted.map((s, i) => ({ ...s, order: i + 1 }));
+                                      });
+                                      setSeqDragIndex(null);
+                                    }}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 8,
+                                      padding: "8px 10px",
+                                      background: seqDragIndex === idx ? "#dbeafe" : idx % 2 === 0 ? "#f0f9ff" : "#fff",
+                                      borderBottom: idx < sequentialVideos.length - 1 ? "1px solid #bfdbfe" : "none",
+                                      cursor: "grab",
+                                    }}
+                                  >
+                                    <span style={{ fontSize: 14, color: "#9ca3af" }}>⠿</span>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8", background: "#bfdbfe", borderRadius: 4, padding: "2px 7px", minWidth: 22, textAlign: "center" }}>
+                                      {sv.order}
+                                    </span>
+                                    <span style={{ fontSize: 12, color: "#374151", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {sv.video_name}
+                                    </span>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Grid Preview */}
                 <div style={{ marginBottom: 20 }}>
