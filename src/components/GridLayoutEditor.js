@@ -211,23 +211,51 @@ function GridLayoutEditor({ open, onClose, deviceId, videos = [], advertisements
     // If slot count changed, reinitialize
     if (slots.length !== numSlots) {
       const newSlots = [];
+      const configArray = Array.isArray(savedConfig) ? savedConfig : [];
       const sortedVideos = [...videosOnlyFiltered].sort((a, b) => (a.grid_position || 0) - (b.grid_position || 0));
       
       for (let i = 0; i < numSlots; i++) {
-        // Try to keep existing slot data if available
-        const existingSlot = slots[i];
-        if (existingSlot) {
-          newSlots.push({ ...existingSlot, position: i + 1 });
-        } else {
-          const existingVideo = sortedVideos[i] || null;
-          const effectiveRotation = existingVideo?.device_rotation ?? existingVideo?.rotation ?? null;
+        const position = i + 1;
+        const savedSlot = configArray.find(s => s.position === position);
+
+        if (savedSlot?.ad_name && savedSlot?.content_type === "image") {
+          const adData = allAdvertisements.find(a => a.ad_name === savedSlot.ad_name);
           newSlots.push({
-            position: i + 1,
-            video: existingVideo,
+            position,
+            video: null,
+            advertisement: adData || { ad_name: savedSlot.ad_name },
+            content_type: "image",
+            rotation: savedSlot.rotation ?? null,
+          });
+        } else if (savedSlot?.video_name) {
+          const videoData = sortedVideos.find(v => v.video_name === savedSlot.video_name);
+          const effectiveRotation = savedSlot.rotation ?? videoData?.device_rotation ?? videoData?.rotation ?? null;
+          newSlots.push({
+            position,
+            video: videoData || { video_name: savedSlot.video_name },
             advertisement: null,
-            content_type: existingVideo ? "video" : "video",
+            content_type: "video",
             rotation: effectiveRotation,
           });
+        } else if (savedSlot) {
+          // Slot explicitly cleared — keep empty
+          newSlots.push({ position, video: null, advertisement: null, content_type: "video", rotation: null });
+        } else {
+          // Try to keep existing slot data if available, otherwise auto-fill only when no config saved
+          const existingSlot = slots[i];
+          if (existingSlot) {
+            newSlots.push({ ...existingSlot, position });
+          } else {
+            const existingVideo = configArray.length === 0 ? (sortedVideos[i] || null) : null;
+            const effectiveRotation = existingVideo?.device_rotation ?? existingVideo?.rotation ?? null;
+            newSlots.push({
+              position,
+              video: existingVideo,
+              advertisement: null,
+              content_type: "video",
+              rotation: effectiveRotation,
+            });
+          }
         }
       }
       setSlots(newSlots);
