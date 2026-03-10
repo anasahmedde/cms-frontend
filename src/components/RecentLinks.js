@@ -753,75 +753,86 @@ function VideoPlayerModal({ open, onClose, deviceId, videos }) {
               <div style={{ fontSize: 12, color: "#9ca3af" }}>{error}</div>
             </div>
           ) : isGridMode ? (
-            // GRID MODE - Multiple videos/images simultaneously
-            videoData.slice(0, layoutMode === "grid_1x4" ? 4 : layoutMode === "grid_4" ? 4 : layoutMode === "grid_3" ? 3 : 2).map((item, index) => {
-              const isImage = item.content_type === "image";
-              return (
-                <div
-                  key={item.link_id || index}
-                  style={{
-                    position: "relative",
-                    background: "#111",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                    ...getVideoContainerStyle(index),
-                  }}
-                >
-                  {item.url ? (
-                    <>
-                      {isImage ? (
-                        <img
-                          src={item.url}
-                          alt={item.video_name || "Image"}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: item.fit_mode || "cover",
-                            transform: `rotate(${item.rotation || 0}deg)`,
-                          }}
-                        />
-                      ) : (
-                        <video
-                          ref={el => videoRefs.current[index] = el}
-                          src={item.url}
-                          autoPlay
-                          muted={index > 0} // Only first video has sound
-                          loop
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                            transform: `rotate(${item.rotation || 0}deg)`,
-                          }}
-                        />
-                      )}
-                      {/* Content label overlay */}
-                      <div style={{
-                        position: "absolute",
-                        bottom: 8,
-                        left: 8,
-                        padding: "4px 8px",
-                        background: isImage ? "rgba(16,185,129,0.8)" : "rgba(0,0,0,0.7)",
-                        borderRadius: 4,
-                        color: "#fff",
-                        fontSize: 11,
-                        fontWeight: 600,
-                      }}>
-                        {isImage ? "🖼️" : "🎬"} {index + 1}. {item.video_name || (isImage ? "Image" : "Video")}
-                        {(item.rotation || 0) !== 0 && ` (${item.rotation}°)`}
+            // GRID MODE — build a fixed-size slot array using grid_position so
+            // empty slots render as black cells and content lands in the right cell.
+            (() => {
+              const numSlots = layoutMode === "grid_1x4" ? 4 : layoutMode === "grid_4" ? 4 : layoutMode === "grid_3" ? 3 : 2;
+              // Build slot array: grid_position is 1-based, array index is 0-based
+              const slots = Array(numSlots).fill(null);
+              videoData.forEach(item => {
+                const pos = item.grid_position;
+                const idx = (pos > 0 && pos <= numSlots) ? pos - 1 : null;
+                if (idx !== null && slots[idx] === null) slots[idx] = item;
+              });
+              return slots.map((item, index) => {
+                const isImage = item?.content_type === "image";
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      position: "relative",
+                      background: "#111",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden",
+                      ...getVideoContainerStyle(index),
+                    }}
+                  >
+                    {item?.url ? (
+                      <>
+                        {isImage ? (
+                          <img
+                            src={item.url}
+                            alt={item.video_name || "Image"}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: item.fit_mode || "cover",
+                              transform: `rotate(${item.rotation || 0}deg)`,
+                            }}
+                          />
+                        ) : (
+                          <video
+                            ref={el => videoRefs.current[index] = el}
+                            src={item.url}
+                            autoPlay
+                            muted={index > 0}
+                            loop
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              transform: `rotate(${item.rotation || 0}deg)`,
+                            }}
+                          />
+                        )}
+                        <div style={{
+                          position: "absolute",
+                          bottom: 8,
+                          left: 8,
+                          padding: "4px 8px",
+                          background: isImage ? "rgba(16,185,129,0.8)" : "rgba(0,0,0,0.7)",
+                          borderRadius: 4,
+                          color: "#fff",
+                          fontSize: 11,
+                          fontWeight: 600,
+                        }}>
+                          {isImage ? "🖼️" : "🎬"} {index + 1}. {item.video_name || (isImage ? "Image" : "Video")}
+                          {(item.rotation || 0) !== 0 && ` (${item.rotation}°)`}
+                        </div>
+                      </>
+                    ) : (
+                      // Empty slot — render black with slot number
+                      <div style={{ color: "#374151", textAlign: "center" }}>
+                        <div style={{ fontSize: 24, marginBottom: 4 }}>▪</div>
+                        <div style={{ fontSize: 11 }}>Slot {index + 1}</div>
                       </div>
-                    </>
-                  ) : (
-                    <div style={{ color: "#6b7280", textAlign: "center" }}>
-                      <div style={{ fontSize: 32, marginBottom: 8 }}>{isImage ? "🖼️" : "🎬"}</div>
-                      <div style={{ fontSize: 12 }}>No URL</div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
+                    )}
+                  </div>
+                );
+              });
+            })()
           ) : currentVideo?.url ? (
             // SINGLE MODE - One video/image at a time
             currentVideo.content_type === "image" ? (
