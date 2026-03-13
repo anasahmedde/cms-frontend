@@ -972,7 +972,7 @@ export default function Device() {
 
   // Handler to wipe all videos from a device (delete from device storage)
   const handleWipeVideos = async (device) => {
-    const confirmMsg = `⚠️ DELETE ALL VIDEOS from "${device.device_name || device.mobile_id}"?\n\nThis will:\n• Remove all video assignments from the dashboard\n• Delete all downloaded videos from the device\n\nThis action cannot be undone.`;
+    const confirmMsg = `⚠️ DELETE ALL VIDEOS from "${device.device_name || device.mobile_id}"?\n\nThis will:\n• Delete all downloaded videos from the device storage\n• Device will re-download videos on next sync\n\nVideos on server/S3 will NOT be deleted.\n\nThis action cannot be undone.`;
       
     if (!window.confirm(confirmMsg)) {
       return;
@@ -982,7 +982,7 @@ export default function Device() {
     try {
       const result = await wipeDeviceVideos(device.mobile_id);
       if (result.ok) {
-        toast(`✅ ${result.data?.message || "All videos deleted from device"}`);
+        toast(`✅ ${result.data?.message || "Wipe command sent. Device will clear storage on next sync."}`);
         await loadPage(page, pageSize, qApplied);
       } else {
         toast(`❌ Failed: ${result.error}`);
