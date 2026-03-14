@@ -522,6 +522,12 @@ export default function Device() {
   const [wipingDevice, setWipingDevice] = useState(null); // mobile_id of device being wiped
   const [activeTab, setActiveTab] = useState("active"); // "active" or "inactive"
 
+  // Storage info modal state
+  const [storageModalOpen, setStorageModalOpen] = useState(false);
+  const [storageDevice, setStorageDevice] = useState(null);
+  const [storageInfo, setStorageInfo] = useState(null);
+  const [storageLoading, setStorageLoading] = useState(false);
+
   // Assign videos modal state
   const [assignDevice, setAssignDevice] = useState(null);
   const [assignGroup, setAssignGroup] = useState("");
@@ -991,6 +997,25 @@ export default function Device() {
       toast(`❌ Error: ${err.message}`);
     } finally {
       setWipingDevice(null);
+    }
+  };
+
+  // Handler to view device storage and RAM info
+  const handleViewStorage = async (device) => {
+    setStorageDevice(device);
+    setStorageModalOpen(true);
+    setStorageLoading(true);
+    setStorageInfo(null);
+    
+    try {
+      const res = await dvsgApi.get(`/device/${device.mobile_id}/storage`);
+      setStorageInfo(res.data);
+    } catch (err) {
+      setStorageInfo({ 
+        error: err.response?.data?.detail || err.message || "Failed to fetch storage info" 
+      });
+    } finally {
+      setStorageLoading(false);
     }
   };
 
@@ -1617,6 +1642,18 @@ export default function Device() {
                         </button>
                         <button style={btnReport} onClick={() => openReport(d)} title="View Temperature Report">
                           📈 Report
+                        </button>
+                        <button 
+                          style={{ 
+                            ...btn, 
+                            background: "#0891b2", 
+                            padding: "6px 10px", 
+                            fontSize: 11,
+                          }} 
+                          onClick={() => handleViewStorage(d)}
+                          title="View device storage and RAM info"
+                        >
+                          💾 Storage
                         </button>
                         <button 
                           style={{ 
@@ -2315,6 +2352,145 @@ export default function Device() {
                 💡 <strong>Tip:</strong> To add videos to a group, go to <strong>Link Videos</strong> in the sidebar and select the group.
               </div>
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Storage Info Modal */}
+      <Modal
+        open={storageModalOpen}
+        title={`💾 Storage & RAM Info - ${storageDevice?.device_name || storageDevice?.mobile_id || ''}`}
+        onClose={() => { setStorageModalOpen(false); setStorageDevice(null); setStorageInfo(null); }}
+        width="500px"
+        footer={
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button style={btnGhost} onClick={() => { setStorageModalOpen(false); setStorageDevice(null); setStorageInfo(null); }}>
+              Close
+            </button>
+            <button style={btn} onClick={() => handleViewStorage(storageDevice)} disabled={storageLoading}>
+              🔄 Refresh
+            </button>
+          </div>
+        }
+      >
+        {storageLoading ? (
+          <div style={{ textAlign: "center", padding: 40 }}>
+            <div style={{ fontSize: 24, marginBottom: 10 }}>⏳</div>
+            <div style={{ color: "#6b7280" }}>Loading storage info...</div>
+          </div>
+        ) : storageInfo?.error ? (
+          <div style={{ padding: 20, background: "#fef2f2", borderRadius: 8, border: "1px solid #fecaca" }}>
+            <div style={{ color: "#dc2626", fontWeight: 600, marginBottom: 8 }}>❌ Error</div>
+            <div style={{ color: "#991b1b", fontSize: 14 }}>{storageInfo.error}</div>
+            <div style={{ marginTop: 12, fontSize: 12, color: "#6b7280" }}>
+              Make sure the device is online and has reported its storage info. 
+              Storage info is reported when the app starts and after downloads.
+            </div>
+          </div>
+        ) : storageInfo ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Device Type */}
+            <div style={{ padding: 12, background: storageInfo.is_tv ? "#dbeafe" : "#f0fdf4", borderRadius: 8, border: storageInfo.is_tv ? "1px solid #93c5fd" : "1px solid #86efac" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: storageInfo.is_tv ? "#1e40af" : "#166534" }}>
+                {storageInfo.is_tv ? "📺 Android TV Device" : "📱 Mobile Device"}
+              </div>
+            </div>
+
+            {/* Storage Section */}
+            <div style={{ padding: 16, background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 12 }}>💾 Storage</div>
+              
+              {storageInfo.storage ? (
+                <>
+                  {/* Storage Bar */}
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: 12, color: "#6b7280" }}>
+                      <span>Used: {storageInfo.storage.used_bytes ? Math.round(storageInfo.storage.used_bytes / 1024 / 1024 / 1024 * 10) / 10 : 0} GB</span>
+                      <span>Total: {storageInfo.storage.total_mb ? Math.round(storageInfo.storage.total_mb / 1024 * 10) / 10 : 0} GB</span>
+                    </div>
+                    <div style={{ height: 20, background: "#e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                      <div 
+                        style={{ 
+                          height: "100%", 
+                          width: `${storageInfo.storage.percent_used || 0}%`, 
+                          background: storageInfo.storage.percent_used > 90 ? "#dc2626" : storageInfo.storage.percent_used > 70 ? "#f59e0b" : "#10b981",
+                          borderRadius: 10,
+                          transition: "width 0.3s ease"
+                        }} 
+                      />
+                    </div>
+                    <div style={{ textAlign: "center", marginTop: 4, fontSize: 13, fontWeight: 600, color: storageInfo.storage.percent_used > 90 ? "#dc2626" : "#374151" }}>
+                      {storageInfo.storage.percent_used || 0}% Used
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div style={{ padding: 10, background: "#fff", borderRadius: 6, border: "1px solid #e5e7eb" }}>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>Available</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: "#059669" }}>
+                        {storageInfo.storage.available_mb ? Math.round(storageInfo.storage.available_mb / 1024 * 10) / 10 : 0} GB
+                      </div>
+                    </div>
+                    <div style={{ padding: 10, background: "#fff", borderRadius: 6, border: "1px solid #e5e7eb" }}>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>App Content</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: "#2563eb" }}>
+                        {storageInfo.storage.content_mb || 0} MB
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ color: "#6b7280", fontSize: 13 }}>No storage info available</div>
+              )}
+            </div>
+
+            {/* RAM Section */}
+            <div style={{ padding: 16, background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 12 }}>🧠 RAM (Memory)</div>
+              
+              {storageInfo.ram ? (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div style={{ padding: 10, background: "#fff", borderRadius: 6, border: "1px solid #e5e7eb" }}>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>Available</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: storageInfo.low_memory ? "#dc2626" : "#059669" }}>
+                        {storageInfo.ram.available_mb || 0} MB
+                      </div>
+                    </div>
+                    <div style={{ padding: 10, background: "#fff", borderRadius: 6, border: "1px solid #e5e7eb" }}>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>Total (App Heap)</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: "#374151" }}>
+                        {storageInfo.ram.total_mb || 0} MB
+                      </div>
+                    </div>
+                  </div>
+
+                  {storageInfo.low_memory && (
+                    <div style={{ marginTop: 12, padding: 10, background: "#fef2f2", borderRadius: 6, border: "1px solid #fecaca" }}>
+                      <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600 }}>
+                        ⚠️ Low Memory Warning
+                      </div>
+                      <div style={{ fontSize: 11, color: "#991b1b", marginTop: 4 }}>
+                        Device is running low on RAM. Videos may not play smoothly.
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ color: "#6b7280", fontSize: 13 }}>No RAM info available</div>
+              )}
+            </div>
+
+            {/* Last Updated */}
+            {storageInfo.last_updated && (
+              <div style={{ fontSize: 11, color: "#9ca3af", textAlign: "center" }}>
+                Last updated: {new Date(storageInfo.last_updated).toLocaleString()}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
+            No storage info available
           </div>
         )}
       </Modal>
