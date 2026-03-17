@@ -2,7 +2,7 @@
 // Device Management with server-side pagination and temperature line graph reports
 // Updated with Report button for each device listing
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { listDevices, insertDevice, deleteDevice } from "../api/device";
+import { listDevices, insertDevice, deleteDevice, wipeDeviceVideos } from "../api/device";
 import { listGroupNames } from "../api/group";
 import { listShopNames } from "../api/shop";
 import axios from "axios";
@@ -519,6 +519,7 @@ export default function Device() {
   // Active status and unassign state
   const [togglingActive, setTogglingActive] = useState(null); // mobile_id of device being toggled
   const [unassigning, setUnassigning] = useState(null); // mobile_id of device being unassigned
+  const [wipingDevice, setWipingDevice] = useState(null); // mobile_id of device being wiped
   const [activeTab, setActiveTab] = useState("active"); // "active" or "inactive"
 
   // Assign videos modal state
@@ -966,6 +967,30 @@ export default function Device() {
       toast(`Failed to unassign device: ${err.response?.data?.detail || err.message}`);
     } finally {
       setUnassigning(null);
+    }
+  };
+
+  // Handler to wipe all videos from a device (delete from device storage)
+  const handleWipeVideos = async (device) => {
+    const confirmMsg = `⚠️ DELETE ALL VIDEOS from "${device.device_name || device.mobile_id}"?\n\nThis will:\n• Delete all downloaded videos from the device storage\n• Device will re-download videos on next sync\n\nVideos on server/S3 will NOT be deleted.\n\nThis action cannot be undone.`;
+      
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+    
+    setWipingDevice(device.mobile_id);
+    try {
+      const result = await wipeDeviceVideos(device.mobile_id);
+      if (result.ok) {
+        toast(`✅ ${result.data?.message || "Wipe command sent. Device will clear storage on next sync."}`);
+        await loadPage(page, pageSize, qApplied);
+      } else {
+        toast(`❌ Failed: ${result.error}`);
+      }
+    } catch (err) {
+      toast(`❌ Error: ${err.message}`);
+    } finally {
+      setWipingDevice(null);
     }
   };
 
@@ -1592,6 +1617,20 @@ export default function Device() {
                         </button>
                         <button style={btnReport} onClick={() => openReport(d)} title="View Temperature Report">
                           📈 Report
+                        </button>
+                        <button
+                          style={{ 
+                            ...btn, 
+                            background: "#7c3aed", 
+                            padding: "6px 10px", 
+                            fontSize: 11,
+                            opacity: wipingDevice === d.mobile_id ? 0.7 : 1,
+                          }} 
+                          onClick={() => handleWipeVideos(d)}
+                          disabled={wipingDevice === d.mobile_id}
+                          title="Delete all videos from this device"
+                        >
+                          {wipingDevice === d.mobile_id ? "..." : "🗑️ Wipe"}
                         </button>
                         <button style={{ ...btn, background: "#6366f1", padding: "6px 12px", fontSize: 12 }} onClick={() => openEditModal(d)} title="Edit Device Resolution">
                           ✏️ Edit
@@ -2279,6 +2318,7 @@ export default function Device() {
           </div>
         )}
       </Modal>
+
     </div>
   );
 }

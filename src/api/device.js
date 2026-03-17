@@ -129,3 +129,28 @@ export async function getDeviceOnlineStatus(mobileId) {
   return { ok: true, online: !!r.data?.online || r.data === true || !!r.data?.is_online };
 }
 
+/**
+ * WIPE all videos from a device (delete links and local files)
+ * POST /device/{mobile_id}/wipe-videos
+ * 
+ * This will:
+ * 1. Remove all video assignments from the database
+ * 2. Send a command to the device to delete all local video files
+ */
+export async function wipeDeviceVideos(mobileId) {
+  try {
+    const id = (mobileId ?? "").toString().trim();
+    if (!id) return { ok: false, error: "mobile_id is required" };
+
+    const res = await deviceApi.post(`/device/${enc(id)}/wipe-videos`);
+    return { ok: true, data: res.data };
+  } catch (err) {
+    console.error("wipeDeviceVideos error:", err);
+    return {
+      ok: false,
+      status: err?.response?.status,
+      error: errMsg(err),
+      raw: err?.response?.data,
+    };
+  }
+}
