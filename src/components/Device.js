@@ -506,6 +506,10 @@ export default function Device() {
   const [customHeight, setCustomHeight] = useState("");
   const [showCustomResolution, setShowCustomResolution] = useState(false);
 
+  // Auto-detected resolution state
+  const [detectedResolution, setDetectedResolution] = useState(null); // e.g. "1920x1080"
+  const [detectingResolution, setDetectingResolution] = useState(false);
+
   // Edit device modal state
   const [editOpen, setEditOpen] = useState(false);
   const [editDevice, setEditDevice] = useState(null);
@@ -994,6 +998,31 @@ export default function Device() {
     }
   };
 
+  // Debounced resolution auto-detect: fires 600 ms after the user stops typing a Mobile ID
+  useEffect(() => {
+    if (!addOpen) return;
+    const id = mobileId.trim();
+    if (!id) {
+      setDetectedResolution(null);
+      return;
+    }
+    setDetectingResolution(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await dvsgApi.get(`/device/${encodeURIComponent(id)}/detected-resolution`);
+        const r = res.data?.resolution || null;
+        setDetectedResolution(r);
+        if (r) setResolution(r);   // pre-fill the resolution dropdown
+      } catch {
+        setDetectedResolution(null);
+      } finally {
+        setDetectingResolution(false);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mobileId, addOpen]);
+
   const handleOpenAddModal = () => {
     setAddOpen(true);
     setStep(1);
@@ -1003,6 +1032,8 @@ export default function Device() {
     setGroup("");
     setShop("");
     setResolution("");
+    setDetectedResolution(null);
+    setDetectingResolution(false);
     setSuccess("");
     setErrText("");
   };
@@ -1042,6 +1073,7 @@ export default function Device() {
           setShowCustomResolution(false);
           setCustomWidth("");
           setCustomHeight("");
+          setDetectedResolution(null);
           setStep(1);
           setAddOpen(false);
           setSuccess("");
@@ -1059,6 +1091,7 @@ export default function Device() {
           setMobileId("");
           setDeviceName("");
           setDownloaded(false);
+          setDetectedResolution(null);
           setStep(1);
           setAddOpen(false);
           setSuccess("");
@@ -1740,6 +1773,25 @@ export default function Device() {
                 <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
                   This is the Android device ID. You can find it in the device settings or from the app.
                 </div>
+                {mobileId.trim() && (
+                  <div style={{ marginTop: 8 }}>
+                    {detectingResolution ? (
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>🔍 Detecting screen resolution...</span>
+                    ) : detectedResolution ? (
+                      <span style={{
+                        fontSize: 12, fontWeight: 600, color: "#166534",
+                        background: "#dcfce7", border: "1px solid #bbf7d0",
+                        borderRadius: 6, padding: "3px 10px",
+                      }}>
+                        ✓ Auto-detected: {detectedResolution}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#92400e" }}>
+                        📡 Device not yet seen — resolution will be set after first connection
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700 }}>
@@ -1803,7 +1855,18 @@ export default function Device() {
                 </div>
 
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Screen Resolution</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                    Screen Resolution
+                    {detectedResolution && (
+                      <span style={{
+                        fontSize: 11, fontWeight: 600, color: "#166534",
+                        background: "#dcfce7", border: "1px solid #bbf7d0",
+                        borderRadius: 6, padding: "2px 8px",
+                      }}>
+                        ✓ Auto-detected
+                      </span>
+                    )}
+                  </div>
                   <select
                     style={inputStyle}
                     value={showCustomResolution ? "custom" : resolution}
