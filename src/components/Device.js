@@ -524,6 +524,7 @@ export default function Device() {
   const [togglingActive, setTogglingActive] = useState(null); // mobile_id of device being toggled
   const [unassigning, setUnassigning] = useState(null); // mobile_id of device being unassigned
   const [wipingDevice, setWipingDevice] = useState(null); // mobile_id of device being wiped
+  const [mutingDevice, setMutingDevice] = useState(null); // mobile_id while mute toggle is in-flight
   const [activeTab, setActiveTab] = useState("active"); // "active" or "inactive"
 
   // Assign videos modal state
@@ -995,6 +996,20 @@ export default function Device() {
       toast(`❌ Error: ${err.message}`);
     } finally {
       setWipingDevice(null);
+    }
+  };
+
+  const handleToggleMute = async (device) => {
+    const newMuted = !device.is_muted;
+    setMutingDevice(device.mobile_id);
+    try {
+      await dvsgApi.post(`/device/${device.mobile_id}/mute`, { is_muted: newMuted });
+      toast(newMuted ? `🔇 ${device.device_name || device.mobile_id} muted` : `🔊 ${device.device_name || device.mobile_id} unmuted`);
+      await loadPage(page, pageSize, qApplied);
+    } catch (err) {
+      toast(`❌ Failed to toggle mute: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setMutingDevice(null);
     }
   };
 
@@ -1652,13 +1667,27 @@ export default function Device() {
                           📈 Report
                         </button>
                         <button
-                          style={{ 
-                            ...btn, 
-                            background: "#7c3aed", 
-                            padding: "6px 10px", 
+                          style={{
+                            ...btn,
+                            background: d.is_muted ? "#6b7280" : "#0ea5e9",
+                            padding: "6px 10px",
+                            fontSize: 11,
+                            opacity: mutingDevice === d.mobile_id ? 0.7 : 1,
+                          }}
+                          onClick={() => handleToggleMute(d)}
+                          disabled={mutingDevice === d.mobile_id}
+                          title={d.is_muted ? "Unmute device" : "Mute device"}
+                        >
+                          {mutingDevice === d.mobile_id ? "..." : d.is_muted ? "🔇 Unmute" : "🔊 Mute"}
+                        </button>
+                        <button
+                          style={{
+                            ...btn,
+                            background: "#7c3aed",
+                            padding: "6px 10px",
                             fontSize: 11,
                             opacity: wipingDevice === d.mobile_id ? 0.7 : 1,
-                          }} 
+                          }}
                           onClick={() => handleWipeVideos(d)}
                           disabled={wipingDevice === d.mobile_id}
                           title="Delete all videos from this device"
