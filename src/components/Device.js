@@ -1477,6 +1477,7 @@ export default function Device() {
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Device Name</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Mobile ID</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Status</th>
+                <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Audio</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Group</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Resolution</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Content</th>
@@ -1535,6 +1536,40 @@ export default function Device() {
                           🌡️ {d.temperature.toFixed(1)}°C
                         </div>
                       )}
+                    </td>
+                    {/* Audio mute/unmute column */}
+                    <td style={{ padding: 12 }}>
+                      <button
+                        onClick={() => handleToggleMute(d)}
+                        disabled={mutingDevice === d.mobile_id}
+                        title={d.is_muted ? "Click to unmute" : "Click to mute"}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          padding: "5px 10px",
+                          borderRadius: 6,
+                          border: "none",
+                          cursor: mutingDevice === d.mobile_id ? "wait" : "pointer",
+                          background: d.is_muted ? "#fee2e2" : "#dcfce7",
+                          color: d.is_muted ? "#dc2626" : "#16a34a",
+                          fontWeight: 700,
+                          fontSize: 11,
+                          opacity: mutingDevice === d.mobile_id ? 0.6 : 1,
+                          transition: "background 0.2s",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <span style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: d.is_muted ? "#dc2626" : "#16a34a",
+                          display: "inline-block",
+                          flexShrink: 0,
+                        }} />
+                        {mutingDevice === d.mobile_id ? "..." : d.is_muted ? "🔇 Muted" : "🔊 Live"}
+                      </button>
                     </td>
                     <td style={{ padding: 12 }}>
                       {d.group_name ? (
@@ -1665,20 +1700,6 @@ export default function Device() {
                         </button>
                         <button style={btnReport} onClick={() => openReport(d)} title="View Temperature Report">
                           📈 Report
-                        </button>
-                        <button
-                          style={{
-                            ...btn,
-                            background: d.is_muted ? "#6b7280" : "#0ea5e9",
-                            padding: "6px 10px",
-                            fontSize: 11,
-                            opacity: mutingDevice === d.mobile_id ? 0.7 : 1,
-                          }}
-                          onClick={() => handleToggleMute(d)}
-                          disabled={mutingDevice === d.mobile_id}
-                          title={d.is_muted ? "Unmute device" : "Mute device"}
-                        >
-                          {mutingDevice === d.mobile_id ? "..." : d.is_muted ? "🔇 Unmute" : "🔊 Mute"}
                         </button>
                         <button
                           style={{
