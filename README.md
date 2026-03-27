@@ -1,275 +1,181 @@
-# DGX Frontend
+# CMS Frontend
 
-A React-based admin dashboard for managing devices, videos, shops, and groups. Built with React 19 and Material-UI.
+A React-based admin dashboard for the Digix CMS platform — managing devices, videos, content approvals, grid layouts, announcements, and real-time monitoring.
 
 ## Overview
 
-This frontend application provides a user-friendly interface for the DGX backend system, enabling administrators to:
+The frontend provides a full-featured admin UI for operators to:
 
-- **Manage Devices** - Register, monitor, and configure IoT/mobile devices
-- **Upload Videos** - Upload and manage video content stored on AWS S3
-- **Organize Shops** - Create and manage shop/location entities
-- **Create Groups** - Group devices for bulk video assignments
-- **Link Resources** - Associate devices with videos, shops, and groups
-- **View Reports** - Monitor device status, temperature logs, and activity
+- **Manage Devices** — register, monitor, configure, activate/deactivate IoT/Android devices
+- **Upload Content** — upload videos and images to AWS S3 with metadata configuration
+- **Organize Groups & Shops** — group devices for bulk content assignments
+- **Link Content** — associate devices/groups with videos via direct link or approval workflow
+- **Grid Layout Editor** — visually assign videos to multi-screen grid slots with drag-and-drop
+- **Sequential Playback** — configure ordered video playlists for single-screen devices
+- **Content Approval Queue** — review and approve/reject content change requests
+- **Announcements** — create and schedule global or targeted announcements
+- **Reports & Uptime** — temperature logs, uptime tracking, storage usage, CSV exports
+- **Real-time Updates** — WebSocket-powered pending approval badge and announcement banners
+
+---
 
 ## Features
 
-- 📱 **Device Management** - Real-time online status, temperature monitoring, daily/monthly counters
-- 🎬 **Video Management** - Upload videos, configure rotation, fit mode, and display duration
-- 🏪 **Shop Management** - Create and organize shop locations
-- 👥 **Group Management** - Bulk assign videos to device groups
-- 🔗 **Link Management** - Visual interface for device-video-shop-group associations
-- 📊 **Reports & Logs** - Temperature reports, activity logs, CSV exports
+### Recent Links Dashboard
+Central view showing all device-video links with:
+- Live online/offline status per device
+- Temperature and daily/monthly play counters
+- Grid layout badge showing slot assignments
+- ▶️ Play button — preview device content in a modal with correct grid positioning
+- 📐 Grid button — open the Grid Layout Editor
+- ✏️ Content button — edit assigned videos directly
+
+### Grid Layout Editor
+Visual drag-and-drop editor for multi-screen layouts:
+- **Layouts**: Single, 2 Horizontal, 2 Vertical, 3 Videos, 4 Grid (2×2), 4 Grid (1×4)
+- Drag videos and images into slots
+- Per-slot rotation (0°/90°/180°/270°) and fit mode
+- Empty slots are preserved on save and reopen
+- Videos are placed at their correct grid position (not packed left)
+- **Apply to Group** — push the same layout to all devices in the group
+
+### Sequential Playback (Single Screen)
+When the single layout is selected, a **"Play all videos in sequence"** toggle appears:
+- **OFF** (default): only the one assigned video plays, looping
+- **ON**: select which group videos to include and drag to set playback order; the device plays them in sequence, looping forever
+- Persists per device and syncs to the whole group via Apply to Group
+
+### Content Approval Workflow
+- Users submit content change requests (link/assign/remove) with optional notes
+- Admins review in the Approval Queue with media previews
+- Approving immediately syncs `device_video_shop_group` and refreshes Recent Links
+- Pending count badge updates in real-time via WebSocket (no polling)
+
+### Announcements
+- Create global or device-targeted announcements
+- Schedule start/end times with optional expiration
+- Banner displayed to all connected admin sessions in real-time
+
+---
 
 ## Tech Stack
 
-- **React 19** - UI Framework
-- **Material-UI (MUI) 7** - Component Library
-- **Axios** - HTTP Client
-- **Lucide React** - Icon Library
-- **Emotion** - CSS-in-JS Styling
+- **React 19** — UI framework
+- **Axios** — HTTP client
+- **WebSocket** (native browser API) — real-time updates
+- **CSS-in-JS** (inline styles) — component styling
+
+---
 
 ## Project Structure
 
 ```
 src/
-├── api/                    # API client modules
-│   ├── config.js          # API endpoint configuration
-│   ├── httpFactory.js     # Axios instance factory
-│   ├── device.js          # Device API calls
-│   ├── video.js           # Video API calls
-│   ├── shop.js            # Shop API calls
-│   ├── group.js           # Group API calls
-│   ├── link.js            # Link API calls
-│   ├── dvsg.js            # Combined service API calls
-│   └── paginate.js        # Pagination utilities
-├── components/             # React components
-│   ├── Device.js          # Device management UI
-│   ├── Video.js           # Video management UI
-│   ├── Shop.js            # Shop management UI
-│   ├── Group.js           # Group management UI
-│   ├── Linker.js          # Resource linking UI
-│   ├── RecentLinks.js     # Links display component
-│   ├── GroupLinkedVideo.js # Group video assignments
-│   ├── Reports.js         # Reports and analytics
-│   └── TemperatureReportModal.jsx # Temperature details
-├── App.jsx                 # Main application component
-├── App.js                  # Alternative app entry
-├── index.js               # React entry point
-└── index.css              # Global styles
+├── api/                          # API client modules
+│   ├── config.js                 # Base URL configuration
+│   ├── device.js                 # Device API calls
+│   ├── video.js                  # Video API calls
+│   ├── shop.js                   # Shop API calls
+│   ├── group.js                  # Group API calls
+│   ├── link.js                   # Link API calls
+│   └── dvsg.js                   # Combined service API calls
+├── components/
+│   ├── RecentLinks.js            # Main dashboard + VideoPlayerModal
+│   ├── GridLayoutEditor.js       # Grid layout drag-and-drop editor
+│   ├── ContentApprovalQueue.jsx  # Approval review UI
+│   ├── GroupLinkedVideo.js       # Group video assignment + approval submit
+│   ├── Device.js                 # Device management
+│   ├── Video.js                  # Video upload and management
+│   ├── Shop.js                   # Shop management
+│   ├── Group.js                  # Group management
+│   ├── Advertisement.js          # Image/ad management
+│   ├── Reports.js                # Analytics and logs
+│   ├── GlobalAnnouncementBanner.jsx  # Announcement display
+│   ├── ExpirationNotificationBanner.jsx # Expiry warnings
+│   ├── PlatformAdmin.js          # Platform-level admin tools
+│   └── PlatformDashboard.js      # Platform overview
+└── App.js                        # Root component, routing, WebSocket setup
 ```
+
+---
 
 ## Installation
 
 ### Prerequisites
-
 - Node.js 18+ (LTS recommended)
-- npm or yarn
-- DGX Backend services running
+- CMS Backend running on port 8005
 
 ### Setup
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd dgx-frontend
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
-
-3. **Configure environment variables**
-
-   Create a `.env` file in the project root:
-   ```env
-   # API Host (defaults to window.location.hostname)
-   REACT_APP_API_HOST=localhost
-   
-   # Individual service URLs (optional - uses defaults if not set)
-   REACT_APP_API_GROUP_BASEURL=http://localhost:8001
-   REACT_APP_API_SHOP_BASEURL=http://localhost:8002
-   REACT_APP_API_VIDEO_BASEURL=http://localhost:8003
-   REACT_APP_API_LINK_BASEURL=http://localhost:8005
-   REACT_APP_API_DEVICE_BASEURL=http://localhost:8005
-   REACT_APP_API_DVSG_BASEURL=http://localhost:8005
-   
-   # Pagination
-   REACT_APP_API_PAGE_SIZE=100
-   ```
-
-4. **Start the development server**
-   ```bash
-   npm start
-   # or
-   yarn start
-   ```
-
-   The app will open at `http://localhost:3000`
-
-## Available Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm start` | Run development server |
-| `npm run build` | Create production build |
-| `npm test` | Run test suite |
-| `npm run eject` | Eject from Create React App |
-
-## API Configuration
-
-The frontend connects to multiple backend services. Default ports:
-
-| Service | Default Port | Environment Variable |
-|---------|-------------|---------------------|
-| Group | 8001 | `REACT_APP_API_GROUP_BASEURL` |
-| Shop | 8002 | `REACT_APP_API_SHOP_BASEURL` |
-| Video | 8003 | `REACT_APP_API_VIDEO_BASEURL` |
-| DVSG (Combined) | 8005 | `REACT_APP_API_DVSG_BASEURL` |
-| Device | 8005 | `REACT_APP_API_DEVICE_BASEURL` |
-| Link | 8005 | `REACT_APP_API_LINK_BASEURL` |
-
-## Usage
-
-### Device Management
-
-1. Click **Device** button to open device management modal
-2. View all registered devices with online status
-3. Add new devices with mobile ID
-4. Monitor temperature and counters
-5. Delete devices (must unlink first)
-
-### Video Management
-
-1. Click **Video** button to open video management modal
-2. Upload new videos (supports MP4, WebM, etc.)
-3. Configure video properties:
-   - **Rotation**: 0°, 90°, 180°, 270°
-   - **Fit Mode**: cover, contain, fill, none
-   - **Display Duration**: seconds for slideshow
-4. Preview videos with presigned S3 URLs
-
-### Shop Management
-
-1. Click **Shop** button to open shop management modal
-2. Create new shops with names
-3. Edit or delete existing shops
-
-### Group Management
-
-1. Click **Group** button to open group management modal
-2. Create device groups
-3. Assign videos to groups (bulk assignment)
-4. All devices in a group receive the assigned videos
-
-### Linking Resources
-
-Use the Linker component to create associations between:
-- Devices ↔ Videos
-- Devices ↔ Shops
-- Devices ↔ Groups
-- Groups ↔ Videos (bulk assignment)
-
-## Building for Production
-
 ```bash
-npm run build
+git clone <repository-url>
+cd cms-frontend
+
+npm install
 ```
 
-This creates an optimized build in the `build/` directory, ready for deployment.
+### Environment Variables
 
-### Deployment Options
+Create a `.env` file:
 
-- **Static hosting**: Serve the `build/` folder with nginx, Apache, or any static file server
-- **CDN**: Deploy to AWS S3 + CloudFront, Vercel, Netlify, etc.
-- **Container**: Use with nginx in a Docker container
+```env
+REACT_APP_API_BASE_URL=http://localhost:8005
+REACT_APP_API_GROUP_BASEURL=http://localhost:8005
+REACT_APP_API_SHOP_BASEURL=http://localhost:8005
+REACT_APP_API_VIDEO_BASEURL=http://localhost:8005
+REACT_APP_API_LINK_BASEURL=http://localhost:8005
+REACT_APP_API_DEVICE_BASEURL=http://localhost:8005
+REACT_APP_API_DVSG_BASEURL=http://localhost:8005
+```
 
-Example nginx configuration:
+### Run
+
+```bash
+npm start        # Development server at http://localhost:3000
+npm run build    # Production build → build/
+```
+
+---
+
+## Deployment
+
+CI/CD is configured via `.github/workflows/deploy-frontend.yml`. Pushes to `staging` trigger automatic deployment.
+
+Serve the `build/` folder with any static file server or CDN (nginx, S3+CloudFront, Vercel, Netlify).
+
+Example nginx config:
 ```nginx
 server {
     listen 80;
     server_name your-domain.com;
-    root /var/www/dgx-frontend/build;
+    root /var/www/cms-frontend/build;
     index index.html;
 
     location / {
         try_files $uri $uri/ /index.html;
     }
-
-    location /api {
-        proxy_pass http://backend:8005;
-    }
 }
 ```
 
-## Dependencies
+---
 
-### Production
-```json
-{
-  "@emotion/react": "^11.14.0",
-  "@emotion/styled": "^11.14.1",
-  "@mui/material": "^7.3.2",
-  "axios": "^1.12.2",
-  "lucide-react": "^0.544.0",
-  "react": "^19.1.1",
-  "react-dom": "^19.1.1",
-  "react-scripts": "5.0.1",
-  "web-vitals": "^2.1.4"
-}
-```
+## Branch Strategy
 
-### Development
-```json
-{
-  "autoprefixer": "^10.4.22",
-  "postcss": "^8.5.6",
-  "postcss-preset-env": "^10.4.0"
-}
-```
+| Branch | Purpose |
+|--------|---------|
+| `staging` | Main integration branch — all PRs target here |
+| `main` | Production-stable |
+| `fix/*` | Bug fix branches |
+| `feat/*` | Feature branches |
 
-## Browser Support
-
-### Production
-- \>0.2% market share
-- Not dead browsers
-- No Opera Mini
-
-### Development
-- Last 1 Chrome version
-- Last 1 Firefox version
-- Last 1 Safari version
+---
 
 ## Troubleshooting
 
-### Common Issues
+**CORS errors** — ensure backend has CORS enabled for the frontend origin.
 
-**CORS Errors**
-- Ensure backend services have CORS enabled
-- Check that API URLs are correctly configured
+**Videos not loading in preview** — check S3 presigned URL expiration and bucket permissions.
 
-**API Connection Failed**
-- Verify backend services are running
-- Check environment variables
-- Confirm network connectivity
+**WebSocket not connecting** — verify `REACT_APP_API_BASE_URL` points to the correct backend host and the WS endpoint is reachable.
 
-**Videos Not Playing**
-- Verify S3 bucket permissions
-- Check presigned URL expiration
-- Ensure correct content type
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-[Add your license here]
+**Approval badge not updating** — the badge uses WebSocket push; check the WS connection in browser DevTools → Network → WS.
