@@ -857,7 +857,7 @@ export default function Device() {
   const openReport = useCallback(
     (device) => {
       setReportDevice(device.mobile_id);
-      setReportDeviceName(device.name || device.mobile_id);
+      setReportDeviceName(device.device_name || device.mobile_id);
       setReportTimeRange("24h");
       setReportOpen(true);
       loadReportData(device.mobile_id, "24h");
