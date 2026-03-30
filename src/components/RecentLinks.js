@@ -975,7 +975,7 @@ function VideoPlayerModal({ open, onClose, deviceId, videos }) {
 }
 
 /* ======================== Temperature Report Modal (UPDATED) ======================== */
-function TemperatureReportModal({ open, onClose, deviceId }) {
+function TemperatureReportModal({ open, onClose, deviceId, deviceName }) {
   const [loading, setLoading] = useState(false);
   const [series, setSeries] = useState([]);
   const [error, setError] = useState(null);
@@ -1140,7 +1140,7 @@ function TemperatureReportModal({ open, onClose, deviceId }) {
           }}
         >
           <div style={{ color: "#fff", fontWeight: 700, fontSize: 16 }}>
-            🌡️ Temperature Report: {deviceId}
+            🌡️ Temperature Report: {deviceName || deviceId}
           </div>
           <button
             onClick={onClose}
@@ -2091,6 +2091,7 @@ export default function RecentLinks({ refreshKey }) {
   const [editing, setEditing] = useState(null);
   const [playingRow, setPlayingRow] = useState(null);
   const [reportDevice, setReportDevice] = useState(null);
+  const [reportDeviceName, setReportDeviceName] = useState("");
   const [uptimeDevice, setUptimeDevice] = useState(null);
   const [gridLayoutDevice, setGridLayoutDevice] = useState(null);
   const [renamingDevice, setRenamingDevice] = useState(null); // { mobile_id, device_name }
@@ -2866,7 +2867,7 @@ export default function RecentLinks({ refreshKey }) {
 
                       <button
                         style={styles.btnWarning}
-                        onClick={() => setReportDevice(r.mobile_id)}
+                        onClick={() => { setReportDevice(r.mobile_id); setReportDeviceName(r.device_name || r.mobile_id); }}
                         title="Temperature report"
                       >
                         📊 Report
@@ -2931,6 +2932,7 @@ export default function RecentLinks({ refreshKey }) {
         open={!!reportDevice}
         onClose={() => setReportDevice(null)}
         deviceId={reportDevice}
+        deviceName={reportDeviceName}
       />
       <UptimeReportModal
         open={!!uptimeDevice}
