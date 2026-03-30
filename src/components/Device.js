@@ -674,6 +674,7 @@ export default function Device() {
   // Line Graph Report Modal State
   const [reportOpen, setReportOpen] = useState(false);
   const [reportDevice, setReportDevice] = useState(null);
+  const [reportDeviceName, setReportDeviceName] = useState("");
   const [reportData, setReportData] = useState([]);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportTimeRange, setReportTimeRange] = useState("24h");
@@ -856,6 +857,7 @@ export default function Device() {
   const openReport = useCallback(
     (device) => {
       setReportDevice(device.mobile_id);
+      setReportDeviceName(device.name || device.mobile_id);
       setReportTimeRange("24h");
       setReportOpen(true);
       loadReportData(device.mobile_id, "24h");
@@ -2021,7 +2023,7 @@ export default function Device() {
         {/* Temperature Report Modal */}
         <Modal
           open={reportOpen}
-          title={`📈 Temperature Report: ${reportDevice}`}
+          title={`📈 Temperature Report: ${reportDeviceName}`}
           onClose={() => setReportOpen(false)}
           width="900px"
           footer={
