@@ -156,7 +156,10 @@ export default function Reports() {
   const filteredDevices = useMemo(() => {
     if (!deviceSearch.trim()) return devices;
     const q = deviceSearch.toLowerCase();
-    return devices.filter(d => d.mobile_id?.toLowerCase().includes(q));
+    return devices.filter(d =>
+      d.mobile_id?.toLowerCase().includes(q) ||
+      d.device_name?.toLowerCase().includes(q)
+    );
   }, [devices, deviceSearch]);
 
   // Load devices
@@ -376,7 +379,7 @@ export default function Reports() {
           <div style={{ marginBottom: 12 }}>
             <input
               type="text"
-              placeholder="🔍 Search device ID..."
+              placeholder="🔍 Search by device name or ID..."
               value={deviceSearch}
               onChange={(e) => setDeviceSearch(e.target.value)}
               style={{ ...styles.select, marginBottom: 8 }}
@@ -476,7 +479,13 @@ export default function Reports() {
                     }
                   }}>
                   <input type="checkbox" checked={selectedDevices.includes(d.mobile_id)} readOnly />
-                  <span style={{ fontSize: 12, fontFamily: "monospace" }}>{d.mobile_id}</span>
+                  <span style={{ fontSize: 12 }}>
+                    {d.device_name ? (
+                      <><strong>{d.device_name}</strong> <span style={{ fontFamily: "monospace", color: "#9ca3af", fontSize: 11 }}>({d.mobile_id})</span></>
+                    ) : (
+                      <span style={{ fontFamily: "monospace" }}>{d.mobile_id}</span>
+                    )}
+                  </span>
                 </div>
             )))}
           </div>

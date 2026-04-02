@@ -506,6 +506,10 @@ export default function Device() {
   const [customHeight, setCustomHeight] = useState("");
   const [showCustomResolution, setShowCustomResolution] = useState(false);
 
+  // Auto-detected resolution state
+  const [detectedResolution, setDetectedResolution] = useState(null); // e.g. "1920x1080"
+  const [detectingResolution, setDetectingResolution] = useState(false);
+
   // Edit device modal state
   const [editOpen, setEditOpen] = useState(false);
   const [editDevice, setEditDevice] = useState(null);
@@ -520,6 +524,7 @@ export default function Device() {
   const [togglingActive, setTogglingActive] = useState(null); // mobile_id of device being toggled
   const [unassigning, setUnassigning] = useState(null); // mobile_id of device being unassigned
   const [wipingDevice, setWipingDevice] = useState(null); // mobile_id of device being wiped
+  const [mutingDevice, setMutingDevice] = useState(null); // mobile_id while mute toggle is in-flight
   const [activeTab, setActiveTab] = useState("active"); // "active" or "inactive"
 
   // Assign videos modal state
@@ -669,6 +674,7 @@ export default function Device() {
   // Line Graph Report Modal State
   const [reportOpen, setReportOpen] = useState(false);
   const [reportDevice, setReportDevice] = useState(null);
+  const [reportDeviceName, setReportDeviceName] = useState("");
   const [reportData, setReportData] = useState([]);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportTimeRange, setReportTimeRange] = useState("24h");
@@ -851,6 +857,7 @@ export default function Device() {
   const openReport = useCallback(
     (device) => {
       setReportDevice(device.mobile_id);
+      setReportDeviceName(device.device_name || device.mobile_id);
       setReportTimeRange("24h");
       setReportOpen(true);
       loadReportData(device.mobile_id, "24h");
@@ -994,6 +1001,45 @@ export default function Device() {
     }
   };
 
+  const handleToggleMute = async (device) => {
+    const newMuted = !device.is_muted;
+    setMutingDevice(device.mobile_id);
+    try {
+      await dvsgApi.post(`/device/${device.mobile_id}/mute`, { is_muted: newMuted });
+      toast(newMuted ? `🔇 ${device.device_name || device.mobile_id} muted` : `🔊 ${device.device_name || device.mobile_id} unmuted`);
+      await loadPage(page, pageSize, qApplied);
+    } catch (err) {
+      toast(`❌ Failed to toggle mute: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setMutingDevice(null);
+    }
+  };
+
+  // Debounced resolution auto-detect: fires 600 ms after the user stops typing a Mobile ID
+  useEffect(() => {
+    if (!addOpen) return;
+    const id = mobileId.trim();
+    if (!id) {
+      setDetectedResolution(null);
+      return;
+    }
+    setDetectingResolution(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await dvsgApi.get(`/device/${encodeURIComponent(id)}/detected-resolution`);
+        const r = res.data?.resolution || null;
+        setDetectedResolution(r);
+        if (r) setResolution(r);   // pre-fill the resolution dropdown
+      } catch {
+        setDetectedResolution(null);
+      } finally {
+        setDetectingResolution(false);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mobileId, addOpen]);
+
   const handleOpenAddModal = () => {
     setAddOpen(true);
     setStep(1);
@@ -1003,6 +1049,8 @@ export default function Device() {
     setGroup("");
     setShop("");
     setResolution("");
+    setDetectedResolution(null);
+    setDetectingResolution(false);
     setSuccess("");
     setErrText("");
   };
@@ -1042,6 +1090,7 @@ export default function Device() {
           setShowCustomResolution(false);
           setCustomWidth("");
           setCustomHeight("");
+          setDetectedResolution(null);
           setStep(1);
           setAddOpen(false);
           setSuccess("");
@@ -1059,6 +1108,7 @@ export default function Device() {
           setMobileId("");
           setDeviceName("");
           setDownloaded(false);
+          setDetectedResolution(null);
           setStep(1);
           setAddOpen(false);
           setSuccess("");
@@ -1429,6 +1479,7 @@ export default function Device() {
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Device Name</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Mobile ID</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Status</th>
+                <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Audio</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Group</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Resolution</th>
                 <th style={{ padding: 12, fontSize: 12, color: "#6b7280" }}>Content</th>
@@ -1487,6 +1538,40 @@ export default function Device() {
                           🌡️ {d.temperature.toFixed(1)}°C
                         </div>
                       )}
+                    </td>
+                    {/* Audio mute/unmute column */}
+                    <td style={{ padding: 12 }}>
+                      <button
+                        onClick={() => handleToggleMute(d)}
+                        disabled={mutingDevice === d.mobile_id}
+                        title={d.is_muted ? "Click to unmute" : "Click to mute"}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          padding: "5px 10px",
+                          borderRadius: 6,
+                          border: "none",
+                          cursor: mutingDevice === d.mobile_id ? "wait" : "pointer",
+                          background: d.is_muted ? "#fee2e2" : "#dcfce7",
+                          color: d.is_muted ? "#dc2626" : "#16a34a",
+                          fontWeight: 700,
+                          fontSize: 11,
+                          opacity: mutingDevice === d.mobile_id ? 0.6 : 1,
+                          transition: "background 0.2s",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <span style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: d.is_muted ? "#dc2626" : "#16a34a",
+                          display: "inline-block",
+                          flexShrink: 0,
+                        }} />
+                        {mutingDevice === d.mobile_id ? "..." : d.is_muted ? "🔇 Muted" : "🔊 Live"}
+                      </button>
                     </td>
                     <td style={{ padding: 12 }}>
                       {d.group_name ? (
@@ -1619,13 +1704,13 @@ export default function Device() {
                           📈 Report
                         </button>
                         <button
-                          style={{ 
-                            ...btn, 
-                            background: "#7c3aed", 
-                            padding: "6px 10px", 
+                          style={{
+                            ...btn,
+                            background: "#7c3aed",
+                            padding: "6px 10px",
                             fontSize: 11,
                             opacity: wipingDevice === d.mobile_id ? 0.7 : 1,
-                          }} 
+                          }}
                           onClick={() => handleWipeVideos(d)}
                           disabled={wipingDevice === d.mobile_id}
                           title="Delete all videos from this device"
@@ -1740,6 +1825,25 @@ export default function Device() {
                 <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
                   This is the Android device ID. You can find it in the device settings or from the app.
                 </div>
+                {mobileId.trim() && (
+                  <div style={{ marginTop: 8 }}>
+                    {detectingResolution ? (
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>🔍 Detecting screen resolution...</span>
+                    ) : detectedResolution ? (
+                      <span style={{
+                        fontSize: 12, fontWeight: 600, color: "#166534",
+                        background: "#dcfce7", border: "1px solid #bbf7d0",
+                        borderRadius: 6, padding: "3px 10px",
+                      }}>
+                        ✓ Auto-detected: {detectedResolution}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#92400e" }}>
+                        📡 Device not yet seen — resolution will be set after first connection
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700 }}>
@@ -1803,7 +1907,18 @@ export default function Device() {
                 </div>
 
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Screen Resolution</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                    Screen Resolution
+                    {detectedResolution && (
+                      <span style={{
+                        fontSize: 11, fontWeight: 600, color: "#166534",
+                        background: "#dcfce7", border: "1px solid #bbf7d0",
+                        borderRadius: 6, padding: "2px 8px",
+                      }}>
+                        ✓ Auto-detected
+                      </span>
+                    )}
+                  </div>
                   <select
                     style={inputStyle}
                     value={showCustomResolution ? "custom" : resolution}
@@ -1908,7 +2023,7 @@ export default function Device() {
         {/* Temperature Report Modal */}
         <Modal
           open={reportOpen}
-          title={`📈 Temperature Report: ${reportDevice}`}
+          title={`📈 Temperature Report: ${reportDeviceName}`}
           onClose={() => setReportOpen(false)}
           width="900px"
           footer={
