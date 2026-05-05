@@ -7,7 +7,6 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { listLinks, deleteLink, createLink, getDeviceOnlineStatus } from "../api/link";
 import { listVideoNames } from "../api/video";
 import { listGroupVideoNames } from "../api/dvsg";
-import { deviceWS } from "../api/websocket";
 import axios from "axios";
 import GridLayoutEditor from "./GridLayoutEditor";
 
@@ -2123,30 +2122,9 @@ export default function RecentLinks({ refreshKey }) {
   }, [refreshKey]);
 
   useEffect(() => {
-    const id = setInterval(load, 15000);
+    const id = setInterval(load, 30000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // WebSocket: update online status instantly when backend broadcasts a change.
-  // This means the dashboard reflects reality within ~1s instead of up to ~55s.
-  useEffect(() => {
-    const onOnline = (data) => {
-      if (data?.mobile_id) {
-        setOnlineStatus((prev) => ({ ...prev, [data.mobile_id]: true }));
-      }
-    };
-    const onOffline = (data) => {
-      if (data?.mobile_id) {
-        setOnlineStatus((prev) => ({ ...prev, [data.mobile_id]: false }));
-      }
-    };
-    const unOnline  = deviceWS.on("deviceOnline",  onOnline);
-    const unOffline = deviceWS.on("deviceOffline", onOffline);
-    return () => {
-      unOnline  && unOnline();
-      unOffline && unOffline();
-    };
   }, []);
 
   const rowsGrouped = useMemo(() => groupRows(rowsRaw), [rowsRaw]);
