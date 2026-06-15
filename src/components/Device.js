@@ -515,6 +515,7 @@ export default function Device() {
   const [editDevice, setEditDevice] = useState(null);
   const [editDeviceName, setEditDeviceName] = useState("");
   const [editResolution, setEditResolution] = useState("");
+  const [editBleId, setEditBleId] = useState("");
   const [editCustomWidth, setEditCustomWidth] = useState("");
   const [editCustomHeight, setEditCustomHeight] = useState("");
   const [showEditCustomResolution, setShowEditCustomResolution] = useState(false);
@@ -640,6 +641,7 @@ export default function Device() {
       setEditCustomHeight("");
       setEditResolution(deviceRes);
     }
+    setEditBleId(device.ble_device_id || "");
     setEditOpen(true);
     setErrText("");
     setSuccess("");
@@ -658,7 +660,12 @@ export default function Device() {
       if (editDeviceName !== (editDevice.device_name || "")) {
         await dvsgApi.post(`/device/${editDevice.mobile_id}/name`, { device_name: editDeviceName });
       }
-      
+
+      // Update BLE device ID (save empty string as null = disable auth)
+      if (editBleId !== (editDevice.ble_device_id || "")) {
+        await dvsgApi.post(`/device/${editDevice.mobile_id}/ble-id`, { ble_device_id: editBleId || null });
+      }
+
       setSuccess("Device settings updated successfully!");
       setTimeout(() => {
         setEditOpen(false);
@@ -2144,6 +2151,24 @@ export default function Device() {
               />
               <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
                 A friendly name to easily identify this device.
+              </div>
+            </div>
+
+            {/* BLE Device ID */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
+                BLE Device ID
+                <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af", marginLeft: 8 }}>optional</span>
+              </div>
+              <input
+                value={editBleId}
+                onChange={(e) => setEditBleId(e.target.value)}
+                placeholder='e.g. 01, 02 — leave empty to skip pairing'
+                style={inputStyle}
+                maxLength={50}
+              />
+              <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
+                Must match the ID hardcoded in the ESP32 firmware. Leave empty if no ESP32 is used.
               </div>
             </div>
 
