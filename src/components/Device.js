@@ -645,6 +645,10 @@ export default function Device() {
     setEditOpen(true);
     setErrText("");
     setSuccess("");
+    // Authoritative fetch — works even if the device list doesn't include ble_device_id
+    dvsgApi.get(`/device/${device.mobile_id}/ble-id`)
+      .then((res) => setEditBleId(res.data?.ble_device_id || ""))
+      .catch(() => {});
   };
 
   // Update device resolution and name
