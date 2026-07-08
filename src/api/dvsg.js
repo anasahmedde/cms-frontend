@@ -29,3 +29,12 @@ export const setGroupVideosByNames = (groupName, videoNames = []) =>
 export async function getDeviceTemperatureSeries(mobileId, days = 30, bucket = "day") {
   return safeGet(`/device/${encodeURIComponent(mobileId)}/temperature_series`, { days, bucket });
 }
+
+// Gender counting (isolated /webapp router — Linux web player + camera)
+export async function getGenderSeries(mobileId, range = "24h") {
+  return safeGet(`/webapp/device/${encodeURIComponent(mobileId)}/gender-series`, { range });
+}
+
+export async function getGenderSummary(mobileId) {
+  return safeGet(`/webapp/device/${encodeURIComponent(mobileId)}/gender-summary`);
+}
