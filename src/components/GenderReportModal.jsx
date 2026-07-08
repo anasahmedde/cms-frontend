@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getGenderSeries, getGenderSummary } from "../api/dvsg";
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ResponsiveContainer
-} from "recharts";
+
+// Dependency-free chart (no recharts) so the CRA build has nothing extra to resolve.
 
 const RANGES = [
   { key: "24h", label: "Last 24h" },
@@ -10,16 +9,62 @@ const RANGES = [
   { key: "30d", label: "Last 30 days" },
 ];
 
+const MALE = "#2563eb";
+const FEMALE = "#db2777";
+
 function Stat({ title, male, female }) {
   const total = (male || 0) + (female || 0);
   return (
     <div style={{ flex: 1, background: "#f0f4f8", borderRadius: 10, padding: "12px 14px" }}>
       <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 700 }}>{title}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: "#1a1a2e" }}>{total}</div>
-      <div style={{ fontSize: 12, color: "#374151", marginTop: 2 }}>
-        <span style={{ color: "#2563eb" }}>♂ {male || 0}</span>
-        {"   "}
-        <span style={{ color: "#db2777" }}>♀ {female || 0}</span>
+      <div style={{ fontSize: 12, marginTop: 2 }}>
+        <span style={{ color: MALE }}>♂ {male || 0}</span>{"   "}
+        <span style={{ color: FEMALE }}>♀ {female || 0}</span>
+      </div>
+    </div>
+  );
+}
+
+function fmtLabel(t, range) {
+  const d = new Date(t);
+  return range === "24h"
+    ? d.toLocaleTimeString([], { hour: "2-digit" })
+    : d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+// Simple stacked vertical bars using divs.
+function BarChart({ data, range }) {
+  const max = Math.max(1, ...data.map(d => d.male + d.female));
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 16, marginBottom: 8, fontSize: 12 }}>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: MALE, marginRight: 4 }} />Male</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: FEMALE, marginRight: 4 }} />Female</span>
+      </div>
+      <div style={{
+        display: "flex", alignItems: "flex-end", gap: 4, height: 260,
+        borderBottom: "1px solid #e5e7eb", overflowX: "auto", paddingTop: 8,
+      }}>
+        {data.map((d, i) => {
+          const total = d.male + d.female;
+          const h = Math.round((total / max) * 240);
+          const mh = total ? Math.round((d.male / total) * h) : 0;
+          const fh = h - mh;
+          return (
+            <div key={i} title={`${fmtLabel(d.t, range)}\nMale: ${d.male}  Female: ${d.female}`}
+                 style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 22 }}>
+              <div style={{ display: "flex", flexDirection: "column-reverse", height: h, width: 16 }}>
+                <div style={{ height: mh, background: MALE }} />
+                <div style={{ height: fh, background: FEMALE }} />
+              </div>
+              <div style={{ fontSize: 9, color: "#9ca3af", marginTop: 4, whiteSpace: "nowrap",
+                            transform: "rotate(-45deg)", transformOrigin: "top left", height: 24 }}>
+                {fmtLabel(d.t, range)}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -66,7 +111,7 @@ export default function GenderReportModal({ open, onClose, mobileId }) {
   return (
     <div style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999,
     }}>
       <div style={{ width: 900, maxWidth: "95vw", background: "#fff", borderRadius: 12, padding: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -96,7 +141,7 @@ export default function GenderReportModal({ open, onClose, mobileId }) {
           ))}
         </div>
 
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 16 }}>
           {loading && <div>Loading...</div>}
           {err && <div style={{ color: "crimson" }}>{err}</div>}
           {!loading && !err && data.length === 0 && (
@@ -104,25 +149,7 @@ export default function GenderReportModal({ open, onClose, mobileId }) {
               No gender data yet for this device.
             </div>
           )}
-          {!loading && !err && data.length > 0 && (
-            <div style={{ width: "100%", height: 320 }}>
-              <ResponsiveContainer>
-                <BarChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="t" tickFormatter={(v) => {
-                    const d = new Date(v);
-                    return range === "24h" ? d.toLocaleTimeString([], { hour: "2-digit" })
-                                           : d.toLocaleDateString();
-                  }} />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip labelFormatter={(v) => new Date(v).toLocaleString()} />
-                  <Legend />
-                  <Bar dataKey="male" name="Male" stackId="g" fill="#2563eb" />
-                  <Bar dataKey="female" name="Female" stackId="g" fill="#db2777" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          {!loading && !err && data.length > 0 && <BarChart data={data} range={range} />}
         </div>
       </div>
     </div>
