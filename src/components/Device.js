@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { listDevices, insertDevice, deleteDevice, wipeDeviceVideos } from "../api/device";
 import { listGroupNames } from "../api/group";
 import { listShopNames } from "../api/shop";
+import GenderReportModal from "./GenderReportModal";
 import axios from "axios";
 
 // DVSG API for device creation with linking
@@ -516,6 +517,7 @@ export default function Device() {
   const [editDeviceName, setEditDeviceName] = useState("");
   const [editResolution, setEditResolution] = useState("");
   const [editBleId, setEditBleId] = useState("");
+  const [editGenderEnabled, setEditGenderEnabled] = useState(false);
   const [editCustomWidth, setEditCustomWidth] = useState("");
   const [editCustomHeight, setEditCustomHeight] = useState("");
   const [showEditCustomResolution, setShowEditCustomResolution] = useState(false);
@@ -649,6 +651,11 @@ export default function Device() {
     dvsgApi.get(`/device/${device.mobile_id}/ble-id`)
       .then((res) => setEditBleId(res.data?.ble_device_id || ""))
       .catch(() => {});
+    // Gender-counting flag lives in the isolated /webapp router
+    setEditGenderEnabled(false);
+    dvsgApi.get(`/webapp/device/${device.mobile_id}/config`)
+      .then((res) => setEditGenderEnabled(!!res.data?.gender_counting_enabled))
+      .catch(() => {});
   };
 
   // Update device resolution and name
@@ -670,6 +677,9 @@ export default function Device() {
         await dvsgApi.post(`/device/${editDevice.mobile_id}/ble-id`, { ble_device_id: editBleId || null });
       }
 
+      // Update gender-counting toggle (isolated /webapp router)
+      await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/gender-enabled`, { enabled: !!editGenderEnabled });
+
       setSuccess("Device settings updated successfully!");
       setTimeout(() => {
         setEditOpen(false);
@@ -681,6 +691,10 @@ export default function Device() {
     }
     setUpdating(false);
   };
+
+  // Gender Count Report Modal State
+  const [genderOpen, setGenderOpen] = useState(false);
+  const [genderMobileId, setGenderMobileId] = useState(null);
 
   // Line Graph Report Modal State
   const [reportOpen, setReportOpen] = useState(false);
@@ -1714,6 +1728,9 @@ export default function Device() {
                         <button style={btnReport} onClick={() => openReport(d)} title="View Temperature Report">
                           📈 Report
                         </button>
+                        <button style={{ ...btnReport, background: "#0ea5e9" }} onClick={() => { setGenderMobileId(d.mobile_id); setGenderOpen(true); }} title="View Gender Count Report">
+                          👥 Gender
+                        </button>
                         <button
                           style={{
                             ...btn,
@@ -2031,6 +2048,13 @@ export default function Device() {
           )}
         </Modal>
 
+        {/* Gender Count Report Modal */}
+        <GenderReportModal
+          open={genderOpen}
+          mobileId={genderMobileId}
+          onClose={() => setGenderOpen(false)}
+        />
+
         {/* Temperature Report Modal */}
         <Modal
           open={reportOpen}
@@ -2173,6 +2197,25 @@ export default function Device() {
               />
               <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
                 Must match the ID hardcoded in the ESP32 firmware. Leave empty if no ESP32 is used.
+              </div>
+            </div>
+
+            {/* Gender counting (camera) — Linux web player only */}
+            <div>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={editGenderEnabled}
+                  onChange={(e) => setEditGenderEnabled(e.target.checked)}
+                  style={{ width: 18, height: 18 }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 800 }}>
+                  Enable gender counting using the camera
+                  <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af", marginLeft: 8 }}>optional</span>
+                </span>
+              </label>
+              <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
+                Only for Linux web-player devices with a camera. The AI model runs locally and sends only counts.
               </div>
             </div>
 
