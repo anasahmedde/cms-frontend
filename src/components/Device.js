@@ -530,6 +530,7 @@ export default function Device() {
   const [editFooterStyle, setEditFooterStyle] = useState({ ...DEFAULT_FOOTER_STYLE });
   // Header/footer comes from the device's GROUP unless this device overrides it
   const [editHfOverride, setEditHfOverride] = useState(false);
+  const [editGroupHf, setEditGroupHf] = useState(null); // the group's header/footer config (null = no group)
   const [editCustomWidth, setEditCustomWidth] = useState("");
   const [editCustomHeight, setEditCustomHeight] = useState("");
   const [showEditCustomResolution, setShowEditCustomResolution] = useState(false);
@@ -674,10 +675,12 @@ export default function Device() {
     setEditHeaderStyle({ ...DEFAULT_HEADER_STYLE });
     setEditFooterStyle({ ...DEFAULT_FOOTER_STYLE });
     setEditHfOverride(false);
+    setEditGroupHf(null);
     dvsgApi.get(`/webapp/device/${device.mobile_id}/header-footer`)
       .then((res) => {
         const override = !!res.data?.header_footer_override;
         setEditHfOverride(override);
+        setEditGroupHf(res.data?.group || null);
         // Show the device's own values when overriding, otherwise show what it
         // currently inherits from its group (read-only preview).
         const src = override ? res.data : (res.data?.effective || {});
@@ -2278,35 +2281,57 @@ export default function Device() {
               </div>
             </div>
 
-            {/* Header & Footer — set on the GROUP; a device can override it */}
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
-                Header &amp; Footer <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af" }}>from group</span>
-              </div>
+            {/* Header & Footer — only relevant if this device's GROUP has it enabled */}
+            {(() => {
+              const g = editGroupHf;
+              const groupHas = !!g && (g.header_enabled || g.footer_enabled);
 
-              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 8 }}>
-                <input type="checkbox" checked={editHfOverride}
-                  onChange={(e) => setEditHfOverride(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <span style={{ fontSize: 13, fontWeight: 700 }}>Override group settings for this device</span>
-              </label>
+              if (!groupHas) {
+                return (
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
+                      Header &amp; Footer <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af" }}>from group</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#9ca3af" }}>
+                      {g
+                        ? `Group "${g.gname}" has no header/footer enabled, so this device shows none. Enable it in Groups → Edit.`
+                        : "This device is not assigned to a group, so it has no header/footer."}
+                    </div>
+                  </div>
+                );
+              }
 
-              <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>
-                {editHfOverride
-                  ? "This device uses its own header/footer below (the group's is ignored)."
-                  : "This device inherits its group's header/footer (shown below, read-only). Tick the box to customise it."}
-              </div>
+              return (
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
+                    Header &amp; Footer <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af" }}>from group “{g.gname}”</span>
+                  </div>
 
-              <HeaderFooterEditor
-                disabled={!editHfOverride}
-                headerEnabled={editHeaderEnabled} setHeaderEnabled={setEditHeaderEnabled}
-                headerText={editHeaderText} setHeaderText={setEditHeaderText}
-                footerEnabled={editFooterEnabled} setFooterEnabled={setEditFooterEnabled}
-                footerImageUrl={editFooterImageUrl}
-                footerFile={editFooterFile} setFooterFile={setEditFooterFile}
-                headerStyle={editHeaderStyle} setHeaderStyle={setEditHeaderStyle}
-                footerStyle={editFooterStyle} setFooterStyle={setEditFooterStyle}
-              />
-            </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 8 }}>
+                    <input type="checkbox" checked={editHfOverride}
+                      onChange={(e) => setEditHfOverride(e.target.checked)} style={{ width: 18, height: 18 }} />
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>Override group settings for this device</span>
+                  </label>
+
+                  <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>
+                    {editHfOverride
+                      ? "This device uses its own header/footer below (the group's is ignored)."
+                      : "This device inherits its group's header/footer (shown below, read-only). Tick the box to customise it."}
+                  </div>
+
+                  <HeaderFooterEditor
+                    disabled={!editHfOverride}
+                    headerEnabled={editHeaderEnabled} setHeaderEnabled={setEditHeaderEnabled}
+                    headerText={editHeaderText} setHeaderText={setEditHeaderText}
+                    footerEnabled={editFooterEnabled} setFooterEnabled={setEditFooterEnabled}
+                    footerImageUrl={editFooterImageUrl}
+                    footerFile={editFooterFile} setFooterFile={setEditFooterFile}
+                    headerStyle={editHeaderStyle} setHeaderStyle={setEditHeaderStyle}
+                    footerStyle={editFooterStyle} setFooterStyle={setEditFooterStyle}
+                  />
+                </div>
+              );
+            })()}
 
             {/* Resolution Selection */}
             <div>
