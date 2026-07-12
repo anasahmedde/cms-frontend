@@ -6,20 +6,8 @@ import { listDevices, insertDevice, deleteDevice, wipeDeviceVideos } from "../ap
 import { listGroupNames } from "../api/group";
 import { listShopNames } from "../api/shop";
 import GenderReportModal from "./GenderReportModal";
+import HeaderFooterEditor, { DEFAULT_HEADER_STYLE, DEFAULT_FOOTER_STYLE } from "./HeaderFooterEditor";
 import axios from "axios";
-
-// Default header/footer styling (kept in sync with the Android player defaults)
-const DEFAULT_HEADER_STYLE = {
-  bgColor: "#000000", textColor: "#FFFFFF", fontSize: 22,
-  fontFamily: "sans", bold: false, align: "center", rotation: 0,
-};
-const DEFAULT_FOOTER_STYLE = {
-  bgColor: "#000000", heightDp: 80, rotation: 0, scaleType: "fit",
-};
-const HF_GRID = { display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10 };
-const HF_LBL = { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#374151", fontWeight: 600 };
-const HF_NUM = { width: 64, padding: "4px 6px", border: "1px solid #d1d5db", borderRadius: 6 };
-const HF_SEL = { padding: "4px 6px", border: "1px solid #d1d5db", borderRadius: 6 };
 
 // DVSG API for device creation with linking
 const DVSG_BASE =
@@ -519,9 +507,6 @@ export default function Device() {
   const [customWidth, setCustomWidth] = useState("");
   const [customHeight, setCustomHeight] = useState("");
   const [showCustomResolution, setShowCustomResolution] = useState(false);
-  // Device creation: optional header (image) / footer (text) feature toggles
-  const [newHeaderEnabled, setNewHeaderEnabled] = useState(false);
-  const [newFooterEnabled, setNewFooterEnabled] = useState(false);
 
   // Auto-detected resolution state
   const [detectedResolution, setDetectedResolution] = useState(null); // e.g. "1920x1080"
@@ -543,6 +528,8 @@ export default function Device() {
   // Header/footer styling (persisted as one JSON blob)
   const [editHeaderStyle, setEditHeaderStyle] = useState({ ...DEFAULT_HEADER_STYLE });
   const [editFooterStyle, setEditFooterStyle] = useState({ ...DEFAULT_FOOTER_STYLE });
+  // Header/footer comes from the device's GROUP unless this device overrides it
+  const [editHfOverride, setEditHfOverride] = useState(false);
   const [editCustomWidth, setEditCustomWidth] = useState("");
   const [editCustomHeight, setEditCustomHeight] = useState("");
   const [showEditCustomResolution, setShowEditCustomResolution] = useState(false);
@@ -686,13 +673,19 @@ export default function Device() {
     setEditHeaderText(""); setEditFooterImageUrl(""); setEditFooterFile(null);
     setEditHeaderStyle({ ...DEFAULT_HEADER_STYLE });
     setEditFooterStyle({ ...DEFAULT_FOOTER_STYLE });
+    setEditHfOverride(false);
     dvsgApi.get(`/webapp/device/${device.mobile_id}/header-footer`)
       .then((res) => {
-        setEditHeaderEnabled(!!res.data?.header_enabled);
-        setEditFooterEnabled(!!res.data?.footer_enabled);
-        setEditHeaderText(res.data?.header_text || "");
-        setEditFooterImageUrl(res.data?.footer_image_url || "");
-        const st = res.data?.style || {};
+        const override = !!res.data?.header_footer_override;
+        setEditHfOverride(override);
+        // Show the device's own values when overriding, otherwise show what it
+        // currently inherits from its group (read-only preview).
+        const src = override ? res.data : (res.data?.effective || {});
+        setEditHeaderEnabled(!!src.header_enabled);
+        setEditFooterEnabled(!!src.footer_enabled);
+        setEditHeaderText(src.header_text || "");
+        setEditFooterImageUrl(src.footer_image_url || "");
+        const st = src.style || {};
         setEditHeaderStyle({ ...DEFAULT_HEADER_STYLE, ...(st.header || {}) });
         setEditFooterStyle({ ...DEFAULT_FOOTER_STYLE, ...(st.footer || {}) });
       })
@@ -721,18 +714,27 @@ export default function Device() {
       // Update gender-counting toggle (isolated /webapp router)
       await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/gender-enabled`, { enabled: !!editGenderEnabled });
 
-      // Header (text) / footer (image): flags + header text, then upload footer image if a new one was chosen
-      await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/header-footer`, {
-        header_enabled: !!editHeaderEnabled,
-        footer_enabled: !!editFooterEnabled,
-        header_text: editHeaderText || null,
-        style: { header: editHeaderStyle, footer: editFooterStyle },
-      });
-      if (editFooterFile) {
-        const fd = new FormData();
-        fd.append("file", editFooterFile);
-        await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/footer-image`, fd, {
-          headers: { "Content-Type": "multipart/form-data" },
+      // Header/footer: normally inherited from the group. Only write the device's own
+      // values when this device explicitly overrides the group.
+      if (editHfOverride) {
+        await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/header-footer`, {
+          header_footer_override: true,
+          header_enabled: !!editHeaderEnabled,
+          footer_enabled: !!editFooterEnabled,
+          header_text: editHeaderText || null,
+          style: { header: editHeaderStyle, footer: editFooterStyle },
+        });
+        if (editFooterFile) {
+          const fd = new FormData();
+          fd.append("file", editFooterFile);
+          await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/footer-image`, fd, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        }
+      } else {
+        // Back to inheriting from the group
+        await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/header-footer`, {
+          header_footer_override: false,
         });
       }
 
@@ -1162,14 +1164,7 @@ export default function Device() {
       });
 
       if (response.data) {
-        // Persist optional header/footer feature flags for the new device
-        if (newHeaderEnabled || newFooterEnabled) {
-          try {
-            await dvsgApi.post(`/webapp/device/${id}/header-footer`, {
-              header_enabled: newHeaderEnabled, footer_enabled: newFooterEnabled,
-            });
-          } catch (_) { /* non-fatal */ }
-        }
+        // Header/footer is configured on the GROUP — the device inherits it.
         setSuccess(`Device ${name || id} created and linked successfully!`);
         setTimeout(async () => {
           setMobileId("");
@@ -1180,8 +1175,6 @@ export default function Device() {
           setCustomWidth("");
           setCustomHeight("");
           setDetectedResolution(null);
-          setNewHeaderEnabled(false);
-          setNewFooterEnabled(false);
           setStep(1);
           setAddOpen(false);
           setSuccess("");
@@ -1908,26 +1901,6 @@ export default function Device() {
                 </div>
               </div>
 
-              {/* Optional header/footer feature toggles */}
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
-                  Display Options <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af" }}>optional</span>
-                </div>
-                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 6 }}>
-                  <input type="checkbox" checked={newHeaderEnabled}
-                    onChange={(e) => setNewHeaderEnabled(e.target.checked)} style={{ width: 18, height: 18 }} />
-                  <span style={{ fontSize: 13 }}>Enable Header <span style={{ color: "#9ca3af" }}>(text)</span></span>
-                </label>
-                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                  <input type="checkbox" checked={newFooterEnabled}
-                    onChange={(e) => setNewFooterEnabled(e.target.checked)} style={{ width: 18, height: 18 }} />
-                  <span style={{ fontSize: 13 }}>Enable Footer <span style={{ color: "#9ca3af" }}>(image)</span></span>
-                </label>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
-                  Add the header text / footer image after creating, in the device Edit screen.
-                </div>
-              </div>
-
               <div>
                 <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Mobile ID *</div>
                 <input
@@ -2305,93 +2278,34 @@ export default function Device() {
               </div>
             </div>
 
-            {/* Header (image) / Footer (text) */}
+            {/* Header & Footer — set on the GROUP; a device can override it */}
             <div>
               <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
-                Header &amp; Footer <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af" }}>optional</span>
+                Header &amp; Footer <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af" }}>from group</span>
               </div>
 
-              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 6 }}>
-                <input type="checkbox" checked={editHeaderEnabled}
-                  onChange={(e) => setEditHeaderEnabled(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <span style={{ fontSize: 13 }}>Enable Header <span style={{ color: "#9ca3af" }}>(text)</span></span>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 8 }}>
+                <input type="checkbox" checked={editHfOverride}
+                  onChange={(e) => setEditHfOverride(e.target.checked)} style={{ width: 18, height: 18 }} />
+                <span style={{ fontSize: 13, fontWeight: 700 }}>Override group settings for this device</span>
               </label>
 
-              {editHeaderEnabled && (
-                <div style={{ margin: "0 0 12px 28px" }}>
-                  <textarea value={editHeaderText}
-                    onChange={(e) => setEditHeaderText(e.target.value)}
-                    placeholder="Header text shown at the top of the screen"
-                    style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} maxLength={500} />
-                  <div style={HF_GRID}>
-                    <label style={HF_LBL}>Background
-                      <input type="color" value={editHeaderStyle.bgColor}
-                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, bgColor: e.target.value }))} /></label>
-                    <label style={HF_LBL}>Text
-                      <input type="color" value={editHeaderStyle.textColor}
-                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, textColor: e.target.value }))} /></label>
-                    <label style={HF_LBL}>Size
-                      <input type="number" min="8" max="120" value={editHeaderStyle.fontSize} style={HF_NUM}
-                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, fontSize: Number(e.target.value) || 22 }))} /></label>
-                    <label style={HF_LBL}>Font
-                      <select value={editHeaderStyle.fontFamily} style={HF_SEL}
-                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, fontFamily: e.target.value }))}>
-                        <option value="sans">Sans</option><option value="serif">Serif</option><option value="monospace">Mono</option>
-                      </select></label>
-                    <label style={HF_LBL}>Align
-                      <select value={editHeaderStyle.align} style={HF_SEL}
-                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, align: e.target.value }))}>
-                        <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
-                      </select></label>
-                    <label style={HF_LBL}>Rotation
-                      <select value={editHeaderStyle.rotation} style={HF_SEL}
-                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, rotation: Number(e.target.value) }))}>
-                        <option value={0}>0°</option><option value={90}>90°</option><option value={180}>180°</option><option value={270}>270°</option>
-                      </select></label>
-                    <label style={HF_LBL}>
-                      <input type="checkbox" checked={!!editHeaderStyle.bold}
-                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, bold: e.target.checked }))} /> Bold</label>
-                  </div>
-                </div>
-              )}
+              <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>
+                {editHfOverride
+                  ? "This device uses its own header/footer below (the group's is ignored)."
+                  : "This device inherits its group's header/footer (shown below, read-only). Tick the box to customise it."}
+              </div>
 
-              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 6 }}>
-                <input type="checkbox" checked={editFooterEnabled}
-                  onChange={(e) => setEditFooterEnabled(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <span style={{ fontSize: 13 }}>Enable Footer <span style={{ color: "#9ca3af" }}>(image)</span></span>
-              </label>
-
-              {editFooterEnabled && (
-                <div style={{ margin: "0 0 4px 28px" }}>
-                  {editFooterImageUrl && !editFooterFile && (
-                    <img src={editFooterImageUrl} alt="footer"
-                      style={{ maxHeight: 60, maxWidth: "100%", borderRadius: 6, marginBottom: 6, display: "block" }} />
-                  )}
-                  <input type="file" accept="image/*"
-                    onChange={(e) => setEditFooterFile(e.target.files?.[0] || null)} />
-                  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
-                    {editFooterFile ? `Selected: ${editFooterFile.name}` : "Upload a footer image (shown at the bottom of the screen)."}
-                  </div>
-                  <div style={HF_GRID}>
-                    <label style={HF_LBL}>Background
-                      <input type="color" value={editFooterStyle.bgColor}
-                        onChange={(e) => setEditFooterStyle((s) => ({ ...s, bgColor: e.target.value }))} /></label>
-                    <label style={HF_LBL}>Height
-                      <input type="number" min="20" max="600" value={editFooterStyle.heightDp} style={HF_NUM}
-                        onChange={(e) => setEditFooterStyle((s) => ({ ...s, heightDp: Number(e.target.value) || 80 }))} /></label>
-                    <label style={HF_LBL}>Rotation
-                      <select value={editFooterStyle.rotation} style={HF_SEL}
-                        onChange={(e) => setEditFooterStyle((s) => ({ ...s, rotation: Number(e.target.value) }))}>
-                        <option value={0}>0°</option><option value={90}>90°</option><option value={180}>180°</option><option value={270}>270°</option>
-                      </select></label>
-                    <label style={HF_LBL}>Fit
-                      <select value={editFooterStyle.scaleType} style={HF_SEL}
-                        onChange={(e) => setEditFooterStyle((s) => ({ ...s, scaleType: e.target.value }))}>
-                        <option value="fit">Fit</option><option value="fill">Fill</option><option value="center">Center</option>
-                      </select></label>
-                  </div>
-                </div>
-              )}
+              <HeaderFooterEditor
+                disabled={!editHfOverride}
+                headerEnabled={editHeaderEnabled} setHeaderEnabled={setEditHeaderEnabled}
+                headerText={editHeaderText} setHeaderText={setEditHeaderText}
+                footerEnabled={editFooterEnabled} setFooterEnabled={setEditFooterEnabled}
+                footerImageUrl={editFooterImageUrl}
+                footerFile={editFooterFile} setFooterFile={setEditFooterFile}
+                headerStyle={editHeaderStyle} setHeaderStyle={setEditHeaderStyle}
+                footerStyle={editFooterStyle} setFooterStyle={setEditFooterStyle}
+              />
             </div>
 
             {/* Resolution Selection */}
