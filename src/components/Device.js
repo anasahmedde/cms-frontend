@@ -8,6 +8,19 @@ import { listShopNames } from "../api/shop";
 import GenderReportModal from "./GenderReportModal";
 import axios from "axios";
 
+// Default header/footer styling (kept in sync with the Android player defaults)
+const DEFAULT_HEADER_STYLE = {
+  bgColor: "#000000", textColor: "#FFFFFF", fontSize: 22,
+  fontFamily: "sans", bold: false, align: "center", rotation: 0,
+};
+const DEFAULT_FOOTER_STYLE = {
+  bgColor: "#000000", heightDp: 80, rotation: 0, scaleType: "fit",
+};
+const HF_GRID = { display: "flex", flexWrap: "wrap", gap: 10, marginTop: 10 };
+const HF_LBL = { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#374151", fontWeight: 600 };
+const HF_NUM = { width: 64, padding: "4px 6px", border: "1px solid #d1d5db", borderRadius: 6 };
+const HF_SEL = { padding: "4px 6px", border: "1px solid #d1d5db", borderRadius: 6 };
+
 // DVSG API for device creation with linking
 const DVSG_BASE =
   process.env.REACT_APP_API_BASE_URL ||
@@ -527,6 +540,9 @@ export default function Device() {
   const [editHeaderText, setEditHeaderText] = useState("");
   const [editFooterImageUrl, setEditFooterImageUrl] = useState(""); // current image (presigned) for preview
   const [editFooterFile, setEditFooterFile] = useState(null);       // newly selected upload
+  // Header/footer styling (persisted as one JSON blob)
+  const [editHeaderStyle, setEditHeaderStyle] = useState({ ...DEFAULT_HEADER_STYLE });
+  const [editFooterStyle, setEditFooterStyle] = useState({ ...DEFAULT_FOOTER_STYLE });
   const [editCustomWidth, setEditCustomWidth] = useState("");
   const [editCustomHeight, setEditCustomHeight] = useState("");
   const [showEditCustomResolution, setShowEditCustomResolution] = useState(false);
@@ -668,12 +684,17 @@ export default function Device() {
     // Header (text) / footer (image) config
     setEditHeaderEnabled(false); setEditFooterEnabled(false);
     setEditHeaderText(""); setEditFooterImageUrl(""); setEditFooterFile(null);
+    setEditHeaderStyle({ ...DEFAULT_HEADER_STYLE });
+    setEditFooterStyle({ ...DEFAULT_FOOTER_STYLE });
     dvsgApi.get(`/webapp/device/${device.mobile_id}/header-footer`)
       .then((res) => {
         setEditHeaderEnabled(!!res.data?.header_enabled);
         setEditFooterEnabled(!!res.data?.footer_enabled);
         setEditHeaderText(res.data?.header_text || "");
         setEditFooterImageUrl(res.data?.footer_image_url || "");
+        const st = res.data?.style || {};
+        setEditHeaderStyle({ ...DEFAULT_HEADER_STYLE, ...(st.header || {}) });
+        setEditFooterStyle({ ...DEFAULT_FOOTER_STYLE, ...(st.footer || {}) });
       })
       .catch(() => {});
   };
@@ -705,6 +726,7 @@ export default function Device() {
         header_enabled: !!editHeaderEnabled,
         footer_enabled: !!editFooterEnabled,
         header_text: editHeaderText || null,
+        style: { header: editHeaderStyle, footer: editFooterStyle },
       });
       if (editFooterFile) {
         const fd = new FormData();
@@ -2301,6 +2323,35 @@ export default function Device() {
                     onChange={(e) => setEditHeaderText(e.target.value)}
                     placeholder="Header text shown at the top of the screen"
                     style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} maxLength={500} />
+                  <div style={HF_GRID}>
+                    <label style={HF_LBL}>Background
+                      <input type="color" value={editHeaderStyle.bgColor}
+                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, bgColor: e.target.value }))} /></label>
+                    <label style={HF_LBL}>Text
+                      <input type="color" value={editHeaderStyle.textColor}
+                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, textColor: e.target.value }))} /></label>
+                    <label style={HF_LBL}>Size
+                      <input type="number" min="8" max="120" value={editHeaderStyle.fontSize} style={HF_NUM}
+                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, fontSize: Number(e.target.value) || 22 }))} /></label>
+                    <label style={HF_LBL}>Font
+                      <select value={editHeaderStyle.fontFamily} style={HF_SEL}
+                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, fontFamily: e.target.value }))}>
+                        <option value="sans">Sans</option><option value="serif">Serif</option><option value="monospace">Mono</option>
+                      </select></label>
+                    <label style={HF_LBL}>Align
+                      <select value={editHeaderStyle.align} style={HF_SEL}
+                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, align: e.target.value }))}>
+                        <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
+                      </select></label>
+                    <label style={HF_LBL}>Rotation
+                      <select value={editHeaderStyle.rotation} style={HF_SEL}
+                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, rotation: Number(e.target.value) }))}>
+                        <option value={0}>0°</option><option value={90}>90°</option><option value={180}>180°</option><option value={270}>270°</option>
+                      </select></label>
+                    <label style={HF_LBL}>
+                      <input type="checkbox" checked={!!editHeaderStyle.bold}
+                        onChange={(e) => setEditHeaderStyle((s) => ({ ...s, bold: e.target.checked }))} /> Bold</label>
+                  </div>
                 </div>
               )}
 
@@ -2320,6 +2371,24 @@ export default function Device() {
                     onChange={(e) => setEditFooterFile(e.target.files?.[0] || null)} />
                   <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
                     {editFooterFile ? `Selected: ${editFooterFile.name}` : "Upload a footer image (shown at the bottom of the screen)."}
+                  </div>
+                  <div style={HF_GRID}>
+                    <label style={HF_LBL}>Background
+                      <input type="color" value={editFooterStyle.bgColor}
+                        onChange={(e) => setEditFooterStyle((s) => ({ ...s, bgColor: e.target.value }))} /></label>
+                    <label style={HF_LBL}>Height
+                      <input type="number" min="20" max="600" value={editFooterStyle.heightDp} style={HF_NUM}
+                        onChange={(e) => setEditFooterStyle((s) => ({ ...s, heightDp: Number(e.target.value) || 80 }))} /></label>
+                    <label style={HF_LBL}>Rotation
+                      <select value={editFooterStyle.rotation} style={HF_SEL}
+                        onChange={(e) => setEditFooterStyle((s) => ({ ...s, rotation: Number(e.target.value) }))}>
+                        <option value={0}>0°</option><option value={90}>90°</option><option value={180}>180°</option><option value={270}>270°</option>
+                      </select></label>
+                    <label style={HF_LBL}>Fit
+                      <select value={editFooterStyle.scaleType} style={HF_SEL}
+                        onChange={(e) => setEditFooterStyle((s) => ({ ...s, scaleType: e.target.value }))}>
+                        <option value="fit">Fit</option><option value="fill">Fill</option><option value="center">Center</option>
+                      </select></label>
                   </div>
                 </div>
               )}
