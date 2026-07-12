@@ -1,6 +1,8 @@
 // src/components/Group.js - Enhanced with Videos/Devices Display
 import React, { useEffect, useState } from "react";
-import { insertGroup, listGroups, updateGroup, deleteGroup, getGroupAttachments, unassignDevicesFromGroup } from "../api/group";
+import { insertGroup, listGroups, updateGroup, deleteGroup, getGroupAttachments, unassignDevicesFromGroup,
+         getGroupHeaderFooter, setGroupHeaderFooter, uploadGroupFooterImage } from "../api/group";
+import HeaderFooterEditor, { DEFAULT_HEADER_STYLE, DEFAULT_FOOTER_STYLE } from "./HeaderFooterEditor";
 
 /* ======================== Styles ======================== */
 const styles = {
@@ -167,9 +169,58 @@ export default function Group() {
   const [loadingAttachments, setLoadingAttachments] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
+  // Header/footer is configured on the GROUP; devices inherit it.
+  const [newHeaderEnabled, setNewHeaderEnabled] = useState(false);
+  const [newFooterEnabled, setNewFooterEnabled] = useState(false);
+
+  // Group header/footer config modal
+  const [hfGroup, setHfGroup] = useState(null);     // { id, gname }
+  const [hfSaving, setHfSaving] = useState(false);
+  const [hfHeaderEnabled, setHfHeaderEnabled] = useState(false);
+  const [hfHeaderText, setHfHeaderText] = useState("");
+  const [hfFooterEnabled, setHfFooterEnabled] = useState(false);
+  const [hfFooterImageUrl, setHfFooterImageUrl] = useState("");
+  const [hfFooterFile, setHfFooterFile] = useState(null);
+  const [hfHeaderStyle, setHfHeaderStyle] = useState({ ...DEFAULT_HEADER_STYLE });
+  const [hfFooterStyle, setHfFooterStyle] = useState({ ...DEFAULT_FOOTER_STYLE });
+
   useEffect(() => {
     load();
   }, []);
+
+  const openHeaderFooter = async (g) => {
+    setHfGroup(g);
+    setHfHeaderEnabled(false); setHfFooterEnabled(false);
+    setHfHeaderText(""); setHfFooterImageUrl(""); setHfFooterFile(null);
+    setHfHeaderStyle({ ...DEFAULT_HEADER_STYLE });
+    setHfFooterStyle({ ...DEFAULT_FOOTER_STYLE });
+    const res = await getGroupHeaderFooter(g.id);
+    if (res.ok) {
+      const d = res.data || {};
+      setHfHeaderEnabled(!!d.header_enabled);
+      setHfFooterEnabled(!!d.footer_enabled);
+      setHfHeaderText(d.header_text || "");
+      setHfFooterImageUrl(d.footer_image_url || "");
+      const st = d.style || {};
+      setHfHeaderStyle({ ...DEFAULT_HEADER_STYLE, ...(st.header || {}) });
+      setHfFooterStyle({ ...DEFAULT_FOOTER_STYLE, ...(st.footer || {}) });
+    }
+  };
+
+  const saveHeaderFooter = async () => {
+    if (!hfGroup) return;
+    setHfSaving(true);
+    await setGroupHeaderFooter(hfGroup.id, {
+      header_enabled: hfHeaderEnabled,
+      footer_enabled: hfFooterEnabled,
+      header_text: hfHeaderText || null,
+      style: { header: hfHeaderStyle, footer: hfFooterStyle },
+    });
+    if (hfFooterFile) await uploadGroupFooterImage(hfGroup.id, hfFooterFile);
+    setHfSaving(false);
+    setHfGroup(null);
+    load();
+  };
 
   const load = async () => {
     setLoading(true);
@@ -185,9 +236,28 @@ export default function Group() {
   };
 
   const add = async () => {
-    if (!gname.trim()) return;
-    await insertGroup({ gname: gname.trim() });
+    const name = gname.trim();
+    if (!name) return;
+    await insertGroup({ gname: name });
+
+    // Persist the header/footer choices made at creation time. insertGroup doesn't
+    // return the new id, so re-read the list and find it by name.
+    if (newHeaderEnabled || newFooterEnabled) {
+      try {
+        const res = await listGroups(200, 0);
+        const created = (res.items || []).find((g) => g.gname === name);
+        if (created?.id) {
+          await setGroupHeaderFooter(created.id, {
+            header_enabled: newHeaderEnabled,
+            footer_enabled: newFooterEnabled,
+          });
+        }
+      } catch (_) { /* non-fatal */ }
+    }
+
     setGname("");
+    setNewHeaderEnabled(false);
+    setNewFooterEnabled(false);
     load();
   };
 
@@ -332,6 +402,17 @@ export default function Group() {
           onChange={(e) => setGname(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
         />
+        {/* Header/footer is a GROUP setting — devices in the group inherit it */}
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
+          <input type="checkbox" checked={newHeaderEnabled}
+            onChange={(e) => setNewHeaderEnabled(e.target.checked)} style={{ width: 16, height: 16 }} />
+          Enable Header <span style={{ color: "#9ca3af" }}>(text)</span>
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
+          <input type="checkbox" checked={newFooterEnabled}
+            onChange={(e) => setNewFooterEnabled(e.target.checked)} style={{ width: 16, height: 16 }} />
+          Enable Footer <span style={{ color: "#9ca3af" }}>(image)</span>
+        </label>
         <button style={styles.btnPrimary} onClick={add}>
           ➕ Add Group
         </button>
@@ -409,6 +490,16 @@ export default function Group() {
                         </span>
                       </>
                     )}
+                    <button
+                      style={{ ...styles.btn, background: "#0ea5e9", color: "#fff" }}
+                      title="Header & Footer for this group (all its devices inherit it)"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openHeaderFooter(it);
+                      }}
+                    >
+                      🧩 Header/Footer
+                    </button>
                     <button
                       style={styles.btn}
                       onClick={(e) => {
@@ -555,6 +646,41 @@ export default function Group() {
           })
         )}
       </div>
+
+      {/* Group Header/Footer Modal — every device in the group inherits this */}
+      <Modal
+        open={!!hfGroup}
+        title={`🧩 Header & Footer — ${hfGroup?.gname || ""}`}
+        onClose={() => setHfGroup(null)}
+        footer={
+          <>
+            <button style={styles.btn} onClick={() => setHfGroup(null)} disabled={hfSaving}>
+              Cancel
+            </button>
+            <button style={styles.btnPrimary} onClick={saveHeaderFooter} disabled={hfSaving}>
+              {hfSaving ? "Saving..." : "Save Changes"}
+            </button>
+          </>
+        }
+      >
+        {hfGroup && (
+          <div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
+              Applies to <strong>every device in this group</strong>. A device can still opt out
+              via “Override group settings” in its Edit screen.
+            </div>
+            <HeaderFooterEditor
+              headerEnabled={hfHeaderEnabled} setHeaderEnabled={setHfHeaderEnabled}
+              headerText={hfHeaderText} setHeaderText={setHfHeaderText}
+              footerEnabled={hfFooterEnabled} setFooterEnabled={setHfFooterEnabled}
+              footerImageUrl={hfFooterImageUrl}
+              footerFile={hfFooterFile} setFooterFile={setHfFooterFile}
+              headerStyle={hfHeaderStyle} setHeaderStyle={setHfHeaderStyle}
+              footerStyle={hfFooterStyle} setFooterStyle={setHfFooterStyle}
+            />
+          </div>
+        )}
+      </Modal>
 
       {/* Rename Modal */}
       <Modal

@@ -149,6 +149,38 @@ export async function getGroupAttachments(gname) {
   }
 }
 
+// ---- Group header (text) / footer (image) — devices inherit this ----
+export async function getGroupHeaderFooter(gid) {
+  try {
+    const res = await api.get(`/webapp/group/${gid}/header-footer`);
+    return { ok: true, data: res.data };
+  } catch (err) {
+    return { ok: false, error: err.response?.data?.detail || err.message };
+  }
+}
+
+export async function setGroupHeaderFooter(gid, body) {
+  try {
+    const res = await api.post(`/webapp/group/${gid}/header-footer`, body);
+    return { ok: true, data: res.data };
+  } catch (err) {
+    return { ok: false, error: err.response?.data?.detail || err.message };
+  }
+}
+
+export async function uploadGroupFooterImage(gid, file) {
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await api.post(`/webapp/group/${gid}/footer-image`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return { ok: true, data: res.data };
+  } catch (err) {
+    return { ok: false, error: err.response?.data?.detail || err.message };
+  }
+}
+
 // POST - Unassign all devices from group
 export async function unassignDevicesFromGroup(gname) {
   try {
