@@ -506,6 +506,9 @@ export default function Device() {
   const [customWidth, setCustomWidth] = useState("");
   const [customHeight, setCustomHeight] = useState("");
   const [showCustomResolution, setShowCustomResolution] = useState(false);
+  // Device creation: optional header (image) / footer (text) feature toggles
+  const [newHeaderEnabled, setNewHeaderEnabled] = useState(false);
+  const [newFooterEnabled, setNewFooterEnabled] = useState(false);
 
   // Auto-detected resolution state
   const [detectedResolution, setDetectedResolution] = useState(null); // e.g. "1920x1080"
@@ -518,6 +521,12 @@ export default function Device() {
   const [editResolution, setEditResolution] = useState("");
   const [editBleId, setEditBleId] = useState("");
   const [editGenderEnabled, setEditGenderEnabled] = useState(false);
+  // Header (text) / footer (image)
+  const [editHeaderEnabled, setEditHeaderEnabled] = useState(false);
+  const [editFooterEnabled, setEditFooterEnabled] = useState(false);
+  const [editHeaderText, setEditHeaderText] = useState("");
+  const [editFooterImageUrl, setEditFooterImageUrl] = useState(""); // current image (presigned) for preview
+  const [editFooterFile, setEditFooterFile] = useState(null);       // newly selected upload
   const [editCustomWidth, setEditCustomWidth] = useState("");
   const [editCustomHeight, setEditCustomHeight] = useState("");
   const [showEditCustomResolution, setShowEditCustomResolution] = useState(false);
@@ -656,6 +665,17 @@ export default function Device() {
     dvsgApi.get(`/webapp/device/${device.mobile_id}/config`)
       .then((res) => setEditGenderEnabled(!!res.data?.gender_counting_enabled))
       .catch(() => {});
+    // Header (text) / footer (image) config
+    setEditHeaderEnabled(false); setEditFooterEnabled(false);
+    setEditHeaderText(""); setEditFooterImageUrl(""); setEditFooterFile(null);
+    dvsgApi.get(`/webapp/device/${device.mobile_id}/header-footer`)
+      .then((res) => {
+        setEditHeaderEnabled(!!res.data?.header_enabled);
+        setEditFooterEnabled(!!res.data?.footer_enabled);
+        setEditHeaderText(res.data?.header_text || "");
+        setEditFooterImageUrl(res.data?.footer_image_url || "");
+      })
+      .catch(() => {});
   };
 
   // Update device resolution and name
@@ -679,6 +699,20 @@ export default function Device() {
 
       // Update gender-counting toggle (isolated /webapp router)
       await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/gender-enabled`, { enabled: !!editGenderEnabled });
+
+      // Header (text) / footer (image): flags + header text, then upload footer image if a new one was chosen
+      await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/header-footer`, {
+        header_enabled: !!editHeaderEnabled,
+        footer_enabled: !!editFooterEnabled,
+        header_text: editHeaderText || null,
+      });
+      if (editFooterFile) {
+        const fd = new FormData();
+        fd.append("file", editFooterFile);
+        await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/footer-image`, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
 
       setSuccess("Device settings updated successfully!");
       setTimeout(() => {
@@ -1106,6 +1140,14 @@ export default function Device() {
       });
 
       if (response.data) {
+        // Persist optional header/footer feature flags for the new device
+        if (newHeaderEnabled || newFooterEnabled) {
+          try {
+            await dvsgApi.post(`/webapp/device/${id}/header-footer`, {
+              header_enabled: newHeaderEnabled, footer_enabled: newFooterEnabled,
+            });
+          } catch (_) { /* non-fatal */ }
+        }
         setSuccess(`Device ${name || id} created and linked successfully!`);
         setTimeout(async () => {
           setMobileId("");
@@ -1116,6 +1158,8 @@ export default function Device() {
           setCustomWidth("");
           setCustomHeight("");
           setDetectedResolution(null);
+          setNewHeaderEnabled(false);
+          setNewFooterEnabled(false);
           setStep(1);
           setAddOpen(false);
           setSuccess("");
@@ -1842,6 +1886,26 @@ export default function Device() {
                 </div>
               </div>
 
+              {/* Optional header/footer feature toggles */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
+                  Display Options <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af" }}>optional</span>
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 6 }}>
+                  <input type="checkbox" checked={newHeaderEnabled}
+                    onChange={(e) => setNewHeaderEnabled(e.target.checked)} style={{ width: 18, height: 18 }} />
+                  <span style={{ fontSize: 13 }}>Enable Header <span style={{ color: "#9ca3af" }}>(text)</span></span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <input type="checkbox" checked={newFooterEnabled}
+                    onChange={(e) => setNewFooterEnabled(e.target.checked)} style={{ width: 18, height: 18 }} />
+                  <span style={{ fontSize: 13 }}>Enable Footer <span style={{ color: "#9ca3af" }}>(image)</span></span>
+                </label>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
+                  Add the header text / footer image after creating, in the device Edit screen.
+                </div>
+              </div>
+
               <div>
                 <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>Mobile ID *</div>
                 <input
@@ -2217,6 +2281,48 @@ export default function Device() {
               <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
                 Only for Linux web-player devices with a camera. The AI model runs locally and sends only counts.
               </div>
+            </div>
+
+            {/* Header (image) / Footer (text) */}
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
+                Header &amp; Footer <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af" }}>optional</span>
+              </div>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 6 }}>
+                <input type="checkbox" checked={editHeaderEnabled}
+                  onChange={(e) => setEditHeaderEnabled(e.target.checked)} style={{ width: 18, height: 18 }} />
+                <span style={{ fontSize: 13 }}>Enable Header <span style={{ color: "#9ca3af" }}>(text)</span></span>
+              </label>
+
+              {editHeaderEnabled && (
+                <div style={{ margin: "0 0 12px 28px" }}>
+                  <textarea value={editHeaderText}
+                    onChange={(e) => setEditHeaderText(e.target.value)}
+                    placeholder="Header text shown at the top of the screen"
+                    style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} maxLength={500} />
+                </div>
+              )}
+
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 6 }}>
+                <input type="checkbox" checked={editFooterEnabled}
+                  onChange={(e) => setEditFooterEnabled(e.target.checked)} style={{ width: 18, height: 18 }} />
+                <span style={{ fontSize: 13 }}>Enable Footer <span style={{ color: "#9ca3af" }}>(image)</span></span>
+              </label>
+
+              {editFooterEnabled && (
+                <div style={{ margin: "0 0 4px 28px" }}>
+                  {editFooterImageUrl && !editFooterFile && (
+                    <img src={editFooterImageUrl} alt="footer"
+                      style={{ maxHeight: 60, maxWidth: "100%", borderRadius: 6, marginBottom: 6, display: "block" }} />
+                  )}
+                  <input type="file" accept="image/*"
+                    onChange={(e) => setEditFooterFile(e.target.files?.[0] || null)} />
+                  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
+                    {editFooterFile ? `Selected: ${editFooterFile.name}` : "Upload a footer image (shown at the bottom of the screen)."}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Resolution Selection */}
