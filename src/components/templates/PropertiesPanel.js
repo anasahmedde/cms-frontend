@@ -1,7 +1,7 @@
 // Right-hand properties panel for the selected zone (or template meta when
 // nothing is selected).
 import React from "react";
-import { ZONE_TYPES, BINDING_LABELS, CONTENT_SCOPES, CANVAS_PRESETS } from "./zoneTypes";
+import { ZONE_TYPES, BINDING_LABELS, CONTENT_SCOPES, CANVAS_PRESETS, CANVAS_MIN, CANVAS_MAX, normalizeCanvas, aspectLabel } from "./zoneTypes";
 
 const row = { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 };
 const lbl = (theme) => ({ fontSize: 12, color: theme.textSecondary, width: 86, flexShrink: 0 });
@@ -119,26 +119,37 @@ export default function PropertiesPanel({ theme, state, dispatch }) {
             style={inp(theme)} />
         </div>
         <div style={row}>
-          <label htmlFor="tpl-canvas" style={lbl(theme)}>Canvas</label>
+          <label htmlFor="tpl-preset" style={lbl(theme)}>Preset</label>
           <select
-            id="tpl-canvas"
-            value={`${template.design_width}x${template.design_height}`}
+            id="tpl-preset"
+            value={CANVAS_PRESETS.find((p) => p.w === template.design_width && p.h === template.design_height)?.label || "__custom__"}
             onChange={(e) => {
-              const preset = CANVAS_PRESETS.find((p) => `${p.w}x${p.h}` === e.target.value);
+              const preset = CANVAS_PRESETS.find((p) => p.label === e.target.value);
               if (preset) dispatch({ type: "SET_META", patch: { orientation: preset.orientation, design_width: preset.w, design_height: preset.h } });
             }}
             style={inp(theme)}
           >
-            {CANVAS_PRESETS.map((p) => (
-              <option key={p.label} value={`${p.w}x${p.h}`}>{p.label}</option>
-            ))}
-            {!CANVAS_PRESETS.some((p) => p.w === template.design_width && p.h === template.design_height) && (
-              <option value={`${template.design_width}x${template.design_height}`}>
-                Custom {template.design_width}×{template.design_height}
-              </option>
-            )}
+            {CANVAS_PRESETS.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
+            <option value="__custom__">Custom {template.design_width}×{template.design_height}</option>
           </select>
         </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 8 }}>
+          <div style={row}>
+            <label htmlFor="tpl-w" style={{ ...lbl(theme), width: 60 }}>Width</label>
+            <input id="tpl-w" type="number" min={CANVAS_MIN} max={CANVAS_MAX} value={template.design_width}
+              onChange={(e) => dispatch({ type: "SET_META", patch: normalizeCanvas(e.target.value, template.design_height) })}
+              style={inp(theme)} />
+          </div>
+          <div style={row}>
+            <label htmlFor="tpl-h" style={{ ...lbl(theme), width: 60 }}>Height</label>
+            <input id="tpl-h" type="number" min={CANVAS_MIN} max={CANVAS_MAX} value={template.design_height}
+              onChange={(e) => dispatch({ type: "SET_META", patch: normalizeCanvas(template.design_width, e.target.value) })}
+              style={inp(theme)} />
+          </div>
+        </div>
+        <p style={{ fontSize: 12, color: theme.textSecondary, margin: "0 0 10px" }}>
+          {template.orientation} · {aspectLabel(template.design_width, template.design_height)} · any size 120–10000px
+        </p>
         <p style={{ fontSize: 12, color: theme.textSecondary, lineHeight: 1.5 }}>
           Select a zone on the canvas to edit its position, colors and content source.
           Drag zones to move, use the handles to resize. Hold <b>Alt</b> to disable snapping.

@@ -1,7 +1,7 @@
 // Platform → Templates tab: list, create, open designer, duplicate, link, delete.
 import React, { useCallback, useEffect, useState } from "react";
 import { useTheme } from "../../App";
-import { CANVAS_PRESETS } from "./zoneTypes";
+import { CANVAS_PRESETS, CANVAS_MIN, CANVAS_MAX, normalizeCanvas } from "./zoneTypes";
 import TemplateThumb from "./TemplateThumb";
 import TemplateDesigner from "./TemplateDesigner";
 import LinkCompaniesModal from "./LinkCompaniesModal";
@@ -15,6 +15,7 @@ export default function TemplatesTab() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [customSize, setCustomSize] = useState(false);
   const [creating, setCreating] = useState(false);
   const [designing, setDesigning] = useState(null);   // full template object
   const [linking, setLinking] = useState(null);       // template object
@@ -39,15 +40,22 @@ export default function TemplatesTab() {
   const onCreate = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const preset = CANVAS_PRESETS.find((p) => p.label === fd.get("preset")) || CANVAS_PRESETS[0];
+    let size;
+    if (fd.get("preset") === "__custom__") {
+      const norm = normalizeCanvas(fd.get("custom_w"), fd.get("custom_h"));
+      size = { orientation: norm.orientation, w: norm.design_width, h: norm.design_height };
+    } else {
+      const preset = CANVAS_PRESETS.find((p) => p.label === fd.get("preset")) || CANVAS_PRESETS[0];
+      size = { orientation: preset.orientation, w: preset.w, h: preset.h };
+    }
     setCreating(true);
     setError("");
     const res = await createTemplate({
       name: fd.get("name"),
       description: fd.get("description") || null,
-      orientation: preset.orientation,
-      design_width: preset.w,
-      design_height: preset.h,
+      orientation: size.orientation,
+      design_width: size.w,
+      design_height: size.h,
       zones: [],
     });
     setCreating(false);
@@ -99,7 +107,7 @@ export default function TemplatesTab() {
             Design a screen layout once, link it to a company — every device renders it. Companies without a template keep the default screens.
           </p>
         </div>
-        <button onClick={() => setShowCreate(true)} style={btn(theme.accent)}>+ New Template</button>
+        <button onClick={() => { setCustomSize(false); setShowCreate(true); }} style={btn(theme.accent)}>+ New Template</button>
       </div>
 
       {success && (
@@ -168,11 +176,33 @@ export default function TemplatesTab() {
             <label htmlFor="new-tpl-desc" style={{ fontSize: 12, color: theme.textSecondary }}>Description (optional)</label>
             <input id="new-tpl-desc" name="description" maxLength={1000}
               style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", margin: "4px 0 12px", borderRadius: 8, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.text }} />
-            <label htmlFor="new-tpl-preset" style={{ fontSize: 12, color: theme.textSecondary }}>Screen</label>
-            <select id="new-tpl-preset" name="preset" defaultValue={CANVAS_PRESETS[1].label}
-              style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", margin: "4px 0 16px", borderRadius: 8, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.text }}>
+            <label htmlFor="new-tpl-preset" style={{ fontSize: 12, color: theme.textSecondary }}>Screen size</label>
+            <select id="new-tpl-preset" name="preset" defaultValue={CANVAS_PRESETS[6].label}
+              onChange={(e) => setCustomSize(e.target.value === "__custom__")}
+              style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", margin: "4px 0 12px", borderRadius: 8, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.text }}>
               {CANVAS_PRESETS.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
+              <option value="__custom__">Custom size…</option>
             </select>
+            {customSize && (
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-end", margin: "0 0 16px" }}>
+                <div style={{ flex: 1 }}>
+                  <label htmlFor="new-tpl-w" style={{ fontSize: 12, color: theme.textSecondary }}>Width (px)</label>
+                  <input id="new-tpl-w" name="custom_w" type="number" min={CANVAS_MIN} max={CANVAS_MAX} defaultValue={1080} required
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", marginTop: 4, borderRadius: 8, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.text }} />
+                </div>
+                <span style={{ color: theme.textSecondary, paddingBottom: 10 }}>×</span>
+                <div style={{ flex: 1 }}>
+                  <label htmlFor="new-tpl-h" style={{ fontSize: 12, color: theme.textSecondary }}>Height (px)</label>
+                  <input id="new-tpl-h" name="custom_h" type="number" min={CANVAS_MIN} max={CANVAS_MAX} defaultValue={1920} required
+                    style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", marginTop: 4, borderRadius: 8, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.text }} />
+                </div>
+              </div>
+            )}
+            {!customSize && (
+              <p style={{ fontSize: 11.5, color: theme.textSecondary, margin: "0 0 16px" }}>
+                Any resolution works — zones are positioned in %, so one template fits every screen of the same shape. Pick “Custom size…” for an exact pixel size.
+              </p>
+            )}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button type="button" onClick={() => setShowCreate(false)} style={btn(theme.cardAlt, theme.text)}>Cancel</button>
               <button type="submit" disabled={creating} style={btn(theme.accent)}>{creating ? "Creating…" : "Create & open designer"}</button>
