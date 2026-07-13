@@ -6,7 +6,6 @@ import { listDevices, insertDevice, deleteDevice, wipeDeviceVideos } from "../ap
 import { listGroupNames } from "../api/group";
 import { listShopNames } from "../api/shop";
 import GenderReportModal from "./GenderReportModal";
-import HeaderFooterEditor, { DEFAULT_HEADER_STYLE, DEFAULT_FOOTER_STYLE } from "./HeaderFooterEditor";
 import axios from "axios";
 
 // DVSG API for device creation with linking
@@ -519,18 +518,6 @@ export default function Device() {
   const [editResolution, setEditResolution] = useState("");
   const [editBleId, setEditBleId] = useState("");
   const [editGenderEnabled, setEditGenderEnabled] = useState(false);
-  // Header (text) / footer (image)
-  const [editHeaderEnabled, setEditHeaderEnabled] = useState(false);
-  const [editFooterEnabled, setEditFooterEnabled] = useState(false);
-  const [editHeaderText, setEditHeaderText] = useState("");
-  const [editFooterImageUrl, setEditFooterImageUrl] = useState(""); // current image (presigned) for preview
-  const [editFooterFile, setEditFooterFile] = useState(null);       // newly selected upload
-  // Header/footer styling (persisted as one JSON blob)
-  const [editHeaderStyle, setEditHeaderStyle] = useState({ ...DEFAULT_HEADER_STYLE });
-  const [editFooterStyle, setEditFooterStyle] = useState({ ...DEFAULT_FOOTER_STYLE });
-  // Header/footer comes from the device's GROUP unless this device overrides it
-  const [editHfOverride, setEditHfOverride] = useState(false);
-  const [editGroupHf, setEditGroupHf] = useState(null); // the group's header/footer config (null = no group)
   const [editCustomWidth, setEditCustomWidth] = useState("");
   const [editCustomHeight, setEditCustomHeight] = useState("");
   const [showEditCustomResolution, setShowEditCustomResolution] = useState(false);
@@ -669,30 +656,6 @@ export default function Device() {
     dvsgApi.get(`/webapp/device/${device.mobile_id}/config`)
       .then((res) => setEditGenderEnabled(!!res.data?.gender_counting_enabled))
       .catch(() => {});
-    // Header (text) / footer (image) config
-    setEditHeaderEnabled(false); setEditFooterEnabled(false);
-    setEditHeaderText(""); setEditFooterImageUrl(""); setEditFooterFile(null);
-    setEditHeaderStyle({ ...DEFAULT_HEADER_STYLE });
-    setEditFooterStyle({ ...DEFAULT_FOOTER_STYLE });
-    setEditHfOverride(false);
-    setEditGroupHf(null);
-    dvsgApi.get(`/webapp/device/${device.mobile_id}/header-footer`)
-      .then((res) => {
-        const override = !!res.data?.header_footer_override;
-        setEditHfOverride(override);
-        setEditGroupHf(res.data?.group || null);
-        // Show the device's own values when overriding, otherwise show what it
-        // currently inherits from its group (read-only preview).
-        const src = override ? res.data : (res.data?.effective || {});
-        setEditHeaderEnabled(!!src.header_enabled);
-        setEditFooterEnabled(!!src.footer_enabled);
-        setEditHeaderText(src.header_text || "");
-        setEditFooterImageUrl(src.footer_image_url || "");
-        const st = src.style || {};
-        setEditHeaderStyle({ ...DEFAULT_HEADER_STYLE, ...(st.header || {}) });
-        setEditFooterStyle({ ...DEFAULT_FOOTER_STYLE, ...(st.footer || {}) });
-      })
-      .catch(() => {});
   };
 
   // Update device resolution and name
@@ -716,30 +679,6 @@ export default function Device() {
 
       // Update gender-counting toggle (isolated /webapp router)
       await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/gender-enabled`, { enabled: !!editGenderEnabled });
-
-      // Header/footer: normally inherited from the group. Only write the device's own
-      // values when this device explicitly overrides the group.
-      if (editHfOverride) {
-        await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/header-footer`, {
-          header_footer_override: true,
-          header_enabled: !!editHeaderEnabled,
-          footer_enabled: !!editFooterEnabled,
-          header_text: editHeaderText || null,
-          style: { header: editHeaderStyle, footer: editFooterStyle },
-        });
-        if (editFooterFile) {
-          const fd = new FormData();
-          fd.append("file", editFooterFile);
-          await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/footer-image`, fd, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-        }
-      } else {
-        // Back to inheriting from the group
-        await dvsgApi.post(`/webapp/device/${editDevice.mobile_id}/header-footer`, {
-          header_footer_override: false,
-        });
-      }
 
       setSuccess("Device settings updated successfully!");
       setTimeout(() => {
@@ -1167,7 +1106,6 @@ export default function Device() {
       });
 
       if (response.data) {
-        // Header/footer is configured on the GROUP — the device inherits it.
         setSuccess(`Device ${name || id} created and linked successfully!`);
         setTimeout(async () => {
           setMobileId("");
@@ -2280,58 +2218,6 @@ export default function Device() {
                 Only for Linux web-player devices with a camera. The AI model runs locally and sends only counts.
               </div>
             </div>
-
-            {/* Header & Footer — only relevant if this device's GROUP has it enabled */}
-            {(() => {
-              const g = editGroupHf;
-              const groupHas = !!g && (g.header_enabled || g.footer_enabled);
-
-              if (!groupHas) {
-                return (
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
-                      Header &amp; Footer <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af" }}>from group</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                      {g
-                        ? `Group "${g.gname}" has no header/footer enabled, so this device shows none. Enable it in Groups → Edit.`
-                        : "This device is not assigned to a group, so it has no header/footer."}
-                    </div>
-                  </div>
-                );
-              }
-
-              return (
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
-                    Header &amp; Footer <span style={{ fontSize: 11, fontWeight: 400, color: "#9ca3af" }}>from group “{g.gname}”</span>
-                  </div>
-
-                  <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 8 }}>
-                    <input type="checkbox" checked={editHfOverride}
-                      onChange={(e) => setEditHfOverride(e.target.checked)} style={{ width: 18, height: 18 }} />
-                    <span style={{ fontSize: 13, fontWeight: 700 }}>Override group settings for this device</span>
-                  </label>
-
-                  <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>
-                    {editHfOverride
-                      ? "This device uses its own header/footer below (the group's is ignored)."
-                      : "This device inherits its group's header/footer (shown below, read-only). Tick the box to customise it."}
-                  </div>
-
-                  <HeaderFooterEditor
-                    disabled={!editHfOverride}
-                    headerEnabled={editHeaderEnabled} setHeaderEnabled={setEditHeaderEnabled}
-                    headerText={editHeaderText} setHeaderText={setEditHeaderText}
-                    footerEnabled={editFooterEnabled} setFooterEnabled={setEditFooterEnabled}
-                    footerImageUrl={editFooterImageUrl}
-                    footerFile={editFooterFile} setFooterFile={setEditFooterFile}
-                    headerStyle={editHeaderStyle} setHeaderStyle={setEditHeaderStyle}
-                    footerStyle={editFooterStyle} setFooterStyle={setEditFooterStyle}
-                  />
-                </div>
-              );
-            })()}
 
             {/* Resolution Selection */}
             <div>
