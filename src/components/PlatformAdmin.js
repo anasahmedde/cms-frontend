@@ -2,6 +2,7 @@
 // Platform-level admin panel for managing companies (tenants)
 // FIXED: Device count display, Expiration column, Background task info
 import React, { useState, useEffect, useCallback } from "react";
+import TemplatesTab from "./templates/TemplatesTab";
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8005`;
 
@@ -477,7 +478,11 @@ export default function PlatformAdmin({ onImpersonate }) {
         <button style={tabStyle(tab === "expiring")} onClick={() => setTab("expiring")}>
           ⏰ Expiring Soon {expiringSoonCount > 0 && <span style={{ marginLeft: 6, background: "#f59e0b", color: "#fff", padding: "2px 6px", borderRadius: 10, fontSize: 11 }}>{expiringSoonCount}</span>}
         </button>
+        <button style={tabStyle(tab === "templates")} onClick={() => setTab("templates")}>🎨 Templates</button>
       </div>
+
+      {/* Screen Templates Tab */}
+      {tab === "templates" && <TemplatesTab />}
 
       {/* Dashboard Tab - Enhanced with notifications and expiring companies */}
       {tab === "dashboard" && dashboard && (
