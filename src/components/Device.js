@@ -6,6 +6,7 @@ import { listDevices, insertDevice, deleteDevice, wipeDeviceVideos } from "../ap
 import { listGroupNames } from "../api/group";
 import { listShopNames } from "../api/shop";
 import GenderReportModal from "./GenderReportModal";
+import BulkImportModal from "./BulkImportModal";
 import axios from "axios";
 
 // DVSG API for device creation with linking
@@ -494,6 +495,7 @@ export default function Device() {
 
   // Two-step add modal
   const [addOpen, setAddOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [step, setStep] = useState(1);
 
   // Form data
@@ -1261,6 +1263,9 @@ export default function Device() {
           <button style={btnGhost} onClick={onRefresh} disabled={loading}>
             🔄 Refresh
           </button>
+          <button style={btnGhost} onClick={() => setBulkOpen(true)}>
+            ⬆ Bulk import
+          </button>
           <button style={btn} onClick={handleOpenAddModal}>
             + Add Device
           </button>
@@ -1761,6 +1766,13 @@ export default function Device() {
         </div>
 
         {paginationBar}
+
+        {bulkOpen && (
+          <BulkImportModal
+            onClose={() => setBulkOpen(false)}
+            onImported={onRefresh}
+          />
+        )}
 
         {/* Two-step Add Device Modal */}
         <Modal
