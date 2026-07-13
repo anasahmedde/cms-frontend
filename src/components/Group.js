@@ -175,7 +175,6 @@ export default function Group() {
 
   // Header/footer fields, edited inside the group's Edit modal
   const [hfSaving, setHfSaving] = useState(false);
-  const [hfError, setHfError] = useState("");
   const [hfHeaderEnabled, setHfHeaderEnabled] = useState(false);
   const [hfHeaderText, setHfHeaderText] = useState("");
   const [hfFooterEnabled, setHfFooterEnabled] = useState(false);
@@ -230,7 +229,6 @@ export default function Group() {
   // Edit a group = rename + its header/footer (which all its devices inherit)
   const openEdit = async (g) => {
     setEdit({ id: g.id, current: g.gname, newName: g.gname });
-    setHfError("");
 
     setHfHeaderEnabled(false); setHfFooterEnabled(false);
     setHfHeaderText(""); setHfFooterImageUrl(""); setHfFooterFile(null);
@@ -253,38 +251,19 @@ export default function Group() {
   const saveEdit = async () => {
     if (!edit || !edit.newName.trim()) return;
     setHfSaving(true);
-    setHfError("");
 
     if (edit.newName.trim() !== edit.current) {
       await updateGroup(edit.current, { gname: edit.newName.trim() });
     }
 
-    if (!edit.id) {
-      setHfError("Cannot save header/footer: this group has no id.");
-      setHfSaving(false);
-      return;
-    }
-
-    // Surface failures instead of silently doing nothing.
-    const res = await setGroupHeaderFooter(edit.id, {
-      header_enabled: hfHeaderEnabled,
-      footer_enabled: hfFooterEnabled,
-      header_text: hfHeaderText || null,
-      style: { header: hfHeaderStyle, footer: hfFooterStyle },
-    });
-    if (!res.ok) {
-      setHfError(`Failed to save header/footer: ${res.error}`);
-      setHfSaving(false);
-      return;
-    }
-
-    if (hfFooterFile) {
-      const up = await uploadGroupFooterImage(edit.id, hfFooterFile);
-      if (!up.ok) {
-        setHfError(`Header/footer saved, but the footer image upload failed: ${up.error}`);
-        setHfSaving(false);
-        return;
-      }
+    if (edit.id) {
+      await setGroupHeaderFooter(edit.id, {
+        header_enabled: hfHeaderEnabled,
+        footer_enabled: hfFooterEnabled,
+        header_text: hfHeaderText || null,
+        style: { header: hfHeaderStyle, footer: hfFooterStyle },
+      });
+      if (hfFooterFile) await uploadGroupFooterImage(edit.id, hfFooterFile);
     }
 
     setHfSaving(false);
@@ -697,14 +676,6 @@ export default function Group() {
                 Applies to <strong>every device in this group</strong>. A device can opt out via
                 “Override group settings” in its Edit screen.
               </div>
-              {hfError && (
-                <div style={{
-                  padding: "10px 12px", background: "#fee2e2", border: "1px solid #fecaca",
-                  borderRadius: 8, color: "#dc2626", fontSize: 13, marginBottom: 12,
-                }}>
-                  {hfError}
-                </div>
-              )}
               <HeaderFooterEditor
                 headerEnabled={hfHeaderEnabled} setHeaderEnabled={setHfHeaderEnabled}
                 headerText={hfHeaderText} setHeaderText={setHfHeaderText}
