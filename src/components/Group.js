@@ -173,7 +173,8 @@ export default function Group() {
   const [newHeaderEnabled, setNewHeaderEnabled] = useState(false);
   const [newFooterEnabled, setNewFooterEnabled] = useState(false);
 
-  // Header/footer fields, edited inside the group's Edit modal
+  // Group header/footer config modal
+  const [hfGroup, setHfGroup] = useState(null);     // { id, gname }
   const [hfSaving, setHfSaving] = useState(false);
   const [hfHeaderEnabled, setHfHeaderEnabled] = useState(false);
   const [hfHeaderText, setHfHeaderText] = useState("");
@@ -186,6 +187,40 @@ export default function Group() {
   useEffect(() => {
     load();
   }, []);
+
+  const openHeaderFooter = async (g) => {
+    setHfGroup(g);
+    setHfHeaderEnabled(false); setHfFooterEnabled(false);
+    setHfHeaderText(""); setHfFooterImageUrl(""); setHfFooterFile(null);
+    setHfHeaderStyle({ ...DEFAULT_HEADER_STYLE });
+    setHfFooterStyle({ ...DEFAULT_FOOTER_STYLE });
+    const res = await getGroupHeaderFooter(g.id);
+    if (res.ok) {
+      const d = res.data || {};
+      setHfHeaderEnabled(!!d.header_enabled);
+      setHfFooterEnabled(!!d.footer_enabled);
+      setHfHeaderText(d.header_text || "");
+      setHfFooterImageUrl(d.footer_image_url || "");
+      const st = d.style || {};
+      setHfHeaderStyle({ ...DEFAULT_HEADER_STYLE, ...(st.header || {}) });
+      setHfFooterStyle({ ...DEFAULT_FOOTER_STYLE, ...(st.footer || {}) });
+    }
+  };
+
+  const saveHeaderFooter = async () => {
+    if (!hfGroup) return;
+    setHfSaving(true);
+    await setGroupHeaderFooter(hfGroup.id, {
+      header_enabled: hfHeaderEnabled,
+      footer_enabled: hfFooterEnabled,
+      header_text: hfHeaderText || null,
+      style: { header: hfHeaderStyle, footer: hfFooterStyle },
+    });
+    if (hfFooterFile) await uploadGroupFooterImage(hfGroup.id, hfFooterFile);
+    setHfSaving(false);
+    setHfGroup(null);
+    load();
+  };
 
   const load = async () => {
     setLoading(true);
@@ -226,47 +261,11 @@ export default function Group() {
     load();
   };
 
-  // Edit a group = rename + its header/footer (which all its devices inherit)
-  const openEdit = async (g) => {
-    setEdit({ id: g.id, current: g.gname, newName: g.gname });
+  const openRename = (name) => setEdit({ current: name, newName: name });
 
-    setHfHeaderEnabled(false); setHfFooterEnabled(false);
-    setHfHeaderText(""); setHfFooterImageUrl(""); setHfFooterFile(null);
-    setHfHeaderStyle({ ...DEFAULT_HEADER_STYLE });
-    setHfFooterStyle({ ...DEFAULT_FOOTER_STYLE });
-
-    const res = await getGroupHeaderFooter(g.id);
-    if (res.ok) {
-      const d = res.data || {};
-      setHfHeaderEnabled(!!d.header_enabled);
-      setHfFooterEnabled(!!d.footer_enabled);
-      setHfHeaderText(d.header_text || "");
-      setHfFooterImageUrl(d.footer_image_url || "");
-      const st = d.style || {};
-      setHfHeaderStyle({ ...DEFAULT_HEADER_STYLE, ...(st.header || {}) });
-      setHfFooterStyle({ ...DEFAULT_FOOTER_STYLE, ...(st.footer || {}) });
-    }
-  };
-
-  const saveEdit = async () => {
+  const saveRename = async () => {
     if (!edit || !edit.newName.trim()) return;
-    setHfSaving(true);
-
-    if (edit.newName.trim() !== edit.current) {
-      await updateGroup(edit.current, { gname: edit.newName.trim() });
-    }
-
-    if (edit.id) {
-      await setGroupHeaderFooter(edit.id, {
-        header_enabled: hfHeaderEnabled,
-        footer_enabled: hfFooterEnabled,
-        header_text: hfHeaderText || null,
-        style: { header: hfHeaderStyle, footer: hfFooterStyle },
-      });
-      if (hfFooterFile) await uploadGroupFooterImage(edit.id, hfFooterFile);
-    }
-
-    setHfSaving(false);
+    await updateGroup(edit.current, { gname: edit.newName.trim() });
     setEdit(null);
     load();
   };
@@ -492,11 +491,20 @@ export default function Group() {
                       </>
                     )}
                     <button
-                      style={styles.btn}
-                      title="Rename + set this group's header/footer"
+                      style={{ ...styles.btn, background: "#0ea5e9", color: "#fff" }}
+                      title="Header & Footer for this group (all its devices inherit it)"
                       onClick={(e) => {
                         e.stopPropagation();
-                        openEdit(it);
+                        openHeaderFooter(it);
+                      }}
+                    >
+                      🧩 Header/Footer
+                    </button>
+                    <button
+                      style={styles.btn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openRename(it.gname);
                       }}
                     >
                       ✏️ Edit
@@ -639,18 +647,53 @@ export default function Group() {
         )}
       </div>
 
-      {/* Edit Group Modal — rename + header/footer (all its devices inherit it) */}
+      {/* Group Header/Footer Modal — every device in the group inherits this */}
+      <Modal
+        open={!!hfGroup}
+        title={`🧩 Header & Footer — ${hfGroup?.gname || ""}`}
+        onClose={() => setHfGroup(null)}
+        footer={
+          <>
+            <button style={styles.btn} onClick={() => setHfGroup(null)} disabled={hfSaving}>
+              Cancel
+            </button>
+            <button style={styles.btnPrimary} onClick={saveHeaderFooter} disabled={hfSaving}>
+              {hfSaving ? "Saving..." : "Save Changes"}
+            </button>
+          </>
+        }
+      >
+        {hfGroup && (
+          <div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
+              Applies to <strong>every device in this group</strong>. A device can still opt out
+              via “Override group settings” in its Edit screen.
+            </div>
+            <HeaderFooterEditor
+              headerEnabled={hfHeaderEnabled} setHeaderEnabled={setHfHeaderEnabled}
+              headerText={hfHeaderText} setHeaderText={setHfHeaderText}
+              footerEnabled={hfFooterEnabled} setFooterEnabled={setHfFooterEnabled}
+              footerImageUrl={hfFooterImageUrl}
+              footerFile={hfFooterFile} setFooterFile={setHfFooterFile}
+              headerStyle={hfHeaderStyle} setHeaderStyle={setHfHeaderStyle}
+              footerStyle={hfFooterStyle} setFooterStyle={setHfFooterStyle}
+            />
+          </div>
+        )}
+      </Modal>
+
+      {/* Rename Modal */}
       <Modal
         open={!!edit}
-        title={`✏️ Edit Group${edit?.current ? " — " + edit.current : ""}`}
+        title="✏️ Rename Group"
         onClose={() => setEdit(null)}
         footer={
           <>
-            <button style={styles.btn} onClick={() => setEdit(null)} disabled={hfSaving}>
+            <button style={styles.btn} onClick={() => setEdit(null)}>
               Cancel
             </button>
-            <button style={styles.btnPrimary} onClick={saveEdit} disabled={hfSaving}>
-              {hfSaving ? "Saving..." : "Save Changes"}
+            <button style={styles.btnPrimary} onClick={saveRename}>
+              Save Changes
             </button>
           </>
         }
@@ -658,38 +701,27 @@ export default function Group() {
         {edit && (
           <div style={{ display: "grid", gap: 16 }}>
             <div>
+              <label style={{ display: "block", marginBottom: 8, fontWeight: 600, fontSize: 13, color: "#64748b" }}>
+                Current Name
+              </label>
+              <input style={{ ...styles.input, background: "#f8fafc" }} value={edit.current} disabled />
+            </div>
+            <div>
               <label style={{ display: "block", marginBottom: 8, fontWeight: 600, fontSize: 13, color: "#374151" }}>
-                Group Name
+                New Name
               </label>
               <input
                 autoFocus
                 style={styles.input}
                 value={edit.newName}
                 onChange={(e) => setEdit((x) => ({ ...x, newName: e.target.value }))}
+                onKeyDown={(e) => e.key === "Enter" && saveRename()}
                 placeholder="e.g. North Region"
-              />
-            </div>
-
-            <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4 }}>Header &amp; Footer</div>
-              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
-                Applies to <strong>every device in this group</strong>. A device can opt out via
-                “Override group settings” in its Edit screen.
-              </div>
-              <HeaderFooterEditor
-                headerEnabled={hfHeaderEnabled} setHeaderEnabled={setHfHeaderEnabled}
-                headerText={hfHeaderText} setHeaderText={setHfHeaderText}
-                footerEnabled={hfFooterEnabled} setFooterEnabled={setHfFooterEnabled}
-                footerImageUrl={hfFooterImageUrl}
-                footerFile={hfFooterFile} setFooterFile={setHfFooterFile}
-                headerStyle={hfHeaderStyle} setHeaderStyle={setHfHeaderStyle}
-                footerStyle={hfFooterStyle} setFooterStyle={setHfFooterStyle}
               />
             </div>
           </div>
         )}
       </Modal>
-
 
       {/* Delete Confirmation Modal (for groups with devices) */}
       <Modal
