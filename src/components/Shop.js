@@ -1,6 +1,8 @@
 // src/components/Shop.js - Enhanced Modern UI
 import React, { useEffect, useState } from "react";
 import { insertShop, listShops, updateShop, deleteShop } from "../api/shop";
+import ZoneContentEditor from "./templates/ZoneContentEditor";
+import { getCompanyTemplate } from "./templates/api";
 
 /* ======================== Styles ======================== */
 const styles = {
@@ -143,8 +145,16 @@ export default function Shop() {
   const [shopDevices, setShopDevices] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
 
+  // Screen templates: the content editor only exists when a template is linked.
+  const [hasTemplate, setHasTemplate] = useState(false);
+  const [contentShop, setContentShop] = useState(null);
+  const [contentDevice, setContentDevice] = useState(null);
+
   useEffect(() => {
     load();
+    getCompanyTemplate().then((res) => {
+      if (res.ok) setHasTemplate(!!res.data.template);
+    });
   }, []);
 
   const load = async () => {
@@ -298,6 +308,16 @@ export default function Shop() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }} onClick={(e) => e.stopPropagation()}>
+                  {hasTemplate && (
+                    <button
+                      style={styles.btn}
+                      data-shop-content={it.id}
+                      onClick={() => setContentShop(it)}
+                      title="Fill in the QR code, images and texts shown on this shop's screens"
+                    >
+                      🎨 Screen content
+                    </button>
+                  )}
                   <button style={styles.btn} onClick={() => openRename(it.shop_name)}>
                     ✏️ Edit
                   </button>
@@ -361,18 +381,33 @@ export default function Shop() {
                                 ID: {d.mobile_id}
                               </div>
                             </div>
-                            {d.group_name && (
-                              <span style={{
-                                padding: "4px 10px",
-                                background: "#dbeafe",
-                                color: "#1e40af",
-                                borderRadius: 6,
-                                fontSize: 11,
-                                fontWeight: 500,
-                              }}>
-                                {d.group_name}
-                              </span>
-                            )}
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              {d.group_name && (
+                                <span style={{
+                                  padding: "4px 10px",
+                                  background: "#dbeafe",
+                                  color: "#1e40af",
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                }}>
+                                  {d.group_name}
+                                </span>
+                              )}
+                              {hasTemplate && (
+                                <button
+                                  data-device-content={d.id}
+                                  onClick={() => setContentDevice({ id: d.id, name: d.device_name || d.mobile_id })}
+                                  title="Override this device's screen content (otherwise it uses the shop's)"
+                                  style={{
+                                    padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                                    border: "1px solid #e2e8f0", background: "#fff", color: "#475569", cursor: "pointer",
+                                  }}
+                                >
+                                  🎨 Override content
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -384,6 +419,24 @@ export default function Shop() {
           ))
         )}
       </div>
+
+      {/* Screen content (template zones) — shop scope, and per-device override */}
+      {contentShop && (
+        <ZoneContentEditor
+          scope="shop"
+          targetId={contentShop.id}
+          targetName={contentShop.shop_name}
+          onClose={() => setContentShop(null)}
+        />
+      )}
+      {contentDevice && (
+        <ZoneContentEditor
+          scope="device"
+          targetId={contentDevice.id}
+          targetName={contentDevice.name}
+          onClose={() => setContentDevice(null)}
+        />
+      )}
 
       {/* Rename Modal */}
       <Modal
