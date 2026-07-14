@@ -23,7 +23,7 @@ const SOURCE_NOTE = {
 
 const pretty = (res) => (res ? String(res).replace("x", "×") : res);
 
-export default function AddScreenWizard({ open, onClose, onCreated }) {
+export default function AddScreenWizard({ open, onClose, onCreated, initialLocation = "", initialGroup = "" }) {
   const [step, setStep] = useState(1); // 1 | 2 | 3 | "done"
   const [deviceId, setDeviceId] = useState("");
   const [name, setName] = useState("");
@@ -37,6 +37,14 @@ export default function AddScreenWizard({ open, onClose, onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [createdVia, setCreatedVia] = useState("create"); // "create" | "legacy"
+
+  // Prefill from ?location= / ?group= deep links (e.g. "Add screen here").
+  useEffect(() => {
+    if (!open) return;
+    setLocation((prev) => prev || initialLocation);
+    setGroup((prev) => prev || initialGroup);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialLocation, initialGroup]);
 
   const reset = () => {
     setStep(1); setDeviceId(""); setName(""); setResolution("");

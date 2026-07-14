@@ -110,7 +110,7 @@ export default function UploadModal({ open, kind, onClose, onUploaded }) {
     <Modal
       open={open}
       onClose={close}
-      title={`Upload ${meta.label.toLowerCase()}`}
+      title={kind === "image" ? "Upload layout image" : "Upload playlist media"}
       size="sm"
       closeOnOverlay={!busy}
       footer={
@@ -127,6 +127,13 @@ export default function UploadModal({ open, kind, onClose, onUploaded }) {
         )
       }
     >
+      {!confirmReplace && kind === "image" && (
+        <p className="u-muted" style={{ marginTop: 0 }}>
+          Layout images appear inside split/grid layout slots. For a full-screen
+          image in the playlist rotation, use <strong>Upload media</strong> instead —
+          the rotation accepts images too.
+        </p>
+      )}
       {confirmReplace ? (
         <p>
           <strong>"{name.trim()}"</strong> already exists in the library. Replacing it updates the

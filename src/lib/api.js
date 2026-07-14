@@ -26,7 +26,11 @@ api.interceptors.response.use(
   (err) => {
     const status = err.response?.status;
     const detail = err.response?.data?.detail;
-    if (status === 401 && getToken()) {
+    // Only the session-check endpoint may declare the session dead — a stray
+    // 401 from any other endpoint (replica race, transient) must not log the
+    // user out. The AuthProvider additionally requires two consecutive
+    // failures before showing the session-expired modal.
+    if (status === 401 && getToken() && (err.config?.url || "").includes("/auth/me")) {
       window.dispatchEvent(new CustomEvent("digix:session-expired"));
     } else if (
       status === 403 &&

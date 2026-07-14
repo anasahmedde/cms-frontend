@@ -92,11 +92,11 @@ export default function Media() {
     <div>
       <PageHeader
         title="Media Library"
-        subtitle="Videos and images your screens can play"
+        subtitle="Playlist media plays in the screen rotation (videos, images, HTML, PDF); layout images fill slots in split/grid layouts"
         actions={
           <>
-            <Button variant="secondary" icon={Upload} onClick={() => setUpload("image")}>Upload image</Button>
-            <Button icon={Upload} onClick={() => setUpload("video")}>Upload video</Button>
+            <Button variant="secondary" icon={Upload} onClick={() => setUpload("image")}>Upload layout image</Button>
+            <Button icon={Upload} onClick={() => setUpload("video")}>Upload media</Button>
           </>
         }
       />
@@ -104,8 +104,8 @@ export default function Media() {
         <Tabs
           tabs={[
             { key: "all", label: "All" },
-            { key: "videos", label: "Videos" },
-            { key: "images", label: "Images" },
+            { key: "videos", label: "Playlist media" },
+            { key: "images", label: "Layout images" },
           ]}
           active={tab}
           onChange={switchTab}

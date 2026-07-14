@@ -4,6 +4,7 @@
 // the API, so a rename navigates to the new URL.
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import AssignScreensModal from "../content/locations/AssignScreensModal";
 import { MapPinOff, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { formatDateTime } from "../lib/format";
@@ -30,6 +31,8 @@ export default function LocationDetail() {
   const [error, setError] = useState("");
   const [notFound, setNotFound] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [screensKey, setScreensKey] = useState(0);
   const [del, setDel] = useState(null);
 
   // The template check gates the content editor AND the per-screen override
@@ -99,17 +102,34 @@ export default function LocationDetail() {
         }
         subtitle={`Location ID ${shop.id}${shop.created_at ? ` · Created ${formatDateTime(shop.created_at)}` : ""}`}
         actions={
-          <Button variant="danger" icon={Trash2} onClick={() => setDel(shop)}>
-            Delete location
-          </Button>
+          <>
+            <Link to={`/screens?add=1&location=${encodeURIComponent(shop.shop_name)}`}>
+              <Button variant="secondary">Add screen here</Button>
+            </Link>
+            <Button variant="secondary" onClick={() => setAssignOpen(true)}>
+              Move screen here
+            </Button>
+            <Button variant="danger" icon={Trash2} onClick={() => setDel(shop)}>
+              Delete location
+            </Button>
+          </>
         }
       />
 
       <div style={{ display: "grid", gap: 16 }}>
-        <ScreensCard shopName={shop.shop_name} hasTemplate={!!template.template} />
+        <ScreensCard key={screensKey} shopName={shop.shop_name} hasTemplate={!!template.template} />
         <TemplateContentCard shop={shop} template={template} />
       </div>
 
+      <AssignScreensModal
+        shopName={shop.shop_name}
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        onAssigned={() => {
+          setAssignOpen(false);
+          setScreensKey((k) => k + 1);
+        }}
+      />
       <RenameLocationModal
         open={renameOpen}
         currentName={shop.shop_name}

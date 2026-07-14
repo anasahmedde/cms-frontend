@@ -46,9 +46,24 @@ export default function Login() {
   return (
     <div className="ui-login">
       <div className="ui-login-brand">
-        <div className="ui-login-wordmark">DIGIX</div>
-        <div className="ui-login-accent" aria-hidden="true" />
-        <p className="ui-login-tagline">Digital signage, managed.</p>
+        <div className="ui-login-slides" aria-hidden="true">
+          {[1, 2, 3].map((n) => (
+            <div
+              key={n}
+              className={`ui-login-slide ui-login-slide-${n}`}
+              style={{ backgroundImage: `url(/login/slide-${n}.jpg)` }}
+            />
+          ))}
+          <div className="ui-login-slide-overlay" />
+        </div>
+        <div className="ui-login-brand-content">
+          <div className="ui-login-wordmark">DIGIX</div>
+          <div className="ui-login-accent" aria-hidden="true" />
+          <p className="ui-login-tagline">Digital signage, managed.</p>
+          <p className="ui-login-tagline-sub">
+            One dashboard for every screen — content, layouts, and live fleet health.
+          </p>
+        </div>
       </div>
       <div className="ui-login-side">
         <form className="ui-login-card" onSubmit={handleSubmit} noValidate>

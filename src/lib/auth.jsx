@@ -53,9 +53,14 @@ export function AuthProvider({ children }) {
   const [blockedMessage, setBlockedMessage] = useState(null);
   const [impersonating, setImpersonating] = useState(() => localStorage.getItem(IMPERSONATE_KEY));
 
+  // Two consecutive auth failures are required before declaring the session
+  // dead — a single 401 can be a replica race or a mid-deploy blip.
+  const authFailStreakRef = React.useRef(0);
+
   const refreshMe = useCallback(async () => {
     const res = await apiGet("/auth/me");
     if (res.ok) {
+      authFailStreakRef.current = 0;
       setUser((prev) => {
         const merged = { ...prev, ...res.data };
         // Keep the login-time permission snapshot if /auth/me lacks one.
@@ -66,7 +71,10 @@ export function AuthProvider({ children }) {
         return merged;
       });
     } else if (res.status === 401 || res.status === 403) {
-      setSessionExpired(true); // storage kept — the modal's "Log in again" calls logout()
+      authFailStreakRef.current += 1;
+      if (authFailStreakRef.current >= 2) {
+        setSessionExpired(true); // storage kept — the modal's "Log in again" calls logout()
+      }
     }
     return res;
   }, []);
@@ -129,11 +137,18 @@ export function AuthProvider({ children }) {
 
   const clearSessionExpired = useCallback(() => setSessionExpired(false), []);
 
-  // Validate the stored session once at boot.
+  // Validate the stored session once at boot. A failed first check retries
+  // immediately (second strike) so a genuinely dead token still surfaces the
+  // session-expired modal right away rather than a minute later.
   useEffect(() => {
     if (!loading) return;
     let cancelled = false;
-    refreshMe().finally(() => { if (!cancelled) setLoading(false); });
+    (async () => {
+      const res = await refreshMe();
+      if (!cancelled && !res.ok && (res.status === 401 || res.status === 403)) {
+        await refreshMe();
+      }
+    })().finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
