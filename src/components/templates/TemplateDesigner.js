@@ -1,7 +1,7 @@
 // Full-screen drag-and-drop template designer.
 // Layout: zone palette (left) · canvas (center) · properties panel (right).
 import React, { useEffect, useMemo, useReducer, useRef, useState, useCallback } from "react";
-import { useTheme } from "../../App";
+import { T as theme } from "./theme";
 import { designerReducer, initialDesignerState } from "./designerReducer";
 import { ZONE_TYPES, newZone } from "./zoneTypes";
 import { validateZones, snapTargetsFor, clamp } from "./zoneValidation";
@@ -18,7 +18,6 @@ const btn = (theme, kind = "default") => ({
 });
 
 export default function TemplateDesigner({ template: initial, onClose, onSaved }) {
-  const { theme, isDark } = useTheme();
   const [state, dispatch] = useReducer(designerReducer, initialDesignerState);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -119,7 +118,7 @@ export default function TemplateDesigner({ template: initial, onClose, onSaved }
   const canvasH = ratio >= 1 ? "min(62vh, 560px)" : "min(74vh, 760px)";
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: isDark ? "#0b1220" : "#eef2f7", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "var(--bg)", display: "flex", flexDirection: "column" }}>
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: "#0a1628", flexWrap: "wrap" }}>
         <button onClick={requestClose} style={{ ...btn(theme), background: "rgba(255,255,255,0.1)", color: "#fff", border: "none" }}>← Back</button>

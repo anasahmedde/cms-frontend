@@ -1,11 +1,10 @@
 // Link/unlink a published template to companies. One PUT per toggle, with
 // explicit per-row feedback — no silent failures.
 import React, { useEffect, useState } from "react";
-import { useTheme } from "../../App";
+import { T as theme } from "./theme";
 import { listCompanies, linkCompanyTemplate } from "./api";
 
 export default function LinkCompaniesModal({ template, onClose, onChanged }) {
-  const { theme } = useTheme();
   const [companies, setCompanies] = useState(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
