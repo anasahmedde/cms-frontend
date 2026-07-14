@@ -1,0 +1,334 @@
+/* kit-overlays — Modal, ConfirmModal, Toast, Tabs, Field family, SearchInput.
+   All colors/spacing via tokens.css vars; no hardcoded hex. */
+
+/* ---- Modal ------------------------------------------------------------- */
+.ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--overlay);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+}
+.ui-modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  width: 92vw;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+  animation: ui-modal-in 0.16s ease;
+}
+.ui-modal-sm { max-width: 400px; }
+.ui-modal-md { max-width: 560px; }
+.ui-modal-lg { max-width: 760px; }
+.ui-modal-xl { max-width: 1000px; }
+.ui-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.ui-modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.ui-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: 72vh;
+}
+.ui-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+@keyframes ui-modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- ConfirmModal ------------------------------------------------------ */
+.ui-confirm-message {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+}
+.ui-confirm-linked {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin: 0 0 12px;
+}
+.ui-confirm-linked-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ui-confirm-linked ul {
+  margin: 6px 0 0;
+  padding-left: 22px;
+  color: var(--text);
+  font-size: 13px;
+}
+.ui-confirm-typed {
+  margin-top: 12px;
+}
+.ui-confirm-typed-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+/* ---- Toast ------------------------------------------------------------- */
+.ui-toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+}
+.ui-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--info);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  padding: 10px 12px;
+  animation: ui-toast-in 0.18s ease;
+}
+.ui-toast-success { border-left-color: var(--success); }
+.ui-toast-error { border-left-color: var(--danger); }
+.ui-toast-info { border-left-color: var(--info); }
+.ui-toast-leaving { animation: ui-toast-out 0.18s ease forwards; }
+.ui-toast-icon { flex: none; margin-top: 1px; }
+.ui-toast-success .ui-toast-icon { color: var(--success); }
+.ui-toast-error .ui-toast-icon { color: var(--danger); }
+.ui-toast-info .ui-toast-icon { color: var(--info); }
+.ui-toast-body { flex: 1; min-width: 0; }
+.ui-toast-message {
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: break-word;
+}
+.ui-toast-retry {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 4px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  cursor: pointer;
+}
+.ui-toast-retry:hover { text-decoration: underline; }
+.ui-toast-dismiss {
+  flex: none;
+  display: flex;
+  background: none;
+  border: none;
+  padding: 2px;
+  border-radius: var(--radius-xs);
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.ui-toast-dismiss:hover { color: var(--text); background: var(--elevated); }
+@keyframes ui-toast-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ui-toast-out {
+  to { opacity: 0; transform: translateX(16px); }
+}
+
+/* ---- Tabs -------------------------------------------------------------- */
+.ui-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.ui-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ui-tab:hover { color: var(--text); }
+.ui-tab-active {
+  color: var(--text);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* ---- Field family ------------------------------------------------------ */
+.ui-field { margin: 0 0 14px; }
+.ui-field:last-child { margin-bottom: 0; }
+.ui-field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.ui-field-required { color: var(--danger); margin-left: 2px; }
+.ui-field-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+.ui-field-error {
+  font-size: 12px;
+  color: var(--danger);
+  margin-top: 4px;
+}
+
+.ui-input {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  color: var(--text);
+  font: inherit;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.ui-input::placeholder { color: var(--text-faint); }
+.ui-input:focus,
+.ui-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.ui-input:disabled {
+  background: var(--elevated);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.ui-textarea { min-height: 88px; resize: vertical; }
+.ui-select { cursor: pointer; }
+
+.ui-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.ui-checkbox input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.ui-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.ui-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+.ui-switch-track {
+  flex: none;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background 0.15s ease;
+}
+.ui-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  /* Token reused for its always-white value so the knob reads on both the
+     gray off-track and the amber on-track in both themes. */
+  background: var(--sidebar-text-active);
+  box-shadow: var(--shadow);
+  transition: transform 0.15s ease;
+}
+.ui-switch input:checked + .ui-switch-track { background: var(--accent); }
+.ui-switch input:checked + .ui-switch-track .ui-switch-knob { transform: translateX(14px); }
+.ui-switch input:focus-visible + .ui-switch-track { box-shadow: var(--focus-ring); }
+.ui-is-disabled { opacity: 0.6; cursor: not-allowed; }
+.ui-is-disabled input { cursor: not-allowed; }
+
+/* ---- SearchInput -------------------------------------------------------- */
+.ui-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.ui-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.ui-search-input {
+  padding-left: 32px;
+  padding-right: 32px;
+}
+.ui-search-clear {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  background: none;
+  border: none;
+  padding: 4px;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ui-search-clear:hover { color: var(--text); background: var(--elevated); }
