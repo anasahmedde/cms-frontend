@@ -1,12 +1,12 @@
-// API layer for screen templates — all calls go through the shared authed
-// axios instance (httpFactory), per the repo ruleset.
+// API layer for screen templates — all calls go through THE shared client
+// (lib/api); the old httpFactory instance is gone.
 import {
-  safeGet,
-  safePost,
-  safePut,
-  safeDelete,
+  apiGet as safeGet,
+  apiPost as safePost,
+  apiPut as safePut,
+  apiDelete as safeDelete,
   uploadWithProgress,
-} from "../../api/httpFactory";
+} from "../../lib/api";
 
 export const listTemplates = () => safeGet("/platform/templates");
 export const getTemplate = (id) => safeGet(`/platform/templates/${id}`);
@@ -42,4 +42,15 @@ export const uploadDeviceMedia = (deviceId, zoneKey, file, onProgress) => {
   const fd = new FormData();
   fd.append("file", file);
   return uploadWithProgress(`/device-config/${deviceId}/template-content/${zoneKey}/media`, fd, onProgress);
+};
+
+// Company-wide default content (lowest-precedence layer; endpoints landed with
+// the fleet-telemetry backend PR).
+export const getCompanyContent = () => safeGet("/company/template-content");
+export const putCompanyContent = (zoneKey, payload) =>
+  safePut(`/company/template-content/${zoneKey}`, { payload });
+export const uploadCompanyMedia = (zoneKey, file, onProgress) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return uploadWithProgress(`/company/template-content/${zoneKey}/media`, fd, onProgress);
 };

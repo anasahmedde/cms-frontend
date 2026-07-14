@@ -2,18 +2,19 @@
 // Used at shop scope (the default) and at device scope (override).
 // The zone list is driven entirely by the template — nothing is hardcoded.
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useTheme } from "../../App";
+import { T as theme } from "./theme";
 import { ZONE_TYPES } from "./zoneTypes";
 import {
   getShopContent, putShopContent, uploadShopMedia,
   getDeviceContent, putDeviceContent, uploadDeviceMedia, deleteDeviceContent,
+  getCompanyContent, putCompanyContent, uploadCompanyMedia,
 } from "./api";
 
 const ACCEPT = "image/jpeg,image/png,image/gif,image/webp,video/mp4";
 
 export default function ZoneContentEditor({ scope, targetId, targetName, onClose }) {
-  const { theme } = useTheme();
   const isDevice = scope === "device";
+  const isCompany = scope === "company";
   const [zones, setZones] = useState(null);
   const [content, setContent] = useState({});
   const [drafts, setDrafts] = useState({});     // zoneKey → payload being edited
@@ -25,7 +26,11 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
   const fileRefs = useRef({});
 
   const load = useCallback(async () => {
-    const res = isDevice ? await getDeviceContent(targetId) : await getShopContent(targetId);
+    const res = isDevice
+      ? await getDeviceContent(targetId)
+      : isCompany
+        ? await getCompanyContent()
+        : await getShopContent(targetId);
     if (!res.ok) { setError(`Could not load screen content: ${res.message}`); setZones([]); return; }
     setLinked(res.data.template_linked);
     setZones(res.data.content_zones || []);
@@ -34,7 +39,7 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
     setContent(loaded);
     setDrafts(loaded);
     setError("");
-  }, [isDevice, targetId]);
+  }, [isDevice, isCompany, targetId]);
   useEffect(() => { load(); }, [load]);
 
   const draftOf = (key) => drafts[key] || {};
@@ -49,7 +54,9 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
     delete payload.qr_generated_s3;
     const res = isDevice
       ? await putDeviceContent(targetId, key, payload)
-      : await putShopContent(targetId, key, payload);
+      : isCompany
+        ? await putCompanyContent(key, payload)
+        : await putShopContent(targetId, key, payload);
     setBusyKey("");
     if (!res.ok) {
       const detail = res.data?.detail;
@@ -67,7 +74,11 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
     if (!file) return;
     const key = zone.key;
     setBusyKey(key); setError(""); setProgress((p) => ({ ...p, [key]: 0 }));
-    const fn = isDevice ? uploadDeviceMedia : uploadShopMedia;
+    const fn = isDevice
+      ? uploadDeviceMedia
+      : isCompany
+        ? (_target, key, file, onProgress) => uploadCompanyMedia(key, file, onProgress)
+        : uploadShopMedia;
     const res = await fn(targetId, key, file, (pct) => setProgress((p) => ({ ...p, [key]: pct })));
     setBusyKey(""); setProgress((p) => ({ ...p, [key]: undefined }));
     if (!res.ok) {
@@ -105,7 +116,7 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
           <div>
             <strong style={{ fontSize: 15 }}>Screen content — {targetName}</strong>
             <div style={{ fontSize: 11.5, opacity: 0.75, marginTop: 2 }}>
-              {isDevice ? "Overrides this device only; empty fields fall back to the shop" : "Applies to every device in this shop"}
+              {isDevice ? "Overrides this device only; empty fields fall back to the shop" : isCompany ? "Company-wide defaults — used wherever no location or screen content is set" : "Applies to every device in this shop"}
             </div>
           </div>
           <button onClick={onClose} aria-label="Close" style={{ border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", borderRadius: 6, width: 28, height: 28, cursor: "pointer" }}>✕</button>

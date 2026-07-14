@@ -1,6 +1,6 @@
 // Platform → Templates tab: list, create, open designer, duplicate, link, delete.
 import React, { useCallback, useEffect, useState } from "react";
-import { useTheme } from "../../App";
+import { T as theme } from "./theme";
 import { CANVAS_PRESETS, CANVAS_MIN, CANVAS_MAX, normalizeCanvas } from "./zoneTypes";
 import TemplateThumb from "./TemplateThumb";
 import TemplateDesigner from "./TemplateDesigner";
@@ -10,7 +10,6 @@ import {
 } from "./api";
 
 export default function TemplatesTab() {
-  const { theme } = useTheme();
   const [items, setItems] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
