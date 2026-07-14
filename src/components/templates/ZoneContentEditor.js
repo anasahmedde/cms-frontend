@@ -9,10 +9,11 @@ import {
   getDeviceContent, putDeviceContent, uploadDeviceMedia, deleteDeviceContent,
   getCompanyContent, putCompanyContent, uploadCompanyMedia,
 } from "./api";
+import { apiGet, normalizeList } from "../../lib/api";
 
 const ACCEPT = "image/jpeg,image/png,image/gif,image/webp,video/mp4";
 
-export default function ZoneContentEditor({ scope, targetId, targetName, onClose }) {
+export default function ZoneContentEditor({ scope, targetId, targetName, onClose, focusZoneKey }) {
   const isDevice = scope === "device";
   const isCompany = scope === "company";
   const [zones, setZones] = useState(null);
@@ -141,7 +142,9 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
             </p>
           )}
 
-          {zones && linked && zones.map((zone) => {
+          {zones && linked && zones
+            .filter((zone) => !focusZoneKey || zone.key === focusZoneKey)
+            .map((zone) => {
             const def = ZONE_TYPES[zone.type] || {};
             const d = draftOf(zone.key);
             const saved = content[zone.key];
@@ -192,14 +195,14 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                   </>
                 )}
 
-                {/* Media zones: upload OR external URL / library name */}
+                {/* Media zones: choose from library, OR upload, OR external URL */}
                 {zone.type === "media" && (
                   <>
                     <label htmlFor={`media-src-${zone.key}`} style={lbl}>Source</label>
                     <select id={`media-src-${zone.key}`} value={d.media_url !== undefined ? "url" : "upload"}
                       onChange={(e) => setDraft(zone.key, e.target.value === "url" ? { media_url: "", media_s3: undefined } : { media_url: undefined })}
                       style={{ ...inp, marginBottom: 10 }}>
-                      <option value="upload">Upload an image/video</option>
+                      <option value="upload">Choose from library or upload</option>
                       <option value="url">Paste an image/video URL</option>
                     </select>
                     {d.media_url !== undefined ? (
@@ -207,8 +210,19 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                         placeholder="https://cdn…/promo.jpg or .mp4"
                         onChange={(v) => setDraft(zone.key, { media_url: v, media_type: guessType(v), media_s3: undefined })} />
                     ) : (
-                      <MediaField zone={zone} d={d} saved={saved} theme={theme} lbl={lbl} btn={btn}
-                        busy={busy} pct={pct} fileRefs={fileRefs} onUpload={(f) => upload(zone, f)} />
+                      <>
+                        <LibraryPicker
+                          zoneKey={zone.key} theme={theme} lbl={lbl} inp={inp}
+                          selectedS3={d.media_s3}
+                          onPick={(item) => setDraft(zone.key, {
+                            media_s3: item.s3_link, media_type: item.media_type,
+                            media_url: undefined,
+                          })}
+                        />
+                        <div style={{ fontSize: 11.5, color: theme.textSecondary, margin: "8px 0" }}>— or upload a new file —</div>
+                        <MediaField zone={zone} d={d} saved={saved} theme={theme} lbl={lbl} btn={btn}
+                          busy={busy} pct={pct} fileRefs={fileRefs} onUpload={(f) => upload(zone, f)} />
+                      </>
                     )}
                   </>
                 )}
@@ -250,6 +264,63 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
           <button onClick={onClose} style={btn(theme.cardAlt, theme.text)}>Done</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Pick an already-uploaded video/image from the Media library and reference it
+// by its S3 object (the player presigns media_s3). Loaded once, shared shape:
+// { name, s3_link, media_type }.
+function LibraryPicker({ zoneKey, theme, lbl, inp, selectedS3, onPick }) {
+  const [items, setItems] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      apiGet("/videos", { params: { limit: 500, offset: 0 } }),
+      apiGet("/advertisements", { params: { limit: 500, offset: 0 } }),
+    ]).then(([v, a]) => {
+      if (!alive) return;
+      if (!v.ok && !a.ok) { setError(v.message || a.message); setItems([]); return; }
+      const vids = (v.ok ? normalizeList(v.data, "items").items : []).map((x) => ({
+        name: x.video_name, s3_link: x.s3_link,
+        media_type: (x.content_type === "image" ? "image" : "video"),
+      }));
+      const ads = (a.ok ? normalizeList(a.data, "items").items : []).map((x) => ({
+        name: x.ad_name, s3_link: x.s3_link, media_type: "image",
+      }));
+      setItems([...vids, ...ads].filter((i) => i.s3_link));
+    });
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <label htmlFor={`lib-${zoneKey}`} style={lbl}>Choose from library</label>
+      <select
+        id={`lib-${zoneKey}`}
+        value={selectedS3 || ""}
+        disabled={items === null}
+        onChange={(e) => {
+          const it = (items || []).find((i) => i.s3_link === e.target.value);
+          if (it) onPick(it);
+        }}
+        style={inp}
+      >
+        <option value="">{items === null ? "Loading library…" : "Select a video or image…"}</option>
+        {(items || []).map((i) => (
+          <option key={i.s3_link} value={i.s3_link}>
+            {i.media_type === "video" ? "🎬 " : "🖼️ "}{i.name}
+          </option>
+        ))}
+      </select>
+      {error && <div style={{ fontSize: 11.5, color: theme.danger, marginTop: 4 }}>Couldn't load library: {error}</div>}
+      {items && items.length === 0 && !error && (
+        <div style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 4 }}>
+          Your Media library is empty — upload videos/images under Media first.
+        </div>
+      )}
     </div>
   );
 }

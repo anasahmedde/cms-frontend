@@ -1,7 +1,7 @@
-// Template content hub: one place to fill the editable zones of the company's
-// linked screen template — company-wide defaults, per-location, or per-screen
-// (searchable). Resolution precedence on screens: screen > location > company.
-import { useEffect, useMemo, useState } from "react";
+// Template content hub: see the linked template as a visual layout and click a
+// box to set what it shows — company-wide, per location, or per screen.
+// Screens resolve content as screen > location > company.
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Building2, MapPin, MonitorPlay, LayoutTemplate } from "lucide-react";
 import PageHeader from "../ui/PageHeader";
@@ -14,27 +14,35 @@ import { SkeletonText } from "../ui/Skeleton";
 import { Field, Select } from "../ui/Field";
 import { apiGet, normalizeList } from "../lib/api";
 import ZoneContentEditor from "../components/templates/ZoneContentEditor";
+import TemplateMap from "../components/templates/TemplateMap";
+import {
+  getCompanyContent, getShopContent, getDeviceContent,
+} from "../components/templates/api";
 
-function ScopeCard({ icon: Icon, title, hint, active, onClick, children }) {
-  return (
-    <Card
-      title={<span className="u-flex"><Icon size={16} aria-hidden="true" /> {title}</span>}
-      actions={active && <Badge tone="accent">selected</Badge>}
-    >
-      <p className="u-muted" style={{ marginTop: 0 }}>{hint}</p>
-      {children || <Button variant={active ? "primary" : "secondary"} size="sm" onClick={onClick}>Edit content</Button>}
-    </Card>
-  );
+const SCOPES = [
+  { key: "company", label: "Whole company", icon: Building2, hint: "Default for every screen" },
+  { key: "shop", label: "One location", icon: MapPin, hint: "Overrides the company default" },
+  { key: "device", label: "One screen", icon: MonitorPlay, hint: "Overrides its location + company" },
+];
+
+function contentKeysOf(data) {
+  const out = {};
+  Object.entries(data?.content || {}).forEach(([k, v]) => {
+    if (v && v.payload && Object.keys(v.payload).length) out[k] = true;
+  });
+  return out;
 }
 
 export default function TemplateContent() {
   const [template, setTemplate] = useState(undefined); // undefined=loading, null=none
   const [shops, setShops] = useState([]);
   const [devices, setDevices] = useState([]);
-  const [editing, setEditing] = useState(null); // {scope, targetId, targetName}
+  const [scope, setScope] = useState("company");
   const [shopPick, setShopPick] = useState("");
   const [deviceQuery, setDeviceQuery] = useState("");
   const [devicePick, setDevicePick] = useState("");
+  const [contentByKey, setContentByKey] = useState({});
+  const [editing, setEditing] = useState(null); // {scope, targetId, targetName, focusZoneKey}
 
   useEffect(() => {
     apiGet("/company/template").then((res) =>
@@ -52,11 +60,32 @@ export default function TemplateContent() {
     const needle = deviceQuery.trim().toLowerCase();
     if (!needle) return devices;
     return devices.filter(
-      (d) =>
-        (d.device_name || "").toLowerCase().includes(needle) ||
-        (d.mobile_id || "").toLowerCase().includes(needle)
+      (d) => (d.device_name || "").toLowerCase().includes(needle) || (d.mobile_id || "").toLowerCase().includes(needle)
     );
   }, [devices, deviceQuery]);
+
+  // The resolved editing target for the chosen scope (null until a shop/screen picked).
+  const target = useMemo(() => {
+    if (scope === "company") return { scope: "company", targetId: null, targetName: "your company" };
+    if (scope === "shop") {
+      const s = shops.find((x) => String(x.id) === shopPick);
+      return s ? { scope: "shop", targetId: s.id, targetName: s.shop_name } : null;
+    }
+    const d = deviceMatches.find((x) => String(x.id ?? x.mobile_id) === devicePick);
+    return d ? { scope: "device", targetId: d.id, targetName: d.device_name || d.mobile_id } : null;
+  }, [scope, shopPick, devicePick, shops, deviceMatches]);
+
+  const reloadContentState = useCallback(async () => {
+    if (!target) { setContentByKey({}); return; }
+    const res = target.scope === "device"
+      ? await getDeviceContent(target.targetId)
+      : target.scope === "shop"
+        ? await getShopContent(target.targetId)
+        : await getCompanyContent();
+    setContentByKey(res.ok ? contentKeysOf(res.data) : {});
+  }, [target]);
+
+  useEffect(() => { reloadContentState(); }, [reloadContentState]);
 
   if (template === undefined) {
     return (
@@ -66,7 +95,6 @@ export default function TemplateContent() {
       </div>
     );
   }
-
   if (template === null) {
     return (
       <div>
@@ -91,20 +119,22 @@ export default function TemplateContent() {
           </span>
         }
       />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
-        <ScopeCard
-          icon={Building2}
-          title="Whole company"
-          hint="Default content for every screen — used wherever a location or screen hasn't set its own."
-          active={editing?.scope === "company"}
-          onClick={() => setEditing({ scope: "company", targetId: null, targetName: "your company" })}
-        />
-        <ScopeCard
-          icon={MapPin}
-          title="One location"
-          hint="Content for all screens at a location — overrides the company default."
-          active={editing?.scope === "shop"}
-        >
+
+      <Card title="Editing content for">
+        <div className="u-flex" style={{ flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          {SCOPES.map((s) => (
+            <Button
+              key={s.key}
+              variant={scope === s.key ? "primary" : "secondary"}
+              size="sm"
+              icon={s.icon}
+              onClick={() => setScope(s.key)}
+            >
+              {s.label}
+            </Button>
+          ))}
+        </div>
+        {scope === "shop" && (
           <Field label="Location" htmlFor="tc-shop">
             <Select
               id="tc-shop"
@@ -114,52 +144,46 @@ export default function TemplateContent() {
               options={shops.map((s) => ({ value: String(s.id), label: s.shop_name }))}
             />
           </Field>
-          <Button
-            size="sm"
-            disabled={!shopPick}
-            onClick={() => {
-              const shop = shops.find((s) => String(s.id) === shopPick);
-              setEditing({ scope: "shop", targetId: shop.id, targetName: shop.shop_name });
-            }}
-          >
-            Edit location content
-          </Button>
-        </ScopeCard>
-        <ScopeCard
-          icon={MonitorPlay}
-          title="One screen"
-          hint="Content for a single screen — overrides its location and the company default."
-          active={editing?.scope === "device"}
-        >
-          <SearchInput value={deviceQuery} onChange={setDeviceQuery} placeholder="Search screens…" />
-          <div style={{ margin: "8px 0" }}>
-            <Field label={`Screen (${deviceMatches.length})`} htmlFor="tc-device">
-              <Select
-                id="tc-device"
-                value={devicePick}
-                onChange={(e) => setDevicePick(e.target.value)}
-                placeholder="Select a screen…"
-                options={deviceMatches.map((d) => ({
-                  value: String(d.id ?? d.mobile_id),
-                  label: `${d.device_name || d.mobile_id} · ${d.mobile_id}`,
-                }))}
-              />
-            </Field>
-          </div>
-          <Button
-            size="sm"
-            disabled={!devicePick}
-            onClick={() => {
-              const dev = deviceMatches.find((d) => String(d.id ?? d.mobile_id) === devicePick);
-              setEditing({ scope: "device", targetId: dev.id, targetName: dev.device_name || dev.mobile_id });
-            }}
-          >
-            Edit screen content
-          </Button>
-          <p className="u-faint" style={{ marginBottom: 0 }}>
-            Also available on each screen's page: <Link to="/screens">Screens</Link> → Content & Layout.
-          </p>
-        </ScopeCard>
+        )}
+        {scope === "device" && (
+          <>
+            <SearchInput value={deviceQuery} onChange={setDeviceQuery} placeholder="Search screens…" />
+            <div style={{ marginTop: 8 }}>
+              <Field label={`Screen (${deviceMatches.length})`} htmlFor="tc-device">
+                <Select
+                  id="tc-device"
+                  value={devicePick}
+                  onChange={(e) => setDevicePick(e.target.value)}
+                  placeholder="Select a screen…"
+                  options={deviceMatches.map((d) => ({ value: String(d.id ?? d.mobile_id), label: `${d.device_name || d.mobile_id} · ${d.mobile_id}` }))}
+                />
+              </Field>
+            </div>
+          </>
+        )}
+        <p className="u-muted" style={{ margin: "4px 0 0" }}>
+          {SCOPES.find((s) => s.key === scope)?.hint}.
+          {scope === "device" && <> Also on each screen's page: <Link to="/screens">Screens</Link> → Content &amp; Layout.</>}
+        </p>
+      </Card>
+
+      <div style={{ marginTop: 16 }}>
+        {!target ? (
+          <EmptyState
+            icon={scope === "shop" ? MapPin : MonitorPlay}
+            title={scope === "shop" ? "Pick a location" : "Pick a screen"}
+            hint="Choose one above to see its template layout and set content per box."
+          />
+        ) : (
+          <Card title={`Layout — ${target.targetName}`}>
+            <TemplateMap
+              template={template}
+              contentByKey={contentByKey}
+              selectedKey={editing?.focusZoneKey}
+              onZoneClick={(zoneKey) => setEditing({ ...target, focusZoneKey: zoneKey })}
+            />
+          </Card>
+        )}
       </div>
 
       {editing && (
@@ -167,7 +191,8 @@ export default function TemplateContent() {
           scope={editing.scope}
           targetId={editing.targetId}
           targetName={editing.targetName}
-          onClose={() => setEditing(null)}
+          focusZoneKey={editing.focusZoneKey}
+          onClose={() => { setEditing(null); reloadContentState(); }}
         />
       )}
     </div>
