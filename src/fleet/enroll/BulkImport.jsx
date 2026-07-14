@@ -1,0 +1,221 @@
+// Bulk screen enrollment — kit port of the legacy BulkImportModal, every
+// behavior kept: template download (.xlsx/.csv), upload → validate (dry run)
+// preview with per-row action badges + errors + quota, commit, pending claims.
+import React, { useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { Download, X } from "lucide-react";
+import { apiGet, apiPost } from "../../lib/api";
+import Modal from "../../ui/Modal";
+import Button from "../../ui/Button";
+import Badge from "../../ui/Badge";
+import Table from "../../ui/Table";
+import Tabs from "../../ui/Tabs";
+import Spinner from "../../ui/Spinner";
+import { useToast } from "../../ui/Toast";
+import PendingScreens from "./PendingScreens";
+
+const ACTION_TONE = { create: "success", pending: "warn", skip: "neutral", error: "danger" };
+const ACTION_LABEL = { create: "Create", pending: "Pending", skip: "Already exists", error: "Error" };
+
+function Stat({ label, value, tone }) {
+  return (
+    <div style={{ background: "var(--elevated)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "10px 12px", textAlign: "center" }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color: tone ? `var(--${tone})` : "var(--text)" }}>{value}</div>
+      <div className="u-faint">{label}</div>
+    </div>
+  );
+}
+
+const ROW_COLUMNS = [
+  { key: "row", label: "Row", width: 52, render: (r) => (r.row === 0 ? "—" : r.row) },
+  { key: "device_name", label: "Screen" },
+  { key: "shop_name", label: "Location" },
+  { key: "group_name", label: "Group", render: (r) => r.group_name || <span className="u-faint">Ungrouped</span> },
+  { key: "device_id", label: "Device ID", mono: true },
+  {
+    key: "action",
+    label: "Action",
+    render: (r) => <Badge tone={ACTION_TONE[r.action] || "neutral"}>{ACTION_LABEL[r.action] || r.action || "—"}</Badge>,
+  },
+  { key: "reason", label: "Problem", render: (r) => r.reason || r.error || "" },
+];
+
+const ERROR_COLUMNS = [
+  { key: "row", label: "Row", width: 52, render: (e) => (e.row === 0 ? "—" : e.row) },
+  { key: "reason", label: "Problem" },
+];
+
+export default function BulkImport({ open, onClose, onImported }) {
+  const toast = useToast();
+  const fileRef = useRef(null);
+  const [tab, setTab] = useState("import");
+  const [busy, setBusy] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [preview, setPreview] = useState(null); // validate response
+  const [result, setResult] = useState(null); // commit report
+  const [error, setError] = useState("");
+
+  const download = async (fmt) => {
+    const res = await apiGet(`/bulk-devices/template.${fmt}`, { responseType: "blob" });
+    if (!res.ok) return toast.error(`Could not download the template: ${res.message}`);
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `digix-screens-template.${fmt}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const onFile = async (file) => {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    setPreview(null);
+    setResult(null);
+    setFileName(file.name);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await apiPost("/bulk-devices/validate", fd);
+    setBusy(false);
+    if (!res.ok) return setError(`Validation failed: ${res.message}`);
+    setPreview(res.data);
+  };
+
+  const commit = async () => {
+    if (!preview) return;
+    setBusy(true);
+    setError("");
+    const res = await apiPost("/bulk-devices/commit", { job_id: preview.job_id, auto_create: true });
+    setBusy(false);
+    if (!res.ok) return setError(`Import failed: ${res.message}`);
+    setResult(res.data);
+    setPreview(null);
+    toast.success(`Imported ${Number(res.data?.created || 0) + Number(res.data?.pending || 0)} screen(s)`);
+    onImported?.();
+  };
+
+  const s = preview?.summary;
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Bulk screen enrollment"
+      size="lg"
+      footer={<Button variant="secondary" onClick={onClose}>Done</Button>}
+    >
+      <p className="u-muted" style={{ marginTop: 0 }}>
+        Import many screens from a spreadsheet — validate first, then create.
+      </p>
+
+      <Tabs
+        tabs={[{ key: "import", label: "Import file" }, { key: "pending", label: "Pending screens" }]}
+        active={tab}
+        onChange={setTab}
+      />
+
+      {error && (
+        <div role="alert" className="u-between" style={{ background: "var(--danger-soft)", color: "var(--danger-strong)", borderRadius: "var(--radius-sm)", padding: "10px 12px", margin: "12px 0" }}>
+          <span>{error}</span>
+          <button type="button" aria-label="Dismiss error" onClick={() => setError("")} style={{ border: "none", background: "none", color: "inherit", cursor: "pointer", display: "flex" }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {tab === "import" && (
+        <div style={{ display: "grid", gap: 16, marginTop: 12 }}>
+          <section>
+            <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>1. Download the template</h3>
+            <p className="u-muted" style={{ margin: "0 0 10px" }}>
+              One row per screen. <b>device_name</b> and <b>shop_name</b> are required. Add the <b>device_id</b> (shown on the screen)
+              if you know it and the screen auto-enrolls when it powers on; leave it blank to create a pending screen you claim on site.
+            </p>
+            <div className="u-flex">
+              <Button variant="secondary" size="sm" icon={Download} onClick={() => download("xlsx")}>Excel (.xlsx)</Button>
+              <Button variant="secondary" size="sm" icon={Download} onClick={() => download("csv")}>CSV</Button>
+            </div>
+          </section>
+
+          <section>
+            <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>2. Upload the filled file</h3>
+            <div className="u-flex">
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,.xlsx"
+                aria-label="Upload the filled screens file"
+                onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }}
+              />
+              {busy && <span className="u-flex u-muted"><Spinner size={14} /> Working…</span>}
+              {fileName && !busy && <span className="u-faint">{fileName}</span>}
+            </div>
+          </section>
+
+          {result && (
+            <section role="status" style={{ background: "var(--success-soft)", border: "1px solid var(--success)", borderRadius: "var(--radius-sm)", padding: 12 }}>
+              <div style={{ fontWeight: 700, color: "var(--success)", marginBottom: 4 }}>Import complete</div>
+              <div>
+                Created <b>{result.created}</b> screen(s)
+                {result.pending ? <>, <b>{result.pending}</b> pending (claim on the “Pending screens” tab)</> : null}
+                {result.skipped ? <>, {result.skipped} already existed</> : null}
+                . {result.shops} location(s), {result.groups} group(s) touched.
+              </div>
+            </section>
+          )}
+
+          {s && (
+            <section>
+              <h3 style={{ margin: "0 0 10px", fontSize: 14 }}>Preview — {s.total_rows} row(s)</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 10 }}>
+                <Stat label="Will create" value={s.will_create} tone="success" />
+                <Stat label="Pending" value={s.will_pending} tone="warn" />
+                <Stat label="Already exist" value={s.will_skip} />
+                <Stat label="Errors" value={s.error_rows} tone={s.error_rows ? "danger" : undefined} />
+              </div>
+              <p style={{ margin: "0 0 10px", color: s.quota?.ok ? "var(--text-muted)" : "var(--danger)" }}>
+                Quota: {s.quota?.existing} existing + {s.quota?.new} new = <b>{s.quota?.after}</b>
+                {s.quota?.max > 0 ? <> / {s.quota.max}</> : <> (unlimited)</>}
+                {!s.quota?.ok && " — over the limit"}
+              </p>
+              {(s.new_shops?.length > 0 || s.new_groups?.length > 0) && (
+                <p className="u-muted" style={{ margin: "0 0 10px" }}>
+                  {s.new_shops?.length > 0 && <>Locations referenced: {s.new_shops.join(", ")}. </>}
+                  {s.new_groups?.length > 0 && <>Groups referenced: {s.new_groups.join(", ")}.</>}
+                </p>
+              )}
+              {preview.rows?.length > 0 && (
+                <div style={{ maxHeight: 220, overflowY: "auto", marginBottom: 10 }}>
+                  <Table columns={ROW_COLUMNS} rows={preview.rows} rowKey={(r, i) => r.row ?? i} />
+                </div>
+              )}
+              {preview.errors?.length > 0 && (
+                <div style={{ maxHeight: 160, overflowY: "auto", border: "1px solid var(--danger)", borderRadius: "var(--radius-sm)", marginBottom: 10 }}>
+                  <Table columns={ERROR_COLUMNS} rows={preview.errors} rowKey={(e, i) => i} />
+                </div>
+              )}
+              <div className="u-flex">
+                <Button onClick={commit} disabled={!s.valid} loading={busy}>
+                  Import {Number(s.will_create || 0) + Number(s.will_pending || 0)} screen(s)
+                </Button>
+                {!s.valid && <span className="u-danger">Fix the errors above and re-upload before importing.</span>}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+
+      {tab === "pending" && (
+        <div style={{ marginTop: 12 }}>
+          <p className="u-muted" style={{ marginTop: 0 }}>
+            These screens were imported without a Device ID. On site, read the Device ID shown on the screen and claim it here —
+            or use the <Link to="/screens/pending" onClick={onClose}>Pending screens page</Link>.
+          </p>
+          <PendingScreens onChanged={onImported} />
+        </div>
+      )}
+    </Modal>
+  );
+}

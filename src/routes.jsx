@@ -10,11 +10,13 @@ import CompanyBanners, { useCompanyExpiration } from "./shell/CompanyBanners";
 import ChangePasswordModal from "./legacy/ChangePasswordModal";
 import Login from "./pages/Login";
 import PermissionDenied from "./pages/PermissionDenied";
-import DashboardLegacy from "./pages/DashboardLegacy";
+import Dashboard from "./pages/Dashboard";
+import Screens from "./pages/Screens";
+import PendingScreensPage from "./pages/PendingScreens";
+import ScreenDetail from "./pages/ScreenDetail";
 import MediaLegacy from "./pages/MediaLegacy";
 import Settings from "./pages/Settings";
 import UserManagement from "./legacy/UserManagement";
-import Device from "./components/Device";
 import Group from "./components/Group";
 import Shop from "./components/Shop";
 import GroupLinkedVideo from "./components/GroupLinkedVideo";
@@ -84,7 +86,7 @@ function RequireApprover({ children }) {
 function HomeRedirect() {
   const { isPlatform, isImpersonating } = useAuth();
   if (isPlatform && !isImpersonating) return <Navigate to="/platform" replace />;
-  return <DashboardLegacy />;
+  return <Dashboard />;
 }
 
 function CompaniesPage() {
@@ -117,7 +119,15 @@ export default function AppRoutes() {
         <Route index element={<ErrorBoundary><HomeRedirect /></ErrorBoundary>} />
         <Route
           path="/screens"
-          element={<ErrorBoundary><RequirePerm perm="manage_devices"><LegacyCard><Device onChanged={() => {}} /></LegacyCard></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><RequirePerm perm="manage_devices"><Screens /></RequirePerm></ErrorBoundary>}
+        />
+        <Route
+          path="/screens/pending"
+          element={<ErrorBoundary><RequirePerm perm="manage_devices"><PendingScreensPage /></RequirePerm></ErrorBoundary>}
+        />
+        <Route
+          path="/screens/:mobileId"
+          element={<ErrorBoundary><RequirePerm perm="manage_devices"><ScreenDetail /></RequirePerm></ErrorBoundary>}
         />
         <Route
           path="/groups"
