@@ -19,13 +19,14 @@ const initial = {
   expires_at: "", grace_period_days: 7,
   admin_username: "", admin_full_name: "", admin_email: "",
   template_id: "",
-  features: { temperature: false, footfall: false, gender: false },
+  features: { temperature: false, footfall: false, gender: false, grid: true },
 };
 
 const FEATURE_OPTIONS = [
   { key: "temperature", label: "Temperature monitoring", hint: "BLE temperature probe hardware" },
   { key: "footfall", label: "Footfall counting", hint: "Door/reed-switch counter hardware" },
   { key: "gender", label: "Gender analytics", hint: "Camera-based (web player)" },
+  { key: "grid", label: "Grid / split layout editor", hint: "On by default; turn off if this company only uses templates" },
 ];
 
 export default function CompanyWizard({ open, onClose, onCreated }) {

@@ -20,7 +20,7 @@ import { apiDelete, apiGet, apiPut } from "../lib/api";
 import { formatDateTime } from "../lib/format";
 import { effectiveStatus, expirationLabel } from "../platform/lib";
 import ExpirationModal from "../platform/ExpirationModal";
-import { FEATURE_LABELS, invalidateFeatureCache } from "../lib/features";
+import { FEATURE_LABELS, featureOn, invalidateFeatureCache } from "../lib/features";
 
 export default function PlatformCompanyDetail() {
   const { slug } = useParams();
@@ -233,7 +233,7 @@ export default function PlatformCompanyDetail() {
               <Switch
                 key={key}
                 label={label}
-                checked={!!features[key]}
+                checked={featureOn(features, key)}
                 onChange={(e) => setFeatures({ ...features, [key]: e.target.checked })}
               />
             ))}

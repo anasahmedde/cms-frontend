@@ -3,10 +3,13 @@
 // table, actions are not permission-gated inside the dashboard (parity).
 import { Play, LayoutGrid, Pencil, Activity, Unlink, Trash2 } from "lucide-react";
 import IconButton from "../../ui/IconButton";
+import { useCompanyFeatures, featureOn } from "../../lib/features";
 import "./dashboard.css";
 
 export default function RowActions({ row, canPreview, onAction }) {
   const stop = (e) => e.stopPropagation(); // row click opens screen detail
+  const { features } = useCompanyFeatures();
+  const showLayout = featureOn(features, "grid"); // default ON; company can disable
 
   return (
     <div className="fleet-actions" onClick={stop}>
@@ -17,12 +20,14 @@ export default function RowActions({ row, canPreview, onAction }) {
         disabled={!canPreview}
         onClick={() => onAction("preview", row)}
       />
-      <IconButton
-        label="Edit layout"
-        icon={LayoutGrid}
-        size="sm"
-        onClick={() => onAction("layout", row)}
-      />
+      {showLayout && (
+        <IconButton
+          label="Edit layout"
+          icon={LayoutGrid}
+          size="sm"
+          onClick={() => onAction("layout", row)}
+        />
+      )}
       <IconButton
         label="Rename screen"
         icon={Pencil}

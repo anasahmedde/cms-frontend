@@ -15,6 +15,7 @@ import LayoutEditor from "../LayoutEditor";
 import ZoneContentEditor from "../../components/templates/ZoneContentEditor";
 import PlaylistCard from "./PlaylistCard";
 import { isRealGroup } from "./useScreenDevice";
+import { useCompanyFeatures, featureOn } from "../../lib/features";
 
 function ClearMediaCard({ device }) {
   const toast = useToast();
@@ -164,6 +165,7 @@ function TemplateContentCard({ device }) {
 }
 
 export default function ContentTab({ device, links, linksLoading, linksError, reloadLinks, onDeviceReload }) {
+  const { features } = useCompanyFeatures();
   const gname = isRealGroup(device.group_name) ? device.group_name : null;
 
   return (
@@ -177,16 +179,18 @@ export default function ContentTab({ device, links, linksLoading, linksError, re
         onDeviceReload={onDeviceReload}
       />
 
-      <Card title="Layout">
-        <LayoutEditor
-          mobileId={device.mobile_id}
-          gname={gname}
-          onSaved={() => {
-            reloadLinks();
-            onDeviceReload();
-          }}
-        />
-      </Card>
+      {featureOn(features, "grid") && (
+        <Card title="Layout">
+          <LayoutEditor
+            mobileId={device.mobile_id}
+            gname={gname}
+            onSaved={() => {
+              reloadLinks();
+              onDeviceReload();
+            }}
+          />
+        </Card>
+      )}
 
       <TemplateContentCard device={device} />
 
