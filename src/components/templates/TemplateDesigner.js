@@ -9,6 +9,7 @@ import { validateZones, snapTargetsFor, clamp } from "./zoneValidation";
 import ZoneBox from "./ZoneBox";
 import TemplateThumb from "./TemplateThumb";
 import PropertiesPanel from "./PropertiesPanel";
+import TextRunsEditor from "./TextRunsEditor";
 import { updateTemplate, publishTemplate } from "./api";
 
 const btn = (theme, kind = "default") => ({
@@ -22,6 +23,7 @@ export default function TemplateDesigner({ template: initial, onClose, onSaved }
   const [armedPreset, setArmedPreset] = React.useState(null);
   const armTimer = React.useRef(null);
   const [state, dispatch] = useReducer(designerReducer, initialDesignerState);
+  const [runsZoneKey, setRunsZoneKey] = useState(null);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [banner, setBanner] = useState(null); // {kind:"success"|"error", text}
@@ -248,6 +250,7 @@ export default function TemplateDesigner({ template: initial, onClose, onSaved }
                   onChange={(patch) => dispatch({ type: "UPDATE_ZONE", key: z.key, patch })}
                   onGestureStart={() => dispatch({ type: "BEGIN_GESTURE" })}
                   onGestureEnd={() => dispatch({ type: "END_GESTURE" })}
+                  onEditRuns={(z.type === "text" || z.type === "ticker") ? () => { dispatch({ type: "SELECT", key: z.key }); setRunsZoneKey(z.key); } : undefined}
                 />
               ))}
             </div>
@@ -257,10 +260,25 @@ export default function TemplateDesigner({ template: initial, onClose, onSaved }
         {/* Properties */}
         {!previewMode && (
           <div style={{ width: 300, padding: 16, background: theme.card, borderLeft: `1px solid ${theme.border}`, overflowY: "auto" }}>
-            <PropertiesPanel theme={theme} state={state} dispatch={dispatch} />
+            <PropertiesPanel theme={theme} state={state} dispatch={dispatch} onEditRuns={(key) => setRunsZoneKey(key)} />
           </div>
         )}
       </div>
+
+      {runsZoneKey && (() => {
+        const rz = state.template.zones.find((z) => z.key === runsZoneKey);
+        if (!rz) return null;
+        return (
+          <TextRunsEditor
+            zone={rz}
+            onClose={() => setRunsZoneKey(null)}
+            onSave={(runs) => {
+              dispatch({ type: "UPDATE_ZONE", key: rz.key, patch: { content: { ...(rz.content || {}), runs } }, commit: true });
+              setRunsZoneKey(null);
+            }}
+          />
+        );
+      })()}
 
       {/* Publish confirm */}
       {confirmPublish && (
