@@ -45,6 +45,17 @@ export function designerReducer(state, action) {
       };
     }
 
+    case "REPLACE_ZONES": {
+      return {
+        ...state,
+        past: pushPast(state, state.template.zones),
+        future: [],
+        template: { ...state.template, zones: action.zones },
+        selectedKey: action.zones[0]?.key || null,
+        dirty: true,
+      };
+    }
+
     case "DELETE_ZONE": {
       const zones = state.template.zones.filter((z) => z.key !== action.key);
       return {

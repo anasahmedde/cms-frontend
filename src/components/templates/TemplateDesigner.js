@@ -2,6 +2,7 @@
 // Layout: zone palette (left) · canvas (center) · properties panel (right).
 import React, { useEffect, useMemo, useReducer, useRef, useState, useCallback } from "react";
 import { T as theme } from "./theme";
+import { TEMPLATE_PRESETS } from "./templatePresets";
 import { designerReducer, initialDesignerState } from "./designerReducer";
 import { ZONE_TYPES, newZone } from "./zoneTypes";
 import { validateZones, snapTargetsFor, clamp } from "./zoneValidation";
@@ -18,6 +19,8 @@ const btn = (theme, kind = "default") => ({
 });
 
 export default function TemplateDesigner({ template: initial, onClose, onSaved }) {
+  const [armedPreset, setArmedPreset] = React.useState(null);
+  const armTimer = React.useRef(null);
   const [state, dispatch] = useReducer(designerReducer, initialDesignerState);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -176,6 +179,39 @@ export default function TemplateDesigner({ template: initial, onClose, onSaved }
             ))}
             <p style={{ fontSize: 11, color: theme.textSecondary, lineHeight: 1.5, marginTop: 12 }}>
               Zones may overlap; use Layer (z) to order them. Sizes are % of the screen, so one template fits every resolution.
+            </p>
+            <h4 style={{ margin: "16px 0 8px", fontSize: 12, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              Layouts
+            </h4>
+            {TEMPLATE_PRESETS.filter((t) => t.key !== "blank").map((t) => (
+              <button
+                key={t.key}
+                onClick={() => {
+                  const hasZones = state.template.zones.length > 0;
+                  if (hasZones && armedPreset !== t.key) {
+                    setArmedPreset(t.key);
+                    window.clearTimeout(armTimer.current);
+                    armTimer.current = window.setTimeout(() => setArmedPreset(null), 3000);
+                    return;
+                  }
+                  setArmedPreset(null);
+                  dispatch({ type: "REPLACE_ZONES", zones: JSON.parse(JSON.stringify(t.zones)) });
+                }}
+                title={t.description}
+                style={{
+                  display: "block", width: "100%", textAlign: "left", marginBottom: 6,
+                  padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12.5,
+                  border: `1px solid ${theme.border}`, background: theme.cardAlt, color: theme.text,
+                }}
+              >
+                <span style={{ fontWeight: 600, color: armedPreset === t.key ? theme.warning : undefined }}>
+                  {armedPreset === t.key ? "Click again to replace current zones" : t.name}
+                </span>
+                <span style={{ display: "block", fontSize: 11, color: theme.textSecondary }}>{t.description}</span>
+              </button>
+            ))}
+            <p style={{ fontSize: 11, color: theme.textSecondary, margin: "4px 0 0" }}>
+              Applying a layout replaces the current zones (Undo works).
             </p>
           </div>
         )}
