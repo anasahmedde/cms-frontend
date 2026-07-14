@@ -151,23 +151,50 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                   {savedKey === zone.key && <span style={{ marginLeft: isDevice ? 8 : "auto", fontSize: 12, color: theme.success, fontWeight: 600 }}>✓ Saved</span>}
                 </div>
 
-                {/* QR: image | link | media */}
+                {/* QR: uploaded image | link (generate) | external image/video URL */}
                 {zone.type === "qr" && (
                   <>
                     <label htmlFor={`qr-mode-${zone.key}`} style={lbl}>QR source</label>
-                    <select id={`qr-mode-${zone.key}`} value={d.qr_mode || "image"}
-                      onChange={(e) => setDraft(zone.key, { qr_mode: e.target.value })}
+                    <select id={`qr-mode-${zone.key}`} value={qrSourceOf(d)}
+                      onChange={(e) => setDraft(zone.key, qrSourcePatch(e.target.value))}
                       style={{ ...inp, marginBottom: 10 }}>
-                      <option value="image">Upload a QR image</option>
+                      <option value="upload">Upload a QR image</option>
                       <option value="link">Give a link — we generate the QR</option>
-                      <option value="media">Show an image/video instead</option>
+                      <option value="url">Paste an image/video URL</option>
                     </select>
-                    {d.qr_mode === "link" ? (
+                    {qrSourceOf(d) === "link" && (
                       <>
                         <label htmlFor={`qr-link-${zone.key}`} style={lbl}>Link (https://…)</label>
                         <input id={`qr-link-${zone.key}`} value={d.qr_link || ""} placeholder="https://example.com/menu"
                           onChange={(e) => setDraft(zone.key, { qr_link: e.target.value })} style={inp} />
                       </>
+                    )}
+                    {qrSourceOf(d) === "url" && (
+                      <UrlField zone={zone} value={d.media_url || ""} theme={theme} lbl={lbl}
+                        placeholder="https://cdn…/qr.png (or a video URL)"
+                        onChange={(v) => setDraft(zone.key, { qr_mode: "image", media_url: v, media_type: guessType(v), media_s3: undefined })} />
+                    )}
+                    {qrSourceOf(d) === "upload" && (
+                      <MediaField zone={zone} d={d} saved={saved} theme={theme} lbl={lbl} btn={btn}
+                        busy={busy} pct={pct} fileRefs={fileRefs} onUpload={(f) => upload(zone, f)} />
+                    )}
+                  </>
+                )}
+
+                {/* Media zones: upload OR external URL / library name */}
+                {zone.type === "media" && (
+                  <>
+                    <label htmlFor={`media-src-${zone.key}`} style={lbl}>Source</label>
+                    <select id={`media-src-${zone.key}`} value={d.media_url !== undefined ? "url" : "upload"}
+                      onChange={(e) => setDraft(zone.key, e.target.value === "url" ? { media_url: "", media_s3: undefined } : { media_url: undefined })}
+                      style={{ ...inp, marginBottom: 10 }}>
+                      <option value="upload">Upload an image/video</option>
+                      <option value="url">Paste an image/video URL</option>
+                    </select>
+                    {d.media_url !== undefined ? (
+                      <UrlField zone={zone} value={d.media_url || ""} theme={theme} lbl={lbl}
+                        placeholder="https://cdn…/promo.jpg or .mp4"
+                        onChange={(v) => setDraft(zone.key, { media_url: v, media_type: guessType(v), media_s3: undefined })} />
                     ) : (
                       <MediaField zone={zone} d={d} saved={saved} theme={theme} lbl={lbl} btn={btn}
                         busy={busy} pct={pct} fileRefs={fileRefs} onUpload={(f) => upload(zone, f)} />
@@ -175,33 +202,20 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                   </>
                 )}
 
-                {/* Media zones */}
-                {zone.type === "media" && (
-                  <MediaField zone={zone} d={d} saved={saved} theme={theme} lbl={lbl} btn={btn}
-                    busy={busy} pct={pct} fileRefs={fileRefs} onUpload={(f) => upload(zone, f)} />
-                )}
-
-                {/* Text / ticker zones */}
+                {/* Text / ticker zones: text + text color + background (color/gradient/image) */}
                 {(zone.type === "text" || zone.type === "ticker") && (
                   <>
                     <label htmlFor={`txt-${zone.key}`} style={lbl}>Text</label>
                     <input id={`txt-${zone.key}`} value={d.text || ""} maxLength={5000}
                       onChange={(e) => setDraft(zone.key, { text: e.target.value })}
                       style={{ ...inp, marginBottom: 10 }} placeholder="Shown on the screen" />
-                    <div style={{ display: "flex", gap: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <label htmlFor={`bg-${zone.key}`} style={lbl}>Background</label>
-                        <input id={`bg-${zone.key}`} type="color" value={d.bg_color || "#111827"}
-                          onChange={(e) => setDraft(zone.key, { bg_color: e.target.value })}
-                          style={{ width: 44, height: 30, padding: 0, border: `1px solid ${theme.inputBorder}`, borderRadius: 6, background: theme.inputBg, cursor: "pointer" }} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <label htmlFor={`fg-${zone.key}`} style={lbl}>Text color</label>
-                        <input id={`fg-${zone.key}`} type="color" value={d.text_color || "#ffffff"}
-                          onChange={(e) => setDraft(zone.key, { text_color: e.target.value })}
-                          style={{ width: 44, height: 30, padding: 0, border: `1px solid ${theme.inputBorder}`, borderRadius: 6, background: theme.inputBg, cursor: "pointer" }} />
-                      </div>
+                    <div style={{ marginBottom: 10 }}>
+                      <label htmlFor={`fg-${zone.key}`} style={lbl}>Text color</label>
+                      <input id={`fg-${zone.key}`} type="color" value={d.text_color || "#ffffff"}
+                        onChange={(e) => setDraft(zone.key, { text_color: e.target.value })}
+                        style={{ width: 44, height: 30, padding: 0, border: `1px solid ${theme.inputBorder}`, borderRadius: 6, background: theme.inputBg, cursor: "pointer" }} />
                     </div>
+                    <BgControl zoneKey={zone.key} d={d} setDraft={setDraft} theme={theme} lbl={lbl} inp={inp} />
                   </>
                 )}
 
@@ -253,6 +267,82 @@ function MediaField({ zone, d, saved, theme, lbl, btn, busy, pct, fileRefs, onUp
         <p style={{ fontSize: 11.5, color: theme.textSecondary, margin: "6px 0 0" }}>
           Nothing uploaded yet — this zone stays blank on screen.
         </p>
+      )}
+    </div>
+  );
+}
+
+// ── helpers for the richer content sources ──
+
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v|mkv)(\?|#|$)/i;
+export function guessType(url) {
+  return VIDEO_EXT.test(url || "") ? "video" : "image";
+}
+function qrSourceOf(d) {
+  if (d.qr_mode === "link" || d.qr_link) return "link";
+  if (d.media_url !== undefined) return "url";
+  return "upload";
+}
+function qrSourcePatch(source) {
+  if (source === "link") return { qr_mode: "link", media_url: undefined, media_s3: undefined };
+  if (source === "url") return { qr_mode: "image", qr_link: undefined, media_s3: undefined, media_url: "" };
+  return { qr_mode: "image", qr_link: undefined, media_url: undefined }; // upload
+}
+
+function UrlField({ zone, value, placeholder, theme, lbl, onChange }) {
+  const bad = value && !/^https?:\/\//i.test(value);
+  return (
+    <div>
+      <label htmlFor={`url-${zone.key}`} style={lbl}>Image / video URL</label>
+      <input id={`url-${zone.key}`} value={value} placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 8, fontSize: 13,
+                 border: `1px solid ${bad ? theme.danger : theme.inputBorder}`, background: theme.inputBg, color: theme.text }} />
+      {bad && <p style={{ fontSize: 11.5, color: theme.danger, margin: "4px 0 0" }}>Must start with http:// or https://</p>}
+    </div>
+  );
+}
+
+function BgControl({ zoneKey, d, setDraft, theme, lbl, inp }) {
+  const mode = d.bg_image_url ? "image" : d.bg_gradient ? "gradient" : "color";
+  const grad = d.bg_gradient || { stops: ["#0a1628", "#f59e0b"], angle: 135 };
+  const swatch = { width: 44, height: 30, padding: 0, border: `1px solid ${theme.inputBorder}`, borderRadius: 6, background: theme.inputBg, cursor: "pointer" };
+  const setMode = (m) => {
+    if (m === "color") setDraft(zoneKey, { bg_color: d.bg_color || "#111827", bg_gradient: undefined, bg_image_url: undefined });
+    else if (m === "gradient") setDraft(zoneKey, { bg_gradient: grad, bg_color: undefined, bg_image_url: undefined });
+    else setDraft(zoneKey, { bg_image_url: "", bg_color: undefined, bg_gradient: undefined });
+  };
+  return (
+    <div>
+      <label htmlFor={`bgtype-${zoneKey}`} style={lbl}>Background</label>
+      <select id={`bgtype-${zoneKey}`} value={mode} onChange={(e) => setMode(e.target.value)}
+        style={{ ...inp, marginBottom: 8 }}>
+        <option value="color">Solid color</option>
+        <option value="gradient">Gradient</option>
+        <option value="image">Image</option>
+      </select>
+      {mode === "color" && (
+        <input aria-label="Background color" type="color" value={d.bg_color || "#111827"}
+          onChange={(e) => setDraft(zoneKey, { bg_color: e.target.value })} style={swatch} />
+      )}
+      {mode === "gradient" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <input aria-label="Gradient start" type="color" value={grad.stops[0]}
+            onChange={(e) => setDraft(zoneKey, { bg_gradient: { ...grad, stops: [e.target.value, grad.stops[1]] } })} style={swatch} />
+          <input aria-label="Gradient end" type="color" value={grad.stops[1] || "#f59e0b"}
+            onChange={(e) => setDraft(zoneKey, { bg_gradient: { ...grad, stops: [grad.stops[0], e.target.value] } })} style={swatch} />
+          <label style={{ fontSize: 12, color: theme.textSecondary }}>Angle
+            <input type="range" min="0" max="360" value={grad.angle ?? 135}
+              onChange={(e) => setDraft(zoneKey, { bg_gradient: { ...grad, angle: Number(e.target.value) } })}
+              style={{ verticalAlign: "middle", marginLeft: 6 }} /> {grad.angle ?? 135}°
+          </label>
+          <span style={{ width: 60, height: 26, borderRadius: 6, border: `1px solid ${theme.inputBorder}`,
+            background: `linear-gradient(${grad.angle ?? 135}deg, ${grad.stops[0]}, ${grad.stops[1] || "#f59e0b"})` }} />
+        </div>
+      )}
+      {mode === "image" && (
+        <input aria-label="Background image URL" value={d.bg_image_url || ""} placeholder="https://cdn…/background.jpg"
+          onChange={(e) => setDraft(zoneKey, { bg_image_url: e.target.value })} style={inp} />
       )}
     </div>
   );
