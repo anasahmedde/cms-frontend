@@ -1,6 +1,7 @@
 // Platform → Templates tab: list, create, open designer, duplicate, link, delete.
 import React, { useCallback, useEffect, useState } from "react";
 import { T as theme } from "./theme";
+import { TEMPLATE_PRESETS } from "./templatePresets";
 import { CANVAS_PRESETS, CANVAS_MIN, CANVAS_MAX, normalizeCanvas } from "./zoneTypes";
 import TemplateThumb from "./TemplateThumb";
 import TemplateDesigner from "./TemplateDesigner";
@@ -49,13 +50,14 @@ export default function TemplatesTab() {
     }
     setCreating(true);
     setError("");
+    const layout = TEMPLATE_PRESETS.find((t) => t.key === fd.get("layout_preset")) || TEMPLATE_PRESETS[0];
     const res = await createTemplate({
       name: fd.get("name"),
       description: fd.get("description") || null,
-      orientation: size.orientation,
-      design_width: size.w,
-      design_height: size.h,
-      zones: [],
+      orientation: layout.key !== "blank" ? layout.orientation : size.orientation,
+      design_width: layout.key !== "blank" ? layout.design_width : size.w,
+      design_height: layout.key !== "blank" ? layout.design_height : size.h,
+      zones: JSON.parse(JSON.stringify(layout.zones)),
     });
     setCreating(false);
     if (!res.ok) { setError(`Create failed: ${res.message}`); return; }
@@ -175,6 +177,14 @@ export default function TemplatesTab() {
             <label htmlFor="new-tpl-desc" style={{ fontSize: 12, color: theme.textSecondary }}>Description (optional)</label>
             <input id="new-tpl-desc" name="description" maxLength={1000}
               style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", margin: "4px 0 12px", borderRadius: 8, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.text }} />
+            <label htmlFor="new-tpl-layout" style={{ fontSize: 12, color: theme.textSecondary }}>Start from</label>
+            <select id="new-tpl-layout" name="layout_preset" defaultValue="fullscreen"
+              style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", margin: "4px 0 4px", borderRadius: 8, border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.text }}>
+              {TEMPLATE_PRESETS.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+            </select>
+            <p style={{ fontSize: 11, color: theme.textSecondary, margin: "0 0 12px" }}>
+              A prebuilt arrangement of text, media, QR and playlist zones — everything stays editable in the designer.
+            </p>
             <label htmlFor="new-tpl-preset" style={{ fontSize: 12, color: theme.textSecondary }}>Screen size</label>
             <select id="new-tpl-preset" name="preset" defaultValue={CANVAS_PRESETS[6].label}
               onChange={(e) => setCustomSize(e.target.value === "__custom__")}

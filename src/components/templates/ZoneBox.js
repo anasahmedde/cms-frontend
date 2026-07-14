@@ -91,9 +91,18 @@ export default function ZoneBox({
     onGestureEnd();
   };
 
-  const bg = zone.style?.bg_color || zoneColor(index);
-  const color = zone.style?.text_color || "#ffffff";
+  const st = zone.style || {};
+  const grad = st.bg_gradient;
+  const background = st.bg_image_url
+    ? `url(${st.bg_image_url}) center / cover no-repeat`
+    : grad?.stops?.length
+      ? `linear-gradient(${grad.angle ?? 135}deg, ${grad.stops.join(", ")})`
+      : st.bg_color || zoneColor(index);
+  const color = st.text_color || "#ffffff";
   const def = ZONE_TYPES[zone.type] || {};
+  const isTexty = zone.type === "text" || zone.type === "ticker" || zone.type === "clock";
+  // font_size_vh is % of SCREEN height; the canvas is a scale model of it.
+  const previewFontPct = Math.max(9, ((st.font_size_vh ?? 50) / 100) * (zone.h || 10) * 2.2);
 
   return (
     <div
@@ -110,7 +119,7 @@ export default function ZoneBox({
         left: `${zone.x}%`, top: `${zone.y}%`,
         width: `${zone.w}%`, height: `${zone.h}%`,
         zIndex: 10 + (zone.z || 1),
-        background: bg,
+        background,
         color,
         border: selected ? "2px solid #f59e0b" : "1px solid rgba(255,255,255,0.5)",
         boxShadow: selected ? "0 0 0 3px rgba(245,158,11,0.35)" : "none",
@@ -126,10 +135,24 @@ export default function ZoneBox({
         gap: 2,
       }}
     >
-      <span style={{ fontWeight: 700, fontSize: 11, opacity: 0.9, pointerEvents: "none" }}>
+      <span style={{ fontWeight: 700, fontSize: 11, opacity: 0.9, pointerEvents: "none", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>
         {def.icon} {zone.key}
       </span>
-      <span style={{ fontSize: 10, opacity: 0.85, pointerEvents: "none", padding: "0 4px" }}>
+      <span
+        style={{
+          pointerEvents: "none",
+          padding: "0 6px",
+          width: "100%",
+          opacity: isTexty ? 1 : 0.85,
+          fontSize: isTexty ? `min(${previewFontPct}px, 64px)` : 10,
+          fontWeight: isTexty && st.bold ? 700 : 400,
+          textAlign: isTexty ? st.align || "center" : "center",
+          direction: isTexty ? st.direction || "ltr" : undefined,
+          whiteSpace: zone.type === "ticker" ? "nowrap" : undefined,
+          overflow: "hidden",
+          textShadow: st.bg_image_url ? "0 1px 3px rgba(0,0,0,0.7)" : undefined,
+        }}
+      >
         {zonePreviewText(zone)}
       </span>
       {selected && HANDLES.map((hd) => (

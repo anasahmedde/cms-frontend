@@ -45,6 +45,58 @@ function ColorField({ theme, id, label, value, onChange }) {
   );
 }
 
+function BackgroundSection({ theme, zone, patchStyle, patchZone }) {
+  const st = zone.style || {};
+  const mode = st.bg_image_url ? "image" : st.bg_gradient ? "gradient" : st.bg_color ? "solid" : "none";
+  const grad = st.bg_gradient || { stops: ["#0a1628", "#f59e0b"], angle: 135 };
+
+  const setMode = (m) => {
+    // One background kind at a time — clear the others explicitly.
+    const cleared = { bg_color: undefined, bg_gradient: undefined, bg_image_url: undefined };
+    if (m === "solid") cleared.bg_color = st.bg_color || "#0a1628";
+    if (m === "gradient") cleared.bg_gradient = grad;
+    if (m === "image") cleared.bg_image_url = st.bg_image_url || "";
+    patchZone({ style: cleared });
+  };
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <h4 style={{ margin: "12px 0 8px", fontSize: 12, color: theme.textSecondary, textTransform: "uppercase", letterSpacing: 0.5 }}>
+        Background
+      </h4>
+      <div style={row}>
+        <label htmlFor="z-bg-mode" style={lbl(theme)}>Type</label>
+        <select id="z-bg-mode" value={mode} onChange={(e) => setMode(e.target.value)} style={inp(theme)}>
+          <option value="none">None (transparent)</option>
+          <option value="solid">Solid color</option>
+          <option value="gradient">Gradient</option>
+          <option value="image">Image (URL)</option>
+        </select>
+      </div>
+      {mode === "solid" && (
+        <ColorField theme={theme} id="z-bg" label="Color" value={st.bg_color} onChange={(v) => patchStyle("bg_color", v)} />
+      )}
+      {mode === "gradient" && (
+        <>
+          <ColorField theme={theme} id="z-grad-a" label="From" value={grad.stops[0]}
+            onChange={(v) => patchStyle("bg_gradient", { ...grad, stops: [v || "#0a1628", grad.stops[1] || "#f59e0b"] })} />
+          <ColorField theme={theme} id="z-grad-b" label="To" value={grad.stops[1]}
+            onChange={(v) => patchStyle("bg_gradient", { ...grad, stops: [grad.stops[0] || "#0a1628", v || "#f59e0b"] })} />
+          <NumField theme={theme} id="z-grad-angle" label="Angle °" value={grad.angle ?? 135}
+            onChange={(v) => patchStyle("bg_gradient", { ...grad, angle: Math.max(0, Math.min(360, Math.round(v))) })} min={0} max={360} />
+        </>
+      )}
+      {mode === "image" && (
+        <div style={row}>
+          <label htmlFor="z-bg-img" style={lbl(theme)}>Image URL</label>
+          <input id="z-bg-img" value={st.bg_image_url || ""} placeholder="https://…"
+            onChange={(e) => patchStyle("bg_image_url", e.target.value || undefined)} style={inp(theme)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Layers list — the only reliable way to select a zone that sits under another
 // one, and the fastest way to jump between zones. Ordered top-most first.
 function LayersList({ theme, zones, selectedKey, onSelect }) {
@@ -213,7 +265,7 @@ export default function PropertiesPanel({ theme, state, dispatch }) {
         </div>
       )}
 
-      <ColorField theme={theme} id="z-bg" label="Background" value={zone.style?.bg_color} onChange={(v) => patchStyle("bg_color", v)} />
+      <BackgroundSection theme={theme} zone={zone} patchStyle={patchStyle} patchZone={patchZone} />
       <ColorField theme={theme} id="z-fg" label="Text color" value={zone.style?.text_color} onChange={(v) => patchStyle("text_color", v)} />
 
       {(zone.type === "text" || zone.type === "ticker") && (
@@ -235,7 +287,18 @@ export default function PropertiesPanel({ theme, state, dispatch }) {
               <option value="rtl">RTL (اردو / العربية)</option>
             </select>
           </div>
+          <div style={row}>
+            <label htmlFor="z-bold" style={lbl(theme)}>Bold</label>
+            <input id="z-bold" type="checkbox" checked={!!zone.style?.bold}
+              onChange={(e) => patchStyle("bold", e.target.checked || undefined)} />
+          </div>
+          <NumField theme={theme} id="z-pad" label="Padding %" value={zone.style?.padding_pct ?? 0}
+            onChange={(v) => patchStyle("padding_pct", v)} min={0} max={40} />
         </>
+      )}
+      {zone.type === "ticker" && (
+        <NumField theme={theme} id="z-speed" label="Speed" value={zone.style?.ticker_speed ?? 12}
+          onChange={(v) => patchStyle("ticker_speed", v)} min={1} max={100} />
       )}
       {(zone.type === "media" || zone.type === "playlist") && (
         <div style={row}>

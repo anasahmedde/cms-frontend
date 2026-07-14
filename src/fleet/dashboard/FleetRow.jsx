@@ -7,6 +7,7 @@ import IconButton from "../../ui/IconButton";
 import CopyButton from "../../ui/CopyButton";
 import StatusDot from "../../ui/StatusDot";
 import Badge from "../../ui/Badge";
+import { useCompanyFeatures } from "../../lib/features";
 import ProgressBar from "../../ui/ProgressBar";
 import Skeleton from "../../ui/Skeleton";
 import { timeAgo, formatBytes } from "../../lib/format";
@@ -53,6 +54,7 @@ function buildSlots(layout, links) {
 }
 
 export default function FleetRow({ row, layout, progress, expanded, onToggleExpand, onAction }) {
+  const { features } = useCompanyFeatures();
   const navigate = useNavigate();
   const stop = (e) => e.stopPropagation();
   const status = deviceStatus(row);
@@ -195,16 +197,16 @@ export default function FleetRow({ row, layout, progress, expanded, onToggleExpa
         </td>
         <td>
           <div className="fleet-telemetry">
-            {row.temperature != null && (
+            {features.temperature && row.temperature != null && (
               <Badge tone="warn">
                 <Thermometer size={11} aria-hidden="true" /> {row.temperature}°C
               </Badge>
             )}
-            {row.daily_count != null && <Badge tone="info">Daily: {row.daily_count}</Badge>}
-            {row.monthly_count != null && (
+            {features.footfall && row.daily_count != null && <Badge tone="info">Daily: {row.daily_count}</Badge>}
+            {features.footfall && row.monthly_count != null && (
               <Badge tone="neutral">Monthly: {row.monthly_count}</Badge>
             )}
-            {row.temperature == null && row.daily_count == null && row.monthly_count == null && (
+            {(!features.temperature || row.temperature == null) && (!features.footfall || (row.daily_count == null && row.monthly_count == null)) && (
               <span className="u-faint">—</span>
             )}
           </div>

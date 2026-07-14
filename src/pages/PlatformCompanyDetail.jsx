@@ -13,13 +13,14 @@ import ConfirmModal from "../ui/ConfirmModal";
 import EmptyState from "../ui/EmptyState";
 import ErrorState from "../ui/ErrorState";
 import { SkeletonText } from "../ui/Skeleton";
-import { Field, Input, Select } from "../ui/Field";
+import { Field, Input, Select, Switch } from "../ui/Field";
 import { useToast } from "../ui/Toast";
 import { useAuth } from "../lib/auth";
 import { apiDelete, apiGet, apiPut } from "../lib/api";
 import { formatDateTime } from "../lib/format";
 import { effectiveStatus, expirationLabel } from "../platform/lib";
 import ExpirationModal from "../platform/ExpirationModal";
+import { FEATURE_LABELS, invalidateFeatureCache } from "../lib/features";
 
 export default function PlatformCompanyDetail() {
   const { slug } = useParams();
@@ -35,6 +36,8 @@ export default function PlatformCompanyDetail() {
   const [savingQuotas, setSavingQuotas] = useState(false);
   const [expModal, setExpModal] = useState(null);
   const [templateId, setTemplateId] = useState("");
+  const [features, setFeatures] = useState({});
+  const [savingFeatures, setSavingFeatures] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [deleting, setDeleting] = useState(null); // {linked?}
   const [busy, setBusy] = useState(false);
@@ -49,6 +52,7 @@ export default function PlatformCompanyDetail() {
     setCompany(found);
     setQuotas({ max_devices: found.max_devices, max_users: found.max_users, max_storage_mb: found.max_storage_mb });
     setTemplateId(found.template_id ? String(found.template_id) : "");
+    setFeatures(found.features || {});
     apiGet(`/platform/companies/${encodeURIComponent(slug)}/stats`).then((r) => r.ok && setStats(r.data));
     apiGet(`/platform/company/${found.id}/expiration-history`, { params: { limit: 20 } }).then(
       (r) => setHistory(r.ok ? r.data?.items || r.data?.history || r.data || [] : [])
@@ -199,6 +203,41 @@ export default function PlatformCompanyDetail() {
               ))}
             </div>
           )}
+        </Card>
+
+        <Card
+          title="Analytics features"
+          actions={
+            <Button
+              size="sm"
+              loading={savingFeatures}
+              onClick={async () => {
+                setSavingFeatures(true);
+                const res = await apiPut(`/platform/companies/${encodeURIComponent(slug)}`, { features });
+                setSavingFeatures(false);
+                if (!res.ok) return toast.error(res.message);
+                invalidateFeatureCache();
+                toast.success("Features updated — the company dashboard reflects it on next load");
+              }}
+            >
+              Save
+            </Button>
+          }
+        >
+          <p className="u-muted" style={{ marginTop: 0 }}>
+            Hardware-dependent analytics. Disabled features are hidden from this company's
+            dashboard and reports.
+          </p>
+          <div style={{ display: "grid", gap: 8 }}>
+            {Object.entries(FEATURE_LABELS).map(([key, label]) => (
+              <Switch
+                key={key}
+                label={label}
+                checked={!!features[key]}
+                onChange={(e) => setFeatures({ ...features, [key]: e.target.checked })}
+              />
+            ))}
+          </div>
         </Card>
 
         <Card title="Screen template">

@@ -18,10 +18,7 @@ import "./dashboard.css";
 
 export default function FleetKpis({
   devices, // active screens (already filtered)
-  totalScreens, // server total incl. inactive
-  totals, // { groups, locations, media } from links
   loadingDevices,
-  loadingLinks,
 }) {
   const navigate = useNavigate();
 
@@ -68,40 +65,6 @@ export default function FleetKpis({
           tone="warn"
           loading={loadingDevices}
           onClick={() => navigate("/screens?group=ungrouped")}
-        />
-      </div>
-      <div className="fleet-kpis fleet-kpis--totals">
-        <StatCard
-          icon={MonitorPlay}
-          label="Screens"
-          value={totalScreens}
-          tone="neutral"
-          loading={loadingDevices}
-          onClick={() => navigate("/screens")}
-        />
-        <StatCard
-          icon={Boxes}
-          label="Groups"
-          value={totals.groups}
-          tone="neutral"
-          loading={loadingLinks}
-          onClick={() => navigate("/groups")}
-        />
-        <StatCard
-          icon={MapPin}
-          label="Locations"
-          value={totals.locations}
-          tone="neutral"
-          loading={loadingLinks}
-          onClick={() => navigate("/locations")}
-        />
-        <StatCard
-          icon={Film}
-          label="Media assigned"
-          value={totals.media}
-          tone="neutral"
-          loading={loadingLinks}
-          onClick={() => navigate("/media")}
         />
       </div>
     </>

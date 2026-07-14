@@ -16,7 +16,7 @@ import FleetTable from "../fleet/dashboard/FleetTable";
 import AlertsStrip from "../fleet/dashboard/AlertsStrip";
 import "../fleet/dashboard/dashboard.css";
 
-const EMPTY_FILTERS = { screen: "", group: "", location: "", media: "" };
+
 const REFRESH_MS = 30000;
 
 function QuickActions() {
@@ -43,7 +43,7 @@ function QuickActions() {
 export default function Dashboard() {
   const { devices, total, loading, error, reload } = useFleetDevices({ limit: 500 });
   const links = useFleetLinks();
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [query, setQuery] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
 
   const reloadLinks = links.reload;
@@ -90,42 +90,30 @@ export default function Dashboard() {
   }, [activeDevices, links.byMobileId]);
 
   const filteredRows = useMemo(() => {
-    const f = {
-      screen: filters.screen.trim().toLowerCase(),
-      group: filters.group.trim().toLowerCase(),
-      location: filters.location.trim().toLowerCase(),
-      media: filters.media.trim().toLowerCase(),
-    };
+    const needle = query.trim().toLowerCase();
     return mergedRows
-      .filter(
-        (r) =>
-          !f.screen ||
-          r.mobile_id.toLowerCase().includes(f.screen) ||
-          (r.device_name || "").toLowerCase().includes(f.screen)
-      )
-      .filter(
-        (r) =>
-          !f.group ||
-          (r.ungrouped ? "ungrouped".includes(f.group) : r.gname.toLowerCase().includes(f.group))
-      )
-      .filter((r) => !f.location || (r.location || "").toLowerCase().includes(f.location))
-      .filter(
-        (r) => !f.media || r.links.some((l) => l.video_name.toLowerCase().includes(f.media))
-      )
+      .filter((r) => {
+        if (!needle) return true;
+        return (
+          r.mobile_id.toLowerCase().includes(needle) ||
+          (r.device_name || "").toLowerCase().includes(needle) ||
+          (r.ungrouped ? "ungrouped" : r.gname || "").toLowerCase().includes(needle) ||
+          (r.location || "").toLowerCase().includes(needle) ||
+          r.links.some((l) => (l.video_name || "").toLowerCase().includes(needle))
+        );
+      })
       .sort((a, b) => {
         const byOnline = (b.is_online === true ? 1 : 0) - (a.is_online === true ? 1 : 0);
         if (byOnline !== 0) return byOnline;
         return (a.device_name || a.mobile_id).localeCompare(b.device_name || b.mobile_id);
       });
-  }, [mergedRows, filters]);
+  }, [mergedRows, query]);
 
   const { progressByMobileId } = useDownloadProgress(filteredRows);
 
   const visibleIds = useMemo(() => filteredRows.map((r) => r.mobile_id), [filteredRows]);
   const { layouts, invalidate } = useDeviceLayouts(visibleIds);
 
-  const filtersActive = Object.values(filters).some((v) => v);
-  const clearFilters = () => setFilters(EMPTY_FILTERS);
 
   return (
     <div>
@@ -186,9 +174,9 @@ export default function Dashboard() {
 
       <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--radius)" }}>
         <FleetFilters
-          filters={filters}
-          onChange={(key, value) => setFilters((prev) => ({ ...prev, [key]: value }))}
-          onClear={clearFilters}
+          query={query}
+          onChange={setQuery}
+          onClear={() => setQuery("")}
           inactiveCount={inactiveCount}
           truncatedLinks={links.truncated}
           totalScreens={total}
@@ -203,8 +191,8 @@ export default function Dashboard() {
           invalidateLayout={invalidate}
           progressByMobileId={progressByMobileId}
           onChanged={reloadAll}
-          filtersActive={filtersActive}
-          onClearFilters={clearFilters}
+          filtersActive={!!query.trim()}
+          onClearFilters={() => setQuery("")}
         />
       </div>
     </div>
