@@ -1,3 +1,8 @@
 .env
 node_modules
 src-backup
+/build
+.DS_Store
+*.swp
+*.swn
+*.swo

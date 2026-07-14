@@ -1,0 +1,75 @@
+/* Design tokens — the only place colors/spacing/typography are defined.
+   Theme switching: <html data-theme="dark|light">. Components use var(--*)
+   exclusively; hardcoded hex in a component is a bug. */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+  /* Brand (DIGIX) */
+  --brand-navy: #0a1628;
+  --brand-navy-2: #12203a;
+  --accent: #f59e0b;
+  --accent-strong: #d97706;
+  --accent-soft: rgba(245, 158, 11, 0.14);
+
+  /* Status */
+  --success: #10b981;
+  --success-soft: rgba(16, 185, 129, 0.12);
+  --danger: #ef4444;
+  --danger-strong: #dc2626;
+  --danger-soft: rgba(239, 68, 68, 0.12);
+  --warn: #f59e0b;
+  --warn-soft: rgba(245, 158, 11, 0.14);
+  --info: #3b82f6;
+  --info-soft: rgba(59, 130, 246, 0.12);
+
+  /* Light theme (default) */
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --elevated: #f1f5f9;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --input-bg: #ffffff;
+  --table-head: #f8fafc;
+  --row-hover: #f8fafc;
+  --overlay: rgba(15, 23, 42, 0.55);
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 16px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 8px 32px rgba(15, 23, 42, 0.18);
+
+  /* Sidebar is always dark (brand) in both themes */
+  --sidebar-bg: #0a1628;
+  --sidebar-text: #c7d0e0;
+  --sidebar-text-active: #ffffff;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-active: rgba(245, 158, 11, 0.16);
+
+  /* Type & shape */
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --focus-ring: 0 0 0 3px rgba(245, 158, 11, 0.35);
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b1220;
+  --card: #111a2e;
+  --elevated: #1a2440;
+  --text: #e6ecff;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  --border: #26324d;
+  --border-strong: #33415e;
+  --input-bg: #0e1628;
+  --table-head: #15203a;
+  --row-hover: #16213c;
+  --overlay: rgba(2, 6, 16, 0.7);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --sidebar-bg: #0a1628;
+  --accent-soft: rgba(245, 158, 11, 0.18);
+}

@@ -1,0 +1,394 @@
+/* kit-core.css — styles for the core UI kit (Button, IconButton, Badge,
+   StatusDot, Card, StatCard, Skeleton, EmptyState, ErrorState, Spinner).
+   Every color/space/font comes from tokens.css vars. Transitions: 120ms ease. */
+
+/* ---- Button ------------------------------------------------------------ */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms ease, border-color 120ms ease,
+    color 120ms ease, box-shadow 120ms ease;
+}
+.ui-btn > svg {
+  flex: none;
+}
+.ui-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ui-btn--md {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.ui-btn--sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12.5px;
+}
+.ui-btn--primary {
+  background: var(--accent);
+  color: var(--brand-navy); /* sanctioned amber/navy pairing */
+}
+.ui-btn--primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+.ui-btn--secondary {
+  background: var(--card);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.ui-btn--secondary:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+.ui-btn--danger {
+  background: var(--danger);
+  color: var(--brand-navy); /* dark text beats white on --danger for contrast */
+}
+.ui-btn--danger:hover:not(:disabled) {
+  background: var(--danger-strong);
+}
+.ui-btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+.ui-btn--ghost:hover:not(:disabled) {
+  background: var(--row-hover);
+  color: var(--text);
+}
+
+/* ---- IconButton ---------------------------------------------------------- */
+.ui-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.ui-iconbtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ui-iconbtn--md {
+  width: 32px;
+  height: 32px;
+}
+.ui-iconbtn--sm {
+  width: 26px;
+  height: 26px;
+}
+.ui-iconbtn--ghost {
+  color: var(--text-muted);
+}
+.ui-iconbtn--ghost:hover:not(:disabled) {
+  background: var(--row-hover);
+  color: var(--text);
+}
+.ui-iconbtn--danger {
+  color: var(--danger);
+}
+.ui-iconbtn--danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger-strong);
+}
+
+/* ---- Badge ---------------------------------------------------------------- */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.ui-badge--neutral {
+  background: var(--elevated);
+  color: var(--text-muted);
+}
+.ui-badge--success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.ui-badge--danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.ui-badge--warn {
+  background: var(--warn-soft);
+  color: var(--accent-strong);
+}
+.ui-badge--info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.ui-badge--accent {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+/* ---- StatusDot ------------------------------------------------------------ */
+.ui-statusdot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.ui-statusdot-dot {
+  position: relative;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-color, var(--text-faint));
+}
+.ui-statusdot--online {
+  --dot-color: var(--success);
+}
+.ui-statusdot--offline {
+  --dot-color: var(--danger);
+}
+.ui-statusdot--warn {
+  --dot-color: var(--warn);
+}
+.ui-statusdot--neutral {
+  --dot-color: var(--text-faint);
+}
+.ui-statusdot--pulse .ui-statusdot-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--dot-color, var(--text-faint));
+  animation: ui-dot-ping 2s ease-out infinite;
+}
+@keyframes ui-dot-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  70%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* ---- Card ------------------------------------------------------------------ */
+.ui-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.ui-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.ui-card-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ui-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ui-card-body {
+  padding: 16px;
+}
+
+/* ---- StatCard ---------------------------------------------------------------- */
+.ui-statcard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 14px 16px;
+  appearance: none;
+  text-align: left;
+  font-family: var(--font-ui);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: border-color 120ms ease, transform 120ms ease,
+    box-shadow 120ms ease;
+}
+.ui-statcard--clickable {
+  cursor: pointer;
+}
+.ui-statcard--clickable:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lg);
+}
+.ui-statcard--active,
+.ui-statcard--active:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow);
+}
+.ui-statcard-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: var(--tone-soft, var(--accent-soft));
+  color: var(--tone-color, var(--accent-strong));
+}
+.ui-statcard--accent {
+  --tone-color: var(--accent-strong);
+  --tone-soft: var(--accent-soft);
+}
+.ui-statcard--neutral {
+  --tone-color: var(--text-muted);
+  --tone-soft: var(--elevated);
+}
+.ui-statcard--success {
+  --tone-color: var(--success);
+  --tone-soft: var(--success-soft);
+}
+.ui-statcard--danger {
+  --tone-color: var(--danger);
+  --tone-soft: var(--danger-soft);
+}
+.ui-statcard--warn {
+  --tone-color: var(--accent-strong);
+  --tone-soft: var(--warn-soft);
+}
+.ui-statcard--info {
+  --tone-color: var(--info);
+  --tone-soft: var(--info-soft);
+}
+.ui-statcard-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ui-statcard-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.ui-statcard-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+}
+.ui-statcard-hint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+/* ---- Skeleton ------------------------------------------------------------------ */
+.ui-skeleton {
+  display: inline-block;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(
+    90deg,
+    var(--elevated) 25%,
+    var(--row-hover) 37%,
+    var(--elevated) 63%
+  );
+  background-size: 400% 100%;
+  animation: ui-shimmer 1.4s ease infinite;
+}
+@keyframes ui-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+.ui-skeleton-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---- EmptyState / ErrorState -------------------------------------------------------- */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 40px 20px;
+  text-align: center;
+}
+.ui-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--elevated);
+  color: var(--text-faint);
+}
+.ui-empty-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ui-empty-hint {
+  margin: 0;
+  max-width: 360px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.ui-empty-action {
+  margin-top: 10px;
+}
+.ui-error-icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* ---- Spinner ---------------------------------------------------------------------- */
+.ui-spinner {
+  display: inline-block;
+  flex: none;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: ui-spin 0.7s linear infinite;
+}
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
