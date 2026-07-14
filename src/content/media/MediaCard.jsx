@@ -4,6 +4,7 @@
 import { Play, Eye, Pencil, FolderTree, Trash2, RotateCw, Timer } from "lucide-react";
 import Badge from "../../ui/Badge";
 import IconButton from "../../ui/IconButton";
+import CopyButton from "../../ui/CopyButton";
 import { timeAgo } from "../../lib/format";
 import { contentTypeOf, TYPE_ICONS, TYPE_TONES, FIT_LABELS } from "./lib";
 import "./media.css";
@@ -46,9 +47,9 @@ export default function MediaCard({ item, onPreview, onEdit, onWhereUsed, onDele
           )}
         </div>
 
-        <div className="u-faint">
-          ID {item.id}
-          {item.created_at ? ` · added ${timeAgo(item.created_at)}` : ""}
+        <div className="u-faint u-flex">
+          <span>ID {item.id}{item.created_at ? ` · added ${timeAgo(item.created_at)}` : ""}</span>
+          {item.s3_link && <CopyButton value={item.s3_link} label="Copy link" small />}
         </div>
       </div>
 

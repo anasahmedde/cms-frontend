@@ -10,10 +10,10 @@ const inp = (theme) => ({
   border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.text,
 });
 
-function NumField({ theme, id, label, value, onChange, min = 0, max = 100 }) {
+function NumField({ theme, id, label, value, onChange, min = 0, max = 100, labelWidth }) {
   return (
     <div style={row}>
-      <label htmlFor={id} style={lbl(theme)}>{label}</label>
+      <label htmlFor={id} style={{ ...lbl(theme), ...(labelWidth ? { width: labelWidth } : {}) }}>{label}</label>
       <input
         id={id} type="number" step="0.5" min={min} max={max} value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
@@ -47,10 +47,19 @@ function ColorField({ theme, id, label, value, onChange }) {
 
 function BackgroundSection({ theme, zone, patchStyle, patchZone }) {
   const st = zone.style || {};
-  const mode = st.bg_image_url ? "image" : st.bg_gradient ? "gradient" : st.bg_color ? "solid" : "none";
+  // Mode is explicit state, not derived: deriving it from the values made
+  // "Image (URL)" snap back to "None" before a URL could be typed (the empty
+  // string is falsy) — the reported "Image URL not working".
+  const derived = st.bg_image_url ? "image" : st.bg_gradient ? "gradient" : st.bg_color ? "solid" : "none";
+  const [mode, setModeState] = React.useState(derived);
+  React.useEffect(() => {
+    setModeState(derived);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zone.key]);
   const grad = st.bg_gradient || { stops: ["#0a1628", "#f59e0b"], angle: 135 };
 
   const setMode = (m) => {
+    setModeState(m);
     // One background kind at a time — clear the others explicitly.
     const cleared = { bg_color: undefined, bg_gradient: undefined, bg_image_url: undefined };
     if (m === "solid") cleared.bg_color = st.bg_color || "#0a1628";
@@ -202,6 +211,10 @@ export default function PropertiesPanel({ theme, state, dispatch }) {
         <p style={{ fontSize: 12, color: theme.textSecondary, margin: "0 0 10px" }}>
           {template.orientation} · {aspectLabel(template.design_width, template.design_height)} · any size 120–10000px
         </p>
+        <p style={{ fontSize: 12, color: theme.textSecondary, margin: "0 0 10px" }}>
+          The size above is only a design aid — zones are stored as <b>% of the screen</b>, so the
+          published template fits every resolution. Screens report theirs automatically on enrollment.
+        </p>
         <p style={{ fontSize: 12, color: theme.textSecondary, lineHeight: 1.5 }}>
           Select a zone on the canvas to edit its position, colors and content source.
           Drag zones to move, use the handles to resize. Hold <b>Alt</b> to disable snapping.
@@ -228,11 +241,14 @@ export default function PropertiesPanel({ theme, state, dispatch }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 8 }}>
-        <NumField theme={theme} id="z-x" label="X %" value={zone.x} onChange={(v) => patchZone({ x: v })} />
-        <NumField theme={theme} id="z-y" label="Y %" value={zone.y} onChange={(v) => patchZone({ y: v })} />
-        <NumField theme={theme} id="z-w" label="Width %" value={zone.w} onChange={(v) => patchZone({ w: v })} min={1} />
-        <NumField theme={theme} id="z-h" label="Height %" value={zone.h} onChange={(v) => patchZone({ h: v })} min={1} />
+        <NumField theme={theme} id="z-x" label="X" value={zone.x} onChange={(v) => patchZone({ x: v })} labelWidth={28} />
+        <NumField theme={theme} id="z-y" label="Y" value={zone.y} onChange={(v) => patchZone({ y: v })} labelWidth={28} />
+        <NumField theme={theme} id="z-w" label="W" value={zone.w} onChange={(v) => patchZone({ w: v })} min={1} labelWidth={28} />
+        <NumField theme={theme} id="z-h" label="H" value={zone.h} onChange={(v) => patchZone({ h: v })} min={1} labelWidth={28} />
       </div>
+      <p style={{ fontSize: 11, color: theme.textSecondary, margin: "0 0 10px" }}>
+        All values are % of the screen — the template fits any resolution automatically.
+      </p>
       <NumField theme={theme} id="z-z" label="Layer (z)" value={zone.z || 1} onChange={(v) => patchZone({ z: Math.round(v) })} min={1} max={99} />
 
       <div style={row}>
@@ -259,9 +275,10 @@ export default function PropertiesPanel({ theme, state, dispatch }) {
       {source === "static" && zone.type !== "clock" && (
         <div style={row}>
           <label htmlFor="z-text" style={lbl(theme)}>Text</label>
-          <input id="z-text" value={zone.content?.text || ""}
+          <textarea id="z-text" value={zone.content?.text || ""} rows={3}
             onChange={(e) => patchZone({ content: { text: e.target.value } })}
-            style={inp(theme)} placeholder="Fixed text shown on screen" />
+            style={{ ...inp(theme), resize: "vertical", fontFamily: "inherit" }}
+            placeholder={"Fixed text shown on screen\n(multi-line supported)"} />
         </div>
       )}
 
@@ -312,9 +329,33 @@ export default function PropertiesPanel({ theme, state, dispatch }) {
       )}
 
       <button
-        onClick={() => dispatch({ type: "DELETE_ZONE", key: zone.key })}
+        onClick={() => {
+          const base = zone.key.replace(/_copy\d*$/, "");
+          let n = 2, key = `${base}_copy`;
+          const keys = new Set(template.zones.map((z) => z.key));
+          while (keys.has(key)) key = `${base}_copy${n++}`;
+          dispatch({
+            type: "ADD_ZONE",
+            zone: {
+              ...JSON.parse(JSON.stringify(zone)),
+              key,
+              x: Math.min(95, (zone.x || 0) + 3),
+              y: Math.min(95, (zone.y || 0) + 3),
+            },
+          });
+        }}
         style={{
           marginTop: 12, width: "100%", padding: "8px 12px", borderRadius: 8,
+          border: `1px solid ${theme.border}`, background: theme.cardAlt,
+          color: theme.text, cursor: "pointer", fontWeight: 600, fontSize: 13,
+        }}
+      >
+        Duplicate zone
+      </button>
+      <button
+        onClick={() => dispatch({ type: "DELETE_ZONE", key: zone.key })}
+        style={{
+          marginTop: 8, width: "100%", padding: "8px 12px", borderRadius: 8,
           border: `1px solid ${theme.danger}`, background: "transparent",
           color: theme.danger, cursor: "pointer", fontWeight: 600, fontSize: 13,
         }}
