@@ -13,6 +13,7 @@ import EmptyState from "../ui/EmptyState";
 import { SkeletonText } from "../ui/Skeleton";
 import { Field, Select } from "../ui/Field";
 import { apiGet, normalizeList } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import ZoneContentEditor from "../components/templates/ZoneContentEditor";
 import TemplateMap from "../components/templates/TemplateMap";
 import {
@@ -43,6 +44,8 @@ export default function TemplateContent() {
   const [devicePick, setDevicePick] = useState("");
   const [contentByKey, setContentByKey] = useState({});
   const [editing, setEditing] = useState(null); // {scope, targetId, targetName, focusZoneKey}
+  const { user } = useAuth();
+  const companyName = user?.company?.name || "your company";
 
   useEffect(() => {
     apiGet("/company/template").then((res) =>
@@ -66,14 +69,14 @@ export default function TemplateContent() {
 
   // The resolved editing target for the chosen scope (null until a shop/screen picked).
   const target = useMemo(() => {
-    if (scope === "company") return { scope: "company", targetId: null, targetName: "your company" };
+    if (scope === "company") return { scope: "company", targetId: null, targetName: companyName };
     if (scope === "shop") {
       const s = shops.find((x) => String(x.id) === shopPick);
       return s ? { scope: "shop", targetId: s.id, targetName: s.shop_name } : null;
     }
     const d = deviceMatches.find((x) => String(x.id ?? x.mobile_id) === devicePick);
     return d ? { scope: "device", targetId: d.id, targetName: d.device_name || d.mobile_id } : null;
-  }, [scope, shopPick, devicePick, shops, deviceMatches]);
+  }, [scope, shopPick, devicePick, shops, deviceMatches, companyName]);
 
   const reloadContentState = useCallback(async () => {
     if (!target) { setContentByKey({}); return; }
