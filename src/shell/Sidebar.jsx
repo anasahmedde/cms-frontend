@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, MonitorPlay, Layers, MapPin, Film, Link2, CheckCircle2,
-  BarChart3, UsersRound, Settings, Globe, Building2, Sun, Moon, KeyRound, LogOut,
+  BarChart3, UsersRound, Settings, Globe, Building2, LayoutTemplate,
+  Megaphone, Activity, ScrollText, Sun, Moon, KeyRound, LogOut,
 } from "lucide-react";
 import Badge from "../ui/Badge";
 import { useAuth } from "../lib/auth";
@@ -26,11 +27,13 @@ const COMPANY_NAV = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-// Templates/Announcements/Activity live inside the legacy platform pages for
-// now; their standalone routes arrive with the platform rebuild wave.
 const PLATFORM_NAV = [
   { to: "/platform", label: "Overview", icon: Globe, end: true },
   { to: "/platform/companies", label: "Companies", icon: Building2 },
+  { to: "/platform/templates", label: "Templates", icon: LayoutTemplate },
+  { to: "/platform/announcements", label: "Announcements", icon: Megaphone },
+  { to: "/platform/activity", label: "Activity", icon: Activity },
+  { to: "/platform/audit", label: "Audit log", icon: ScrollText },
 ];
 
 // Same gate as the legacy shell (App.js:462).

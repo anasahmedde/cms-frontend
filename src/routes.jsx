@@ -1,7 +1,7 @@
 // Route table. Every page lives at a real URL (deep-linkable, refresh-safe).
 // Legacy pages mount inside LegacyCard until their rebuild wave replaces them.
 import React, { useState } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./lib/auth";
 import { RequireAuth, RequirePerm, RequirePlatform, PublicOnly } from "./shell/RouteGuards";
 import AppShell from "./shell/AppShell";
@@ -24,10 +24,14 @@ import Settings from "./pages/Settings";
 import UserManagement from "./legacy/UserManagement";
 import Reports from "./pages/Reports";
 import Approvals from "./pages/Approvals";
-import PlatformAdmin from "./components/PlatformAdmin";
-import PlatformDashboard from "./components/PlatformDashboard";
+import PlatformOverview from "./pages/PlatformOverview";
+import PlatformCompanies from "./pages/PlatformCompanies";
+import PlatformCompanyDetail from "./pages/PlatformCompanyDetail";
+import PlatformTemplates from "./pages/PlatformTemplates";
+import PlatformAnnouncements from "./pages/PlatformAnnouncements";
+import PlatformActivity from "./pages/PlatformActivity";
+import PlatformAudit from "./pages/PlatformAudit";
 import { NotificationBell, CompanyStatusTimer } from "./components/ExpirationNotificationBanner";
-import { useToast } from "./ui/Toast";
 
 // Shell + banner strip + header widgets + self-service password modal.
 function ShellChrome() {
@@ -89,22 +93,6 @@ function HomeRedirect() {
   const { isPlatform, isImpersonating } = useAuth();
   if (isPlatform && !isImpersonating) return <Navigate to="/platform" replace />;
   return <Dashboard />;
-}
-
-function CompaniesPage() {
-  const { impersonate } = useAuth();
-  const navigate = useNavigate();
-  const toast = useToast();
-  const handleImpersonate = async (slug, name) => {
-    const res = await impersonate(slug, name);
-    if (res.ok) navigate("/");
-    else toast.error(res.message || "Could not open the company workspace");
-  };
-  return (
-    <LegacyCard>
-      <PlatformAdmin onImpersonate={handleImpersonate} />
-    </LegacyCard>
-  );
 }
 
 export default function AppRoutes() {
@@ -170,11 +158,31 @@ export default function AppRoutes() {
         <Route path="/settings" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
         <Route
           path="/platform"
-          element={<ErrorBoundary><RequirePlatform><LegacyCard><PlatformDashboard /></LegacyCard></RequirePlatform></ErrorBoundary>}
+          element={<ErrorBoundary><RequirePlatform><PlatformOverview /></RequirePlatform></ErrorBoundary>}
         />
         <Route
           path="/platform/companies"
-          element={<ErrorBoundary><RequirePlatform><CompaniesPage /></RequirePlatform></ErrorBoundary>}
+          element={<ErrorBoundary><RequirePlatform><PlatformCompanies /></RequirePlatform></ErrorBoundary>}
+        />
+        <Route
+          path="/platform/companies/:slug"
+          element={<ErrorBoundary><RequirePlatform><PlatformCompanyDetail /></RequirePlatform></ErrorBoundary>}
+        />
+        <Route
+          path="/platform/templates"
+          element={<ErrorBoundary><RequirePlatform><PlatformTemplates /></RequirePlatform></ErrorBoundary>}
+        />
+        <Route
+          path="/platform/announcements"
+          element={<ErrorBoundary><RequirePlatform><PlatformAnnouncements /></RequirePlatform></ErrorBoundary>}
+        />
+        <Route
+          path="/platform/activity"
+          element={<ErrorBoundary><RequirePlatform><PlatformActivity /></RequirePlatform></ErrorBoundary>}
+        />
+        <Route
+          path="/platform/audit"
+          element={<ErrorBoundary><RequirePlatform><PlatformAudit /></RequirePlatform></ErrorBoundary>}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
