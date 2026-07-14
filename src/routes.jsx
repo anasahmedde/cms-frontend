@@ -22,8 +22,8 @@ import Locations from "./pages/Locations";
 import LocationDetail from "./pages/LocationDetail";
 import Settings from "./pages/Settings";
 import UserManagement from "./legacy/UserManagement";
-import Reports from "./components/Reports";
-import ContentApprovalQueue from "./components/ContentApprovalQueue";
+import Reports from "./pages/Reports";
+import Approvals from "./pages/Approvals";
 import PlatformAdmin from "./components/PlatformAdmin";
 import PlatformDashboard from "./components/PlatformDashboard";
 import { NotificationBell, CompanyStatusTimer } from "./components/ExpirationNotificationBanner";
@@ -157,11 +157,11 @@ export default function AppRoutes() {
         />
         <Route
           path="/approvals"
-          element={<ErrorBoundary><RequireApprover><ContentApprovalQueue onApprovalAction={() => {}} /></RequireApprover></ErrorBoundary>}
+          element={<ErrorBoundary><RequireApprover><Approvals /></RequireApprover></ErrorBoundary>}
         />
         <Route
           path="/reports"
-          element={<ErrorBoundary><RequirePerm perm="view_reports"><div className="legacy-page"><Reports /></div></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><RequirePerm perm="view_reports"><Reports /></RequirePerm></ErrorBoundary>}
         />
         <Route
           path="/team"
