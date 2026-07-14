@@ -206,9 +206,24 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                       <option value="url">Paste an image/video URL</option>
                     </select>
                     {d.media_url !== undefined ? (
-                      <UrlField zone={zone} value={d.media_url || ""} theme={theme} lbl={lbl}
-                        placeholder="https://cdn…/promo.jpg or .mp4"
-                        onChange={(v) => setDraft(zone.key, { media_url: v, media_type: guessType(v), media_s3: undefined })} />
+                      <>
+                        <UrlField zone={zone} value={d.media_url || ""} theme={theme} lbl={lbl}
+                          placeholder="https://cdn…/promo.jpg or .mp4"
+                          onChange={(v) => setDraft(zone.key, { media_url: v, media_type: guessType(v), media_s3: undefined })} />
+                        <div style={{ marginTop: 8 }}>
+                          <label htmlFor={`media-kind-${zone.key}`} style={lbl}>This link is a…</label>
+                          <select id={`media-kind-${zone.key}`}
+                            value={d.media_type === "video" ? "video" : "image"}
+                            onChange={(e) => setDraft(zone.key, { media_type: e.target.value })}
+                            style={{ ...inp, marginBottom: 4 }}>
+                            <option value="image">Image (still picture)</option>
+                            <option value="video">Video (plays &amp; loops)</option>
+                          </select>
+                          <div style={{ fontSize: 11.5, color: theme.textSecondary }}>
+                            Auto-set from the link’s extension. Pick <strong>Video</strong> if your link streams a video but doesn’t end in .mp4/.webm — otherwise it shows as a still image.
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <>
                         <LibraryPicker
