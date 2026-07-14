@@ -13,7 +13,7 @@ import { apiGet, normalizeList } from "../../lib/api";
 
 const ACCEPT = "image/jpeg,image/png,image/gif,image/webp,video/mp4";
 
-export default function ZoneContentEditor({ scope, targetId, targetName, onClose }) {
+export default function ZoneContentEditor({ scope, targetId, targetName, onClose, focusZoneKey }) {
   const isDevice = scope === "device";
   const isCompany = scope === "company";
   const [zones, setZones] = useState(null);
@@ -142,7 +142,9 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
             </p>
           )}
 
-          {zones && linked && zones.map((zone) => {
+          {zones && linked && zones
+            .filter((zone) => !focusZoneKey || zone.key === focusZoneKey)
+            .map((zone) => {
             const def = ZONE_TYPES[zone.type] || {};
             const d = draftOf(zone.key);
             const saved = content[zone.key];
