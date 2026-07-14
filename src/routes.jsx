@@ -14,12 +14,14 @@ import Dashboard from "./pages/Dashboard";
 import Screens from "./pages/Screens";
 import PendingScreensPage from "./pages/PendingScreens";
 import ScreenDetail from "./pages/ScreenDetail";
-import MediaLegacy from "./pages/MediaLegacy";
+import Media from "./pages/Media";
+import Groups from "./pages/Groups";
+import GroupDetail from "./pages/GroupDetail";
+import AssignContent from "./pages/AssignContent";
+import Locations from "./pages/Locations";
+import LocationDetail from "./pages/LocationDetail";
 import Settings from "./pages/Settings";
 import UserManagement from "./legacy/UserManagement";
-import Group from "./components/Group";
-import Shop from "./components/Shop";
-import GroupLinkedVideo from "./components/GroupLinkedVideo";
 import Reports from "./components/Reports";
 import ContentApprovalQueue from "./components/ContentApprovalQueue";
 import PlatformAdmin from "./components/PlatformAdmin";
@@ -131,19 +133,27 @@ export default function AppRoutes() {
         />
         <Route
           path="/groups"
-          element={<ErrorBoundary><RequirePerm perm="manage_groups"><LegacyCard><Group /></LegacyCard></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><RequirePerm perm="manage_groups"><Groups /></RequirePerm></ErrorBoundary>}
+        />
+        <Route
+          path="/groups/:gname"
+          element={<ErrorBoundary><RequirePerm perm="manage_groups"><GroupDetail /></RequirePerm></ErrorBoundary>}
         />
         <Route
           path="/locations"
-          element={<ErrorBoundary><RequirePerm perm="manage_shops"><LegacyCard><Shop /></LegacyCard></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><RequirePerm perm="manage_shops"><Locations /></RequirePerm></ErrorBoundary>}
+        />
+        <Route
+          path="/locations/:shopName"
+          element={<ErrorBoundary><RequirePerm perm="manage_shops"><LocationDetail /></RequirePerm></ErrorBoundary>}
         />
         <Route
           path="/media"
-          element={<ErrorBoundary><RequireAnyPerm perms={["manage_videos", "upload_videos"]}><MediaLegacy /></RequireAnyPerm></ErrorBoundary>}
+          element={<ErrorBoundary><RequireAnyPerm perms={["manage_videos", "upload_videos"]}><Media /></RequireAnyPerm></ErrorBoundary>}
         />
         <Route
           path="/assign"
-          element={<ErrorBoundary><RequirePerm perm="manage_links"><LegacyCard><GroupLinkedVideo onDone={() => {}} /></LegacyCard></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><RequirePerm perm="manage_links"><AssignContent /></RequirePerm></ErrorBoundary>}
         />
         <Route
           path="/approvals"
