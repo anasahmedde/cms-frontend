@@ -483,3 +483,71 @@
     padding: 16px;
   }
 }
+
+
+/* Sidebar scrollbar: thin + dark so it disappears into the navy rail
+   (the default light scrollbar showed as a white strip when nav overflowed). */
+.ui-sidebar,
+.ui-sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.ui-sidebar::-webkit-scrollbar,
+.ui-sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.ui-sidebar::-webkit-scrollbar-thumb,
+.ui-sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  border: none;
+}
+.ui-sidebar::-webkit-scrollbar-track,
+.ui-sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
+/* Login brand panel: slow cross-fading photo backdrop under a navy wash. */
+.ui-login-brand {
+  position: relative;
+  overflow: hidden;
+}
+.ui-login-slides,
+.ui-login-slide,
+.ui-login-slide-overlay {
+  position: absolute;
+  inset: 0;
+}
+.ui-login-slide {
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  animation: ui-login-fade 18s infinite;
+}
+.ui-login-slide-2 { animation-delay: 6s; }
+.ui-login-slide-3 { animation-delay: 12s; }
+@keyframes ui-login-fade {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  33.3% { opacity: 1; }
+  41.3% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-login-slide { animation: none; }
+  .ui-login-slide-1 { opacity: 1; }
+}
+.ui-login-slide-overlay {
+  background: linear-gradient(160deg, rgba(10, 22, 40, 0.92) 0%, rgba(10, 22, 40, 0.72) 55%, rgba(10, 22, 40, 0.86) 100%);
+}
+.ui-login-brand-content {
+  position: relative;
+  z-index: 1;
+}
+.ui-login-tagline-sub {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  max-width: 340px;
+  margin-top: 6px;
+}

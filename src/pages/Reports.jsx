@@ -16,6 +16,7 @@ import { SkeletonText } from "../ui/Skeleton";
 import { Field, Select, Input, Checkbox } from "../ui/Field";
 import { useToast } from "../ui/Toast";
 import { apiGet, normalizeList } from "../lib/api";
+import { useCompanyFeatures } from "../lib/features";
 import { formatDuration, formatPercent } from "../lib/format";
 import { LineChart, BarChart } from "../workflows/reports/charts";
 import useReportData from "../workflows/reports/useReportData";
@@ -57,12 +58,22 @@ function csvRows(tab, id, entry) {
 
 export default function Reports() {
   const toast = useToast();
+  const { features } = useCompanyFeatures();
   const [devices, setDevices] = useState([]);
   const [devError, setDevError] = useState("");
   const [devLoading, setDevLoading] = useState(true);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState([]);
-  const [tab, setTab] = useState("temperature");
+  const visibleTabs = TABS.filter(
+    (t) =>
+      t.key === "uptime" ||
+      (t.key === "temperature" ? features.temperature : features.footfall)
+  );
+  const [tab, setTab] = useState("uptime");
+  useEffect(() => {
+    if (!visibleTabs.some((t) => t.key === tab)) setTab("uptime");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleTabs.length]);
   const [preset, setPreset] = useState("7");
   const [custom, setCustom] = useState(false);
   const [startDate, setStartDate] = useState("");
@@ -231,7 +242,7 @@ export default function Reports() {
 
         <div>
           <div className="u-between" style={{ marginBottom: 12, flexWrap: "wrap" }}>
-            <Tabs tabs={TABS} active={tab} onChange={setTab} />
+            <Tabs tabs={visibleTabs} active={tab} onChange={setTab} />
             <div className="u-flex">
               {custom ? (
                 <>

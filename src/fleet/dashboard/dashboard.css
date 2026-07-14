@@ -320,3 +320,16 @@ a.fleet-chip:hover {
 .fleet-preview-dot--active {
   background: var(--accent);
 }
+
+
+.fleet-filters--single {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fleet-filters--single > :first-child {
+  flex: 1;
+  min-width: 260px;
+  max-width: 480px;
+}

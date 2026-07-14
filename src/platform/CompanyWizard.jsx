@@ -7,7 +7,7 @@ import Button from "../ui/Button";
 import Badge from "../ui/Badge";
 import CopyButton from "../ui/CopyButton";
 import KeyValue from "../ui/KeyValue";
-import { Field, Input, Select } from "../ui/Field";
+import { Field, Input, Select, Checkbox } from "../ui/Field";
 import { apiGet, apiPost, apiPut } from "../lib/api";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
@@ -19,7 +19,14 @@ const initial = {
   expires_at: "", grace_period_days: 7,
   admin_username: "", admin_full_name: "", admin_email: "",
   template_id: "",
+  features: { temperature: false, footfall: false, gender: false },
 };
+
+const FEATURE_OPTIONS = [
+  { key: "temperature", label: "Temperature monitoring", hint: "BLE temperature probe hardware" },
+  { key: "footfall", label: "Footfall counting", hint: "Door/reed-switch counter hardware" },
+  { key: "gender", label: "Gender analytics", hint: "Camera-based (web player)" },
+];
 
 export default function CompanyWizard({ open, onClose, onCreated }) {
   const navigate = useNavigate();
@@ -62,6 +69,7 @@ export default function CompanyWizard({ open, onClose, onCreated }) {
       admin_username: form.admin_username.trim(),
       admin_full_name: form.admin_full_name || null,
       admin_email: form.admin_email || null,
+      features: form.features,
     });
     if (!res.ok) {
       setBusy(false);
@@ -178,6 +186,18 @@ export default function CompanyWizard({ open, onClose, onCreated }) {
               <Input id="cw-grace" type="number" min={0} max={30} value={form.grace_period_days} onChange={set("grace_period_days")} />
             </Field>
           )}
+          <Field label="Analytics features" hint="Only enable what this company's hardware supports — everything is off by default">
+            <div style={{ display: "grid", gap: 6 }}>
+              {FEATURE_OPTIONS.map((f) => (
+                <Checkbox
+                  key={f.key}
+                  label={`${f.label} — ${f.hint}`}
+                  checked={!!form.features[f.key]}
+                  onChange={(e) => setForm({ ...form, features: { ...form.features, [f.key]: e.target.checked } })}
+                />
+              ))}
+            </div>
+          </Field>
         </>
       ) : step === 2 ? (
         <>
@@ -202,6 +222,7 @@ export default function CompanyWizard({ open, onClose, onCreated }) {
               { label: "Screens / Team / Storage", value: `${form.max_devices} / ${form.max_users} / ${form.max_storage_mb} MB` },
               { label: "Expires", value: form.expires_at ? new Date(form.expires_at).toLocaleString() : "Never" },
               { label: "Template", value: form.template_id ? templates.find((t) => String(t.id) === form.template_id)?.name : "None" },
+              { label: "Analytics", value: FEATURE_OPTIONS.filter((f) => form.features[f.key]).map((f) => f.label).join(", ") || "None" },
             ]}
           />
           <Badge tone="info">A temporary admin password will be generated and shown once.</Badge>

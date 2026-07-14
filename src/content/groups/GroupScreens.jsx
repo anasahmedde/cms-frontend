@@ -99,6 +99,9 @@ export default function GroupScreens({ gname, attachments, loading, error, reloa
               Unassign all
             </Button>
           )}
+          <Link to={`/screens?add=1&group=${encodeURIComponent(gname)}`}>
+            <Button size="sm" variant="secondary">Enroll new screen</Button>
+          </Link>
           <Button size="sm" icon={Plus} onClick={() => setAdding(true)}>
             Add screen
           </Button>

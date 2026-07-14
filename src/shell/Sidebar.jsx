@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, MonitorPlay, Layers, MapPin, Film, Link2, CheckCircle2,
-  BarChart3, UsersRound, Settings, Globe, Building2, LayoutTemplate,
+  LayoutDashboard, MonitorPlay, Layers, MapPin, Film, Link2, LayoutTemplate, CheckCircle2,
+  BarChart3, UsersRound, Settings, Globe, Building2,
   Megaphone, Activity, ScrollText, Sun, Moon, KeyRound, LogOut,
 } from "lucide-react";
 import Badge from "../ui/Badge";
@@ -21,6 +21,7 @@ const COMPANY_NAV = [
   { to: "/locations", label: "Locations", icon: MapPin, perm: "manage_shops" },
   { to: "/media", label: "Media", icon: Film, anyPerm: ["manage_videos", "upload_videos"] },
   { to: "/assign", label: "Assign content", icon: Link2, perm: "manage_links" },
+  { to: "/template-content", label: "Template content", icon: LayoutTemplate, anyPerm: ["manage_company_settings", "manage_shops", "manage_devices"] },
   { to: "/approvals", label: "Approvals", icon: CheckCircle2, approvals: true },
   { to: "/reports", label: "Reports", icon: BarChart3, perm: "view_reports" },
   { to: "/team", label: "Team", icon: UsersRound, perm: "manage_users" },

@@ -10,8 +10,8 @@ export const LOAD_LIMIT = 200;
 export const KINDS = {
   video: {
     kind: "video",
-    label: "Video",
-    plural: "videos",
+    label: "Playlist",
+    plural: "playlist media",
     nameField: "video_name",
     listPath: "/videos",
     uploadPath: "/upload_video",
@@ -22,8 +22,8 @@ export const KINDS = {
   },
   image: {
     kind: "image",
-    label: "Image",
-    plural: "images",
+    label: "Layout image",
+    plural: "layout images",
     nameField: "ad_name",
     listPath: "/advertisements",
     uploadPath: "/upload_advertisement",

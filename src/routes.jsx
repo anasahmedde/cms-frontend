@@ -15,6 +15,7 @@ import Screens from "./pages/Screens";
 import PendingScreensPage from "./pages/PendingScreens";
 import ScreenDetail from "./pages/ScreenDetail";
 import Media from "./pages/Media";
+import TemplateContent from "./pages/TemplateContent";
 import Groups from "./pages/Groups";
 import GroupDetail from "./pages/GroupDetail";
 import AssignContent from "./pages/AssignContent";
@@ -138,6 +139,10 @@ export default function AppRoutes() {
         <Route
           path="/media"
           element={<ErrorBoundary><RequireAnyPerm perms={["manage_videos", "upload_videos"]}><Media /></RequireAnyPerm></ErrorBoundary>}
+        />
+        <Route
+          path="/template-content"
+          element={<ErrorBoundary><RequireAnyPerm perms={["manage_company_settings", "manage_shops", "manage_devices"]}><TemplateContent /></RequireAnyPerm></ErrorBoundary>}
         />
         <Route
           path="/assign"

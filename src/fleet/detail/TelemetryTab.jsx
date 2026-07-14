@@ -5,6 +5,7 @@ import { History } from "lucide-react";
 import { apiGet } from "../../lib/api";
 import { formatDateTime, timeAgo } from "../../lib/format";
 import Card from "../../ui/Card";
+import { useCompanyFeatures } from "../../lib/features";
 import Table from "../../ui/Table";
 import StatusDot from "../../ui/StatusDot";
 import EmptyState from "../../ui/EmptyState";
@@ -93,25 +94,27 @@ function useGenderEnabled(mobileId) {
 }
 
 export default function TelemetryTab({ device }) {
+  const { features } = useCompanyFeatures();
   const mobileId = device.mobile_id;
   const gender = useGenderEnabled(mobileId);
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <TemperatureCard mobileId={mobileId} />
+      {features.temperature && <TemperatureCard mobileId={mobileId} />}
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))" }}>
-        <FootfallCard mobileId={mobileId} />
-        {gender.loading ? (
-          <Card title="Gender counting">
-            <Skeleton height={80} />
-          </Card>
-        ) : gender.error ? (
-          <Card title="Gender counting">
-            <ErrorState message={gender.error} />
-          </Card>
-        ) : (
-          <GenderCard mobileId={mobileId} enabled={gender.enabled} />
-        )}
+        {features.footfall && <FootfallCard mobileId={mobileId} />}
+        {features.gender &&
+          (gender.loading ? (
+            <Card title="Gender counting">
+              <Skeleton height={80} />
+            </Card>
+          ) : gender.error ? (
+            <Card title="Gender counting">
+              <ErrorState message={gender.error} />
+            </Card>
+          ) : (
+            <GenderCard mobileId={mobileId} enabled={gender.enabled} />
+          ))}
       </div>
       <LogsCard mobileId={mobileId} />
       <OnlineHistoryCard mobileId={mobileId} />

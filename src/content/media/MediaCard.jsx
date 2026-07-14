@@ -26,7 +26,7 @@ export default function MediaCard({ item, onPreview, onEdit, onWhereUsed, onDele
 
         <div className="media-card-meta">
           <Badge tone={item.kind === "video" ? "info" : "success"}>
-            {item.kind === "video" ? "Video" : "Image"}
+            {item.kind === "video" ? "Playlist" : "Layout image"}
           </Badge>
           {item.kind === "video" && type !== "video" && (
             <Badge tone={TYPE_TONES[type] || "neutral"}>{type.toUpperCase()}</Badge>

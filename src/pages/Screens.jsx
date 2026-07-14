@@ -158,7 +158,7 @@ export default function Screens() {
   const [pageSize, setPageSize] = useState(20);
   const [tab, setTab] = useState("active");
   const [pendingCount, setPendingCount] = useState(0);
-  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(() => searchParams.get("add") === "1");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [del, setDel] = useState(null); // { row, linked }
   const [delBusy, setDelBusy] = useState(false);
@@ -342,7 +342,7 @@ export default function Screens() {
         </>
       )}
 
-      <AddScreenWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onCreated={() => { load(); loadPending(); }} />
+      <AddScreenWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onCreated={() => { load(); loadPending(); }} initialLocation={searchParams.get("location") || ""} initialGroup={searchParams.get("group") || ""} />
       {bulkOpen && (
         <BulkImport open onClose={() => setBulkOpen(false)} onImported={() => { load(); loadPending(); }} />
       )}
