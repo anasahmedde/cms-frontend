@@ -146,7 +146,7 @@ function LayersList({ theme, zones, selectedKey, onSelect }) {
   );
 }
 
-export default function PropertiesPanel({ theme, state, dispatch }) {
+export default function PropertiesPanel({ theme, state, dispatch, onEditRuns }) {
   const { template, selectedKey } = state;
   const zone = template.zones.find((z) => z.key === selectedKey);
   const layers = (
@@ -226,6 +226,7 @@ export default function PropertiesPanel({ theme, state, dispatch }) {
 
   const def = ZONE_TYPES[zone.type] || { bindings: [] };
   const source = zone.binding?.source || "static";
+  const runCount = Array.isArray(zone.content?.runs) ? zone.content.runs.length : 0;
 
   return (
     <div>
@@ -272,13 +273,25 @@ export default function PropertiesPanel({ theme, state, dispatch }) {
           </select>
         </div>
       )}
-      {source === "static" && zone.type !== "clock" && (
+      {source === "static" && zone.type !== "clock" && !runCount && (
         <div style={row}>
           <label htmlFor="z-text" style={lbl(theme)}>Text</label>
           <textarea id="z-text" value={zone.content?.text || ""} rows={3}
             onChange={(e) => patchZone({ content: { text: e.target.value } })}
             style={{ ...inp(theme), resize: "vertical", fontFamily: "inherit" }}
             placeholder={"Fixed text shown on screen\n(multi-line supported)"} />
+        </div>
+      )}
+      {(zone.type === "text" || zone.type === "ticker") && onEditRuns && (
+        <div style={{ marginBottom: 10 }}>
+          <button onClick={() => onEditRuns(zone.key)}
+            style={{ width: "100%", padding: "8px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13,
+                     border: `1px solid ${theme.accent}`, background: "rgba(245,158,11,0.12)", color: theme.text, fontWeight: 600 }}>
+            {runCount ? `Edit ${runCount} text item${runCount > 1 ? "s" : ""}…` : "Compose multiple text items…"}
+          </button>
+          <p style={{ fontSize: 11, color: theme.textSecondary, margin: "4px 0 0" }}>
+            {runCount ? "This zone shows the positioned items above; the single Text field is hidden." : "Place several styled texts freely inside this box (or double-click it on the canvas)."}
+          </p>
         </div>
       )}
 

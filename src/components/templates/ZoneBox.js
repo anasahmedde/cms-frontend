@@ -30,7 +30,7 @@ export function zonePreviewText(zone) {
 
 export default function ZoneBox({
   zone, index, selected, canvasRef, snapTargets,
-  onSelect, onChange, onGestureStart, onGestureEnd,
+  onSelect, onChange, onGestureStart, onGestureEnd, onEditRuns,
 }) {
   const gesture = useRef(null);
 
@@ -101,6 +101,7 @@ export default function ZoneBox({
   const color = st.text_color || "#ffffff";
   const def = ZONE_TYPES[zone.type] || {};
   const isTexty = zone.type === "text" || zone.type === "ticker" || zone.type === "clock";
+  const runs = Array.isArray(zone.content?.runs) ? zone.content.runs : null;
   // font_size_vh is % of SCREEN height; the canvas is a scale model of it.
   const previewFontPct = Math.max(9, ((st.font_size_vh ?? 50) / 100) * (zone.h || 10) * 2.2);
 
@@ -114,6 +115,7 @@ export default function ZoneBox({
       onPointerUp={endGesture}
       onPointerCancel={endGesture}
       onKeyDown={(e) => { if (e.key === "Enter") onSelect(zone.key); }}
+      onDoubleClick={(e) => { if (onEditRuns) { e.stopPropagation(); onEditRuns(); } }}
       style={{
         position: "absolute",
         left: `${zone.x}%`, top: `${zone.y}%`,
@@ -135,10 +137,18 @@ export default function ZoneBox({
         gap: 2,
       }}
     >
-      <span style={{ fontWeight: 700, fontSize: 11, opacity: 0.9, pointerEvents: "none", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>
+      <span style={{ fontWeight: 700, fontSize: 11, opacity: 0.9, pointerEvents: "none", textShadow: "0 1px 2px rgba(0,0,0,0.6)", position: runs ? "absolute" : "static", top: 2, left: 4, zIndex: 2 }}>
         {def.icon} {zone.key}
       </span>
-      <span
+      {runs && runs.map((r, ri) => (
+        <span key={ri} style={{
+          position: "absolute", left: `${r.x || 0}%`, top: `${r.y || 0}%`, width: `${r.w || 40}%`,
+          color: r.text_color || "#fff", fontWeight: r.bold ? 700 : 400, textAlign: r.align || "left",
+          fontSize: `${Math.max(7, ((r.font_size_vh || 18) / 100) * (zone.h || 10) * 2.2)}px`,
+          lineHeight: 1.05, pointerEvents: "none", overflow: "hidden", textShadow: "0 1px 2px rgba(0,0,0,0.6)",
+        }}>{r.text || ""}</span>
+      ))}
+      {!runs && <span
         style={{
           pointerEvents: "none",
           padding: "0 6px",
@@ -154,7 +164,7 @@ export default function ZoneBox({
         }}
       >
         {zonePreviewText(zone)}
-      </span>
+      </span>}
       {selected && HANDLES.map((hd) => (
         <div
           key={hd.id}
