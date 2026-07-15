@@ -11,6 +11,7 @@ import ErrorState from "../ui/ErrorState";
 import ConfirmModal from "../ui/ConfirmModal";
 import { useToast } from "../ui/Toast";
 import { apiDelete } from "../lib/api";
+import { useCompanyFeatures, featureOn } from "../lib/features";
 import MediaGrid from "../content/media/MediaGrid";
 import UploadModal from "../content/media/UploadModal";
 import EditModal from "../content/media/EditModal";
@@ -22,6 +23,8 @@ const TAB_KINDS = { all: ["video", "image"], videos: ["video"], images: ["image"
 
 export default function Media() {
   const toast = useToast();
+  const { features } = useCompanyFeatures();
+  const gridEnabled = featureOn(features, "grid");
   const [params, setParams] = useSearchParams();
   const tab = params.get("kind") === "image" ? "images" : params.get("kind") === "video" ? "videos" : "all";
   const [q, setQ] = useState(params.get("q") || "");
@@ -86,26 +89,24 @@ export default function Media() {
     setDeleting(null);
   };
 
-  const uploadKind = tab === "images" ? "image" : "video";
-
   return (
     <div>
       <PageHeader
         title="Media Library"
-        subtitle="Playlist media plays in the screen rotation (videos, images, HTML, PDF); layout images fill slots in split/grid layouts"
-        actions={
-          <>
-            <Button variant="secondary" icon={Upload} onClick={() => setUpload("image")}>Upload layout image</Button>
-            <Button icon={Upload} onClick={() => setUpload("video")}>Upload media</Button>
-          </>
+        subtitle={
+          gridEnabled
+            ? "Media plays in the screen rotation (video, images, HTML, PDF). Images can also fill slots in split/grid layouts."
+            : "Media plays in the screen rotation — video, images, HTML, and PDF."
         }
+        actions={<Button icon={Upload} onClick={() => setUpload(true)}>Upload media</Button>}
       />
       <div className="u-between" style={{ marginBottom: 14, flexWrap: "wrap" }}>
         <Tabs
           tabs={[
             { key: "all", label: "All" },
             { key: "videos", label: "Playlist media" },
-            { key: "images", label: "Layout images" },
+            // Layout images only matter when the company uses grid/split layouts.
+            ...(gridEnabled ? [{ key: "images", label: "Layout images" }] : []),
           ]}
           active={tab}
           onChange={switchTab}
@@ -122,7 +123,7 @@ export default function Media() {
           icon={Film}
           title={q ? "No media matches your search" : "No media yet"}
           hint={q ? "Try a different name." : "Upload a video or image to get started."}
-          action={!q && <Button icon={Upload} onClick={() => setUpload(uploadKind)}>Upload {uploadKind}</Button>}
+          action={!q && <Button icon={Upload} onClick={() => setUpload(true)}>Upload media</Button>}
         />
       ) : (
         <>
@@ -144,10 +145,9 @@ export default function Media() {
 
       <UploadModal
         open={!!upload}
-        kind={upload || "video"}
-        onClose={() => setUpload(null)}
+        onClose={() => setUpload(false)}
         onUploaded={() => {
-          setUpload(null);
+          setUpload(false);
           load();
         }}
       />
