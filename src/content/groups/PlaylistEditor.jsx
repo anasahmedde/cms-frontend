@@ -148,14 +148,13 @@ export default function PlaylistEditor({ gname, onSaved }) {
 
   const saveDirect = async (rotationNames, adNames) => {
     const enc = encodeURIComponent(gname);
-    const [v, a] = await Promise.all([
-      apiPost(`/group/${enc}/videos`, { video_names: rotationNames }),
-      apiPost(`/group/${enc}/advertisements`, { ad_names: adNames }),
-    ]);
-    if (!v.ok || !a.ok) {
-      toast.error((!v.ok ? v.message : a.message) || "Save failed");
-      return false;
-    }
+    // Save sequentially (rotation first) so one request failing can't leave the
+    // two stacks half-committed — the ad stack is rewritten only after the
+    // rotation save has succeeded.
+    const v = await apiPost(`/group/${enc}/videos`, { video_names: rotationNames });
+    if (!v.ok) { toast.error(v.message || "Save failed"); return false; }
+    const a = await apiPost(`/group/${enc}/advertisements`, { ad_names: adNames });
+    if (!a.ok) { toast.error(a.message || "Save failed"); return false; }
     return true;
   };
 
