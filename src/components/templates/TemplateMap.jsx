@@ -96,7 +96,7 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
           const selected = z.key === selectedKey;
           const preview = previewOf(z, contentByKey[z.key]);
           const pin = overrides[z.key];
-          const pinCount = pin ? (pin.shops?.length || 0) + (pin.devices?.length || 0) : 0;
+          const pinCount = pin ? (pin.shops?.length || 0) + (pin.devices?.length || 0) + (pin.groups?.length || 0) : 0;
           return (
             <button
               key={z.key}
