@@ -325,6 +325,13 @@ export default function PropertiesPanel({ theme, state, dispatch, onEditRuns }) 
             </select>
           </div>
           <div style={row}>
+            <label htmlFor="z-valign" style={lbl(theme)}>V-align</label>
+            <select id="z-valign" value={zone.style?.valign || "middle"}
+              onChange={(e) => patchStyle("valign", e.target.value)} style={inp(theme)}>
+              <option value="top">top</option><option value="middle">middle</option><option value="bottom">bottom</option>
+            </select>
+          </div>
+          <div style={row}>
             <label htmlFor="z-dir" style={lbl(theme)}>Direction</label>
             <select id="z-dir" value={zone.style?.direction || "ltr"}
               onChange={(e) => patchStyle("direction", e.target.value)} style={inp(theme)}>

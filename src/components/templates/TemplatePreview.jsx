@@ -75,7 +75,8 @@ function ZoneContent({ z }) {
       return <div style={{ width: "100%", height: "100%", overflow: "hidden", whiteSpace: "nowrap", display: "flex", alignItems: "center", color: textColor, fontSize: `min(${st.font_size_vh || 60}cqh, 12cqw)` }}>{c.text || ""}</div>;
     case "text":
       return <div style={{
-        width: "100%", height: "100%", display: "flex", alignItems: "center",
+        width: "100%", height: "100%", display: "flex",
+        alignItems: st.valign === "top" ? "flex-start" : st.valign === "bottom" ? "flex-end" : "center",
         justifyContent: st.align === "left" ? "flex-start" : st.align === "right" ? "flex-end" : "center",
         padding: "0 2%", color: textColor, fontSize, fontWeight: st.bold ? 700 : 400, textAlign: "center",
         lineHeight: 1.15, direction: st.direction === "rtl" ? "rtl" : "ltr", wordBreak: "break-word", overflow: "hidden",
