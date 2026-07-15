@@ -27,6 +27,48 @@ function isEditable(z) {
   return (z.binding?.source || "static") === "content";
 }
 
+const NAME_PLACEHOLDER = {
+  "company.name": "🏢 Company name",
+  "shop.name": "📍 Location name",
+  "device.name": "🖥 Screen name",
+};
+
+function runsText(runs) {
+  return (runs || []).map((r) => r && r.text).filter(Boolean).join("  ·  ");
+}
+
+// What a zone will actually show, so the layout mirrors the configured screen.
+// Static/designer text lives on the zone (z.content); content-bound text comes
+// from the current-scope payload; name-bound zones show a resolved-per-screen
+// placeholder. Returns { text, muted } or null when there's nothing to preview.
+function previewOf(z, payload) {
+  const src = z.binding?.source || "static";
+  const zc = z.content || {};
+  if (z.type === "text" || z.type === "ticker" || z.type === "clock") {
+    if (NAME_PLACEHOLDER[src]) return { text: NAME_PLACEHOLDER[src], muted: true };
+    if (src === "content") {
+      if (payload?.runs?.length) return { text: runsText(payload.runs) };
+      if (payload?.text) return { text: payload.text };
+    } else {
+      if (Array.isArray(zc.runs) && zc.runs.length) return { text: runsText(zc.runs) };
+      if (zc.text) return { text: zc.text };
+    }
+    if (z.type === "clock") return { text: "🕐 " + (z.style?.format || "HH:mm"), muted: true };
+    return null;
+  }
+  if (z.type === "media") {
+    if (payload?.media_url || payload?.media_s3 || payload?.media_type) {
+      return { text: payload.media_type === "video" ? "🎬 Video set" : "🖼 Image set", muted: true };
+    }
+    return null;
+  }
+  if (z.type === "qr") {
+    if (payload && Object.keys(payload).length) return { text: "▦ QR set", muted: true };
+    return null;
+  }
+  return null;
+}
+
 export default function TemplateMap({ template, contentByKey = {}, selectedKey, onZoneClick }) {
   const zones = template?.zones || [];
   const dw = template?.design_width || 1920;
@@ -52,6 +94,7 @@ export default function TemplateMap({ template, contentByKey = {}, selectedKey, 
           const editable = isEditable(z);
           const hasContent = !!contentByKey[z.key];
           const selected = z.key === selectedKey;
+          const preview = previewOf(z, contentByKey[z.key]);
           return (
             <button
               key={z.key}
@@ -73,10 +116,24 @@ export default function TemplateMap({ template, contentByKey = {}, selectedKey, 
                 boxShadow: selected ? "0 0 0 3px rgba(245,158,11,0.4)" : "none",
               }}
             >
-              <span style={{ fontWeight: 700, textShadow: "0 1px 2px rgba(0,0,0,0.6)", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <span style={{ fontWeight: 700, fontSize: preview ? 9.5 : 11, opacity: preview ? 0.72 : 1, textShadow: "0 1px 2px rgba(0,0,0,0.6)", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {z.key}
               </span>
-              <span style={{ fontSize: 9.5, opacity: 0.85 }}>{TYPE_LABEL[z.type] || z.type}</span>
+              {preview ? (
+                <span
+                  title={preview.text}
+                  style={{
+                    fontSize: 11, fontWeight: 600, lineHeight: 1.2, maxWidth: "100%",
+                    opacity: preview.muted ? 0.85 : 1, textShadow: "0 1px 2px rgba(0,0,0,0.6)",
+                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                    overflow: "hidden", wordBreak: "break-word",
+                  }}
+                >
+                  {preview.text}
+                </span>
+              ) : (
+                <span style={{ fontSize: 9.5, opacity: 0.85 }}>{TYPE_LABEL[z.type] || z.type}</span>
+              )}
               {editable && (
                 <span
                   style={{
