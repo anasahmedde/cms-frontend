@@ -2,6 +2,7 @@
 // nothing is selected).
 import React from "react";
 import { ZONE_TYPES, BINDING_LABELS, CONTENT_SCOPES, CANVAS_PRESETS, CANVAS_MIN, CANVAS_MAX, normalizeCanvas, aspectLabel } from "./zoneTypes";
+import MediaLibraryPicker from "./MediaLibraryPicker";
 
 const row = { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 };
 const lbl = (theme) => ({ fontSize: 12, color: theme.textSecondary, width: 86, flexShrink: 0 });
@@ -50,7 +51,7 @@ function BackgroundSection({ theme, zone, patchStyle, patchZone }) {
   // Mode is explicit state, not derived: deriving it from the values made
   // "Image (URL)" snap back to "None" before a URL could be typed (the empty
   // string is falsy) — the reported "Image URL not working".
-  const derived = st.bg_image_url ? "image" : st.bg_gradient ? "gradient" : st.bg_color ? "solid" : "none";
+  const derived = st.bg_image_s3 ? "media" : st.bg_image_url ? "image" : st.bg_gradient ? "gradient" : st.bg_color ? "solid" : "none";
   const [mode, setModeState] = React.useState(derived);
   React.useEffect(() => {
     setModeState(derived);
@@ -61,10 +62,11 @@ function BackgroundSection({ theme, zone, patchStyle, patchZone }) {
   const setMode = (m) => {
     setModeState(m);
     // One background kind at a time — clear the others explicitly.
-    const cleared = { bg_color: undefined, bg_gradient: undefined, bg_image_url: undefined };
+    const cleared = { bg_color: undefined, bg_gradient: undefined, bg_image_url: undefined, bg_image_s3: undefined };
     if (m === "solid") cleared.bg_color = st.bg_color || "#0a1628";
     if (m === "gradient") cleared.bg_gradient = grad;
     if (m === "image") cleared.bg_image_url = st.bg_image_url || "";
+    if (m === "media") cleared.bg_image_s3 = st.bg_image_s3 || undefined;
     patchZone({ style: cleared });
   };
 
@@ -79,6 +81,7 @@ function BackgroundSection({ theme, zone, patchStyle, patchZone }) {
           <option value="none">None (transparent)</option>
           <option value="solid">Solid color</option>
           <option value="gradient">Gradient</option>
+          <option value="media">Image from media library</option>
           <option value="image">Image (URL)</option>
         </select>
       </div>
@@ -94,6 +97,18 @@ function BackgroundSection({ theme, zone, patchStyle, patchZone }) {
           <NumField theme={theme} id="z-grad-angle" label="Angle °" value={grad.angle ?? 135}
             onChange={(v) => patchStyle("bg_gradient", { ...grad, angle: Math.max(0, Math.min(360, Math.round(v))) })} min={0} max={360} />
         </>
+      )}
+      {mode === "media" && (
+        <div style={row}>
+          <label htmlFor="z-bg-media" style={lbl(theme)}>Media</label>
+          <MediaLibraryPicker
+            id="z-bg-media"
+            imagesOnly
+            value={st.bg_image_s3}
+            onPick={(it) => patchStyle("bg_image_s3", it.s3_link)}
+            style={inp(theme)}
+          />
+        </div>
       )}
       {mode === "image" && (
         <div style={row}>
