@@ -14,8 +14,15 @@ import Spinner from "../../ui/Spinner";
 import { useToast } from "../../ui/Toast";
 import PendingScreens from "./PendingScreens";
 
-const ACTION_TONE = { create: "success", pending: "warn", skip: "neutral", error: "danger" };
-const ACTION_LABEL = { create: "Create", pending: "Pending", skip: "Already exists", error: "Error" };
+const ACTION_TONE = { create: "success", update: "info", unchanged: "neutral", pending: "warn", skip: "neutral", error: "danger" };
+const ACTION_LABEL = { create: "Create", update: "Update", unchanged: "No change", pending: "Pending", skip: "Already exists", error: "Error" };
+
+// Human labels for the change diff fields.
+const FIELD_LABEL = { name: "Name", location: "Location", group: "Group" };
+function changeLabel(field) {
+  if (field.startsWith("content.")) return `Content · ${field.slice("content.".length)}`;
+  return FIELD_LABEL[field] || field;
+}
 
 function Stat({ label, value, tone }) {
   return (
@@ -36,6 +43,27 @@ const ROW_COLUMNS = [
     key: "action",
     label: "Action",
     render: (r) => <Badge tone={ACTION_TONE[r.action] || "neutral"}>{ACTION_LABEL[r.action] || r.action || "—"}</Badge>,
+  },
+  {
+    key: "changes",
+    label: "What changes",
+    render: (r) => {
+      if (!r.changes?.length) return r.action === "unchanged" ? <span className="u-faint">nothing</span> : "";
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {r.changes.map((c, i) => (
+            <span key={i} style={{ fontSize: 12 }}>
+              <b>{changeLabel(c.field)}:</b>{" "}
+              {c.from
+                ? <span className="u-faint" style={{ textDecoration: "line-through" }}>{c.from}</span>
+                : <span className="u-faint">(blank)</span>}
+              {" → "}
+              <span style={{ color: "var(--info)" }}>{c.to}</span>
+            </span>
+          ))}
+        </div>
+      );
+    },
   },
   { key: "reason", label: "Problem", render: (r) => r.reason || r.error || "" },
 ];
@@ -92,7 +120,9 @@ export default function BulkImport({ open, onClose, onImported }) {
     if (!res.ok) return setError(`Import failed: ${res.message}`);
     setResult(res.data);
     setPreview(null);
-    toast.success(`Imported ${Number(res.data?.created || 0) + Number(res.data?.pending || 0)} screen(s)`);
+    const made = Number(res.data?.created || 0) + Number(res.data?.pending || 0);
+    const upd = Number(res.data?.content_updated_existing || 0);
+    toast.success(`Applied — ${made} new${upd ? `, ${upd} updated` : ""}`);
     onImported?.();
   };
 
@@ -160,7 +190,8 @@ export default function BulkImport({ open, onClose, onImported }) {
               <div>
                 Created <b>{result.created}</b> screen(s)
                 {result.pending ? <>, <b>{result.pending}</b> pending (claim on the “Pending screens” tab)</> : null}
-                {result.skipped ? <>, {result.skipped} already existed</> : null}
+                {result.content_updated_existing ? <>, <b>{result.content_updated_existing}</b> updated</> : null}
+                {result.skipped ? <>, {result.skipped} unchanged</> : null}
                 . {result.shops} location(s), {result.groups} group(s) touched.
               </div>
             </section>
@@ -171,8 +202,9 @@ export default function BulkImport({ open, onClose, onImported }) {
               <h3 style={{ margin: "0 0 10px", fontSize: 14 }}>Preview — {s.total_rows} row(s)</h3>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 10 }}>
                 <Stat label="Will create" value={s.will_create} tone="success" />
+                <Stat label="Will update" value={s.will_update || 0} tone={s.will_update ? "info" : undefined} />
+                <Stat label="No change" value={s.will_unchanged || 0} />
                 <Stat label="Pending" value={s.will_pending} tone="warn" />
-                <Stat label="Already exist" value={s.will_skip} />
                 <Stat label="Errors" value={s.error_rows} tone={s.error_rows ? "danger" : undefined} />
               </div>
               <p style={{ margin: "0 0 10px", color: s.quota?.ok ? "var(--text-muted)" : "var(--danger)" }}>
@@ -198,7 +230,8 @@ export default function BulkImport({ open, onClose, onImported }) {
               )}
               <div className="u-flex">
                 <Button onClick={commit} disabled={!s.valid} loading={busy}>
-                  Import {Number(s.will_create || 0) + Number(s.will_pending || 0)} screen(s)
+                  Apply — {Number(s.will_create || 0) + Number(s.will_pending || 0)} new
+                  {s.will_update ? `, ${s.will_update} updated` : ""}
                 </Button>
                 {!s.valid && <span className="u-danger">Fix the errors above and re-upload before importing.</span>}
               </div>
