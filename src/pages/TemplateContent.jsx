@@ -17,11 +17,12 @@ import { apiGet, normalizeList } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import ZoneContentEditor from "../components/templates/ZoneContentEditor";
 import TemplateMap from "../components/templates/TemplateMap";
+import TemplatePreview from "../components/templates/TemplatePreview";
 import TemplateDesigner from "../components/templates/TemplateDesigner";
 import {
   getCompanyContent, getShopContent, getDeviceContent,
   getCompanyTemplateDesign, updateCompanyTemplateDesign, publishCompanyTemplateDesign,
-  getContentOverrides, clearZoneOverrides,
+  getContentOverrides, clearZoneOverrides, getTemplatePreview,
 } from "../components/templates/api";
 
 const SCOPES = [
@@ -57,6 +58,7 @@ export default function TemplateContent() {
   const [overrides, setOverrides] = useState({}); // zone_key -> {shops:[], devices:[]}
   const [clearing, setClearing] = useState(null); // {zoneKey, count} pending confirm
   const [clearBusy, setClearBusy] = useState(false);
+  const [preview, setPreview] = useState(null); // {template, zones} resolved WYSIWYG
   const { user, hasPermission } = useAuth();
   const companyName = user?.company?.name || "your company";
   const canDesign = hasPermission("manage_company_settings");
@@ -131,13 +133,19 @@ export default function TemplateContent() {
   }, [scope, shopPick, devicePick, shops, deviceMatches, companyName]);
 
   const reloadContentState = useCallback(async () => {
-    if (!target) { setContentByKey({}); return; }
+    if (!target) { setContentByKey({}); setPreview(null); return; }
     const res = target.scope === "device"
       ? await getDeviceContent(target.targetId)
       : target.scope === "shop"
         ? await getShopContent(target.targetId)
         : await getCompanyContent();
     setContentByKey(res.ok ? contentByKeyOf(res.data) : {});
+    const pv = await getTemplatePreview({
+      scope: target.scope,
+      shopId: target.scope === "shop" ? target.targetId : undefined,
+      deviceId: target.scope === "device" ? target.targetId : undefined,
+    });
+    setPreview(pv.ok ? pv.data : null);
   }, [target]);
 
   useEffect(() => { reloadContentState(); }, [reloadContentState]);
@@ -270,13 +278,24 @@ export default function TemplateContent() {
           />
         ) : (
           <Card title={`Layout — ${target.targetName}`}>
-            <TemplateMap
-              template={template}
-              contentByKey={contentByKey}
-              overrides={scope === "company" ? overrides : {}}
-              selectedKey={editing?.focusZoneKey}
-              onZoneClick={(zoneKey) => setEditing({ ...target, focusZoneKey: zoneKey })}
-            />
+            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <div>
+                <p className="u-faint" style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 600 }}>Click a box to set its content</p>
+                <TemplateMap
+                  template={template}
+                  contentByKey={contentByKey}
+                  overrides={scope === "company" ? overrides : {}}
+                  selectedKey={editing?.focusZoneKey}
+                  onZoneClick={(zoneKey) => setEditing({ ...target, focusZoneKey: zoneKey })}
+                />
+              </div>
+              <div>
+                <p className="u-faint" style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 600 }}>How it looks on screen</p>
+                {preview?.zones
+                  ? <TemplatePreview template={preview.template} zones={preview.zones} />
+                  : <div style={{ width: 240, minHeight: 120 }}><SkeletonText lines={3} /></div>}
+              </div>
+            </div>
           </Card>
         )}
       </div>

@@ -69,3 +69,11 @@ export const uploadCompanyMedia = (zoneKey, file, onProgress) => {
 export const getContentOverrides = () => safeGet("/company/template-content/overrides");
 export const clearZoneOverrides = (zoneKey) =>
   safeDelete(`/company/template-content/${zoneKey}/overrides`);
+
+// Resolved + presigned zones for the WYSIWYG preview (how a screen actually renders).
+export const getTemplatePreview = ({ scope = "company", shopId, deviceId } = {}) => {
+  const q = new URLSearchParams({ scope });
+  if (shopId != null) q.set("shop_id", shopId);
+  if (deviceId != null) q.set("device_id", deviceId);
+  return safeGet(`/company/template/preview?${q.toString()}`);
+};
