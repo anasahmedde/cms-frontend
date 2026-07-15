@@ -13,7 +13,7 @@ const inp = {
 
 const newRun = () => ({ text: "New text", x: 30, y: 40, w: 40, font_size_vh: 18, text_color: "#ffffff", bold: false, align: "left" });
 
-export default function TextRunsEditor({ zone, onSave, onClose }) {
+export default function TextRunsEditor({ zone, designWidth, designHeight, onSave, onClose }) {
   const [runs, setRuns] = useState(() =>
     Array.isArray(zone?.content?.runs) ? JSON.parse(JSON.stringify(zone.content.runs)) : []
   );
@@ -21,20 +21,29 @@ export default function TextRunsEditor({ zone, onSave, onClose }) {
   const boardRef = useRef(null);
   const drag = useRef(null);
 
-  // Canvas sized to the zone's on-screen aspect (w%×h% of the template canvas).
+  // Canvas mirrors the zone's TRUE on-screen shape: its pixel size on the target
+  // screen is (w% × design_width) by (h% × design_height), so the aspect ratio
+  // must use the template's design resolution — not the raw w%/h% (which only
+  // match on a square screen). The box is scaled down to fit, keeping that ratio.
   const aspect = useMemo(() => {
-    const zw = zone?.w || 50, zh = zone?.h || 20;
-    const bw = 640;
-    return { w: bw, h: Math.max(120, Math.round((bw * zh) / zw)) };
-  }, [zone]);
+    const dw = designWidth || 1920, dh = designHeight || 1080;
+    const zwPx = ((zone?.w || 50) / 100) * dw;
+    const zhPx = ((zone?.h || 20) / 100) * dh;
+    const MAX_W = 640, MAX_H = 440;
+    let w = MAX_W, h = Math.round((MAX_W * zhPx) / zwPx);
+    if (h > MAX_H) { h = MAX_H; w = Math.round((MAX_H * zwPx) / zhPx); }
+    return { w, h };
+  }, [zone, designWidth, designHeight]);
 
   useEffect(() => {
     const move = (e) => {
-      if (!drag.current || !boardRef.current) return;
+      const d = drag.current;
+      if (!d || !boardRef.current) return;
       const b = boardRef.current.getBoundingClientRect();
-      const x = ((e.clientX - b.left) / b.width) * 100 - drag.current.dx;
-      const y = ((e.clientY - b.top) / b.height) * 100 - drag.current.dy;
-      setRuns((rs) => rs.map((r, i) => i === drag.current.i
+      const x = ((e.clientX - b.left) / b.width) * 100 - d.dx;
+      const y = ((e.clientY - b.top) / b.height) * 100 - d.dy;
+      const idx = d.i; // capture now — drag.current may be nulled by pointerup before the updater runs
+      setRuns((rs) => rs.map((r, i) => i === idx
         ? { ...r, x: Math.max(0, Math.min(100, +x.toFixed(1))), y: Math.max(0, Math.min(100, +y.toFixed(1))) }
         : r));
     };
@@ -79,7 +88,8 @@ export default function TextRunsEditor({ zone, onSave, onClose }) {
             </div>
             <div
               ref={boardRef}
-              style={{ position: "relative", width: "100%", maxWidth: aspect.w, height: aspect.h,
+              style={{ position: "relative", width: aspect.w, maxWidth: "100%",
+                       aspectRatio: `${aspect.w} / ${aspect.h}`,
                        background: zone?.style?.bg_color || theme.brandNavy || "#0a1628",
                        borderRadius: 6, overflow: "hidden", border: `1px solid ${theme.border}` }}
             >
