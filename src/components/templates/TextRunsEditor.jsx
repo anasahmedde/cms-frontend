@@ -17,6 +17,11 @@ const zoomBtn = {
   border: `1px solid ${theme.inputBorder}`, background: theme.inputBg, color: theme.text,
   borderRadius: 8, fontSize: 17, lineHeight: 1, cursor: "pointer",
 };
+const HS = 14; // resize-handle size in px (counter-scaled by zoom to stay constant on screen)
+const handle = {
+  position: "absolute", width: HS, height: HS, background: theme.accent,
+  border: "2px solid #fff", borderRadius: 3, zIndex: 6, touchAction: "none", transformOrigin: "center",
+};
 
 const FRAME_H = 420;          // fixed stage height — never changes
 const GRID_LINE = "rgba(148,180,220,0.20)";
@@ -91,9 +96,16 @@ export default function TextRunsEditor({ zone, designWidth, designHeight, onSave
       const px = ((e.clientX - g.left) / g.width) * 100;
       const py = ((e.clientY - g.top) / g.height) * 100;
       const idx = d.i; // capture — drag.current may be nulled by pointerup first
-      setRuns((rs) => rs.map((r, i) => i === idx
-        ? { ...r, x: r1(clamp(px - d.dx, 0, 100)), y: r1(clamp(py - d.dy, 0, 100)) }
-        : r));
+      setRuns((rs) => rs.map((r, i) => {
+        if (i !== idx) return r;
+        // right-edge handle → width, kept so the right edge stays inside the grid
+        if (d.mode === "w") return { ...r, w: r1(clamp(px - d.x0, 5, Math.max(5, 100 - d.x0))) };
+        // bottom-edge handle → text size (% of grid height), kept inside the grid
+        if (d.mode === "size") return { ...r, font_size_vh: r1(clamp(py - d.y0, 2, Math.max(2, 100 - d.y0))) };
+        // body → move, clamped so the whole item stays within the grid (its true screen area)
+        const maxX = Math.max(0, 100 - d.wPct), maxY = Math.max(0, 100 - d.hPct);
+        return { ...r, x: r1(clamp(px - d.dx, 0, maxX)), y: r1(clamp(py - d.dy, 0, maxY)) };
+      }));
     };
     const up = () => { drag.current = null; setPanning(false); };
     window.addEventListener("pointermove", move);
@@ -113,13 +125,23 @@ export default function TextRunsEditor({ zone, designWidth, designHeight, onSave
       const i = +el.getAttribute("data-run-idx");
       setSel(i);
       const g = gridRef.current.getBoundingClientRect();
+      const it = el.getBoundingClientRect();
       const px = ((e.clientX - g.left) / g.width) * 100;
       const py = ((e.clientY - g.top) / g.height) * 100;
-      drag.current = { mode: "move", i, dx: px - runs[i].x, dy: py - runs[i].y };
+      // capture the item's on-screen size (as % of the grid) so move can keep it inside
+      drag.current = { mode: "move", i, dx: px - runs[i].x, dy: py - runs[i].y,
+                       wPct: (it.width / g.width) * 100, hPct: (it.height / g.height) * 100 };
     } else {
       drag.current = { mode: "pan", sx: e.clientX, sy: e.clientY, px0: view.panX, py0: view.panY };
       setPanning(true);
     }
+  };
+
+  // Resize the selected item by cursor: "w" tracks width, "size" tracks text size.
+  const startResize = (e, i, mode) => {
+    e.stopPropagation();
+    setSel(i);
+    drag.current = { mode, i, x0: runs[i].x, y0: runs[i].y };
   };
 
   const cur = sel >= 0 ? runs[sel] : null;
@@ -141,7 +163,7 @@ export default function TextRunsEditor({ zone, designWidth, designHeight, onSave
           <div style={{ flex: "1 1 580px", minWidth: 320 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: theme.textSecondary }}>
-                Scroll to zoom · drag empty grid to pan · drag a text to move · click to edit
+                Scroll to zoom · drag empty grid to pan · drag a text to move · handles resize width &amp; size
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <button onClick={() => zoomStep(0.89)} aria-label="Zoom out" style={zoomBtn}>−</button>
@@ -181,12 +203,23 @@ export default function TextRunsEditor({ zone, designWidth, designHeight, onSave
                       color: r.text_color || "#fff",
                       fontSize: `${((r.font_size_vh || 18) / 100) * grid.gh}px`,
                       fontWeight: r.bold ? 700 : 400, textAlign: r.align || "left",
-                      lineHeight: 1.12, cursor: "move", userSelect: "none", overflow: "hidden", whiteSpace: "pre-wrap",
+                      lineHeight: 1.12, cursor: "move", userSelect: "none",
+                      overflow: i === sel ? "visible" : "hidden", whiteSpace: "pre-wrap",
                       outline: i === sel ? `2px solid ${theme.accent}` : "1px dashed rgba(255,255,255,0.4)",
                       padding: 2,
                     }}
                   >
                     {r.text || " "}
+                    {i === sel && (
+                      <>
+                        <div onPointerDown={(e) => startResize(e, i, "w")} title="Drag to change width"
+                          style={{ ...handle, right: 0, top: "50%", marginTop: -HS / 2, marginRight: -HS / 2,
+                                   transform: `scale(${1 / view.zoom})`, cursor: "ew-resize" }} />
+                        <div onPointerDown={(e) => startResize(e, i, "size")} title="Drag to change text size"
+                          style={{ ...handle, bottom: 0, left: "50%", marginLeft: -HS / 2, marginBottom: -HS / 2,
+                                   transform: `scale(${1 / view.zoom})`, cursor: "ns-resize" }} />
+                      </>
+                    )}
                   </div>
                 ))}
                 {runs.length === 0 && (

@@ -140,14 +140,21 @@ export default function ZoneBox({
       <span style={{ fontWeight: 700, fontSize: 11, opacity: 0.9, pointerEvents: "none", textShadow: "0 1px 2px rgba(0,0,0,0.6)", position: runs ? "absolute" : "static", top: 2, left: 4, zIndex: 2 }}>
         {def.icon} {zone.key}
       </span>
-      {runs && runs.map((r, ri) => (
-        <span key={ri} style={{
-          position: "absolute", left: `${r.x || 0}%`, top: `${r.y || 0}%`, width: `${r.w || 40}%`,
-          color: r.text_color || "#fff", fontWeight: r.bold ? 700 : 400, textAlign: r.align || "left",
-          fontSize: `${Math.max(7, ((r.font_size_vh || 18) / 100) * (zone.h || 10) * 2.2)}px`,
-          lineHeight: 1.05, pointerEvents: "none", overflow: "hidden", textShadow: "0 1px 2px rgba(0,0,0,0.6)",
-        }}>{r.text || ""}</span>
-      ))}
+      {/* WYSIWYG with the players: font_size_vh is % of the ZONE height, so size
+          the runs with container-query height units against the zone box (cqh) —
+          same contract as static/player.html fillRuns and the Android renderer. */}
+      {runs && (
+        <div style={{ position: "absolute", inset: 0, containerType: "size", pointerEvents: "none" }}>
+          {runs.map((r, ri) => (
+            <span key={ri} style={{
+              position: "absolute", left: `${r.x || 0}%`, top: `${r.y || 0}%`, width: `${r.w || 40}%`,
+              color: r.text_color || "#fff", fontWeight: r.bold ? 700 : 400, textAlign: r.align || "left",
+              fontSize: `${r.font_size_vh || 18}cqh`,
+              lineHeight: 1.05, overflow: "hidden", textShadow: "0 1px 2px rgba(0,0,0,0.6)",
+            }}>{r.text || ""}</span>
+          ))}
+        </div>
+      )}
       {!runs && <span
         style={{
           pointerEvents: "none",
