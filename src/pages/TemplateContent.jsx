@@ -12,6 +12,7 @@ import SearchInput from "../ui/SearchInput";
 import EmptyState from "../ui/EmptyState";
 import { SkeletonText } from "../ui/Skeleton";
 import { Field, Select } from "../ui/Field";
+import ConfirmModal from "../ui/ConfirmModal";
 import { apiGet, normalizeList } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import ZoneContentEditor from "../components/templates/ZoneContentEditor";
@@ -20,6 +21,7 @@ import TemplateDesigner from "../components/templates/TemplateDesigner";
 import {
   getCompanyContent, getShopContent, getDeviceContent,
   getCompanyTemplateDesign, updateCompanyTemplateDesign, publishCompanyTemplateDesign,
+  getContentOverrides, clearZoneOverrides,
 } from "../components/templates/api";
 
 const SCOPES = [
@@ -52,6 +54,9 @@ export default function TemplateContent() {
   const [designerTpl, setDesignerTpl] = useState(null); // template loaded into the designer
   const [designerBusy, setDesignerBusy] = useState(false);
   const [notice, setNotice] = useState(null); // {kind:"error"|"info", text}
+  const [overrides, setOverrides] = useState({}); // zone_key -> {shops:[], devices:[]}
+  const [clearing, setClearing] = useState(null); // {zoneKey, count} pending confirm
+  const [clearBusy, setClearBusy] = useState(false);
   const { user, hasPermission } = useAuth();
   const companyName = user?.company?.name || "your company";
   const canDesign = hasPermission("manage_company_settings");
@@ -62,15 +67,32 @@ export default function TemplateContent() {
     );
   }, []);
 
+  const loadOverrides = useCallback(() => {
+    getContentOverrides().then((res) => setOverrides(res.ok ? res.data?.overrides || {} : {}));
+  }, []);
+
   useEffect(() => {
     loadTemplate();
+    loadOverrides();
     apiGet("/shops", { params: { limit: 1000, offset: 0 } }).then(
       (res) => res.ok && setShops(normalizeList(res.data, "items").items)
     );
     apiGet("/devices", { params: { limit: 500, offset: 0 } }).then(
       (res) => res.ok && setDevices(normalizeList(res.data, "items").items)
     );
-  }, [loadTemplate]);
+  }, [loadTemplate, loadOverrides]);
+
+  const doClearOverrides = useCallback(async () => {
+    if (!clearing) return;
+    setClearBusy(true);
+    const res = await clearZoneOverrides(clearing.zoneKey);
+    setClearBusy(false);
+    const zk = clearing.zoneKey;
+    setClearing(null);
+    if (!res.ok) { setNotice({ kind: "error", text: `Couldn't clear pins for “${zk}”: ${res.message}` }); return; }
+    setNotice({ kind: "info", text: `Cleared ${res.data?.cleared ?? 0} pinned override(s) for “${zk}”. Screens fall back to the company setting within ~30s.` });
+    loadOverrides();
+  }, [clearing, loadOverrides]);
 
   const openDesigner = useCallback(async () => {
     setDesignerBusy(true);
@@ -216,6 +238,29 @@ export default function TemplateContent() {
         </p>
       </Card>
 
+      {scope === "company" && Object.keys(overrides).length > 0 && (
+        <Card title="Some boxes are pinned to specific screens or locations">
+          <p className="u-muted" style={{ marginTop: 0 }}>
+            These boxes have their own content set on specific screens/locations, so your
+            company-wide changes <strong>won't appear there</strong> until you clear the pins.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {Object.entries(overrides).map(([zoneKey, o]) => {
+              const nD = (o.devices || []).length, nS = (o.shops || []).length;
+              const parts = [nD && `${nD} screen${nD > 1 ? "s" : ""}`, nS && `${nS} location${nS > 1 ? "s" : ""}`].filter(Boolean);
+              return (
+                <div key={zoneKey} className="u-flex" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <span>📌 <strong>{zoneKey}</strong> — pinned on {parts.join(", ")}</span>
+                  <Button variant="secondary" size="sm" onClick={() => setClearing({ zoneKey, count: nD + nS })}>
+                    Clear pins
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       <div style={{ marginTop: 16 }}>
         {!target ? (
           <EmptyState
@@ -228,6 +273,7 @@ export default function TemplateContent() {
             <TemplateMap
               template={template}
               contentByKey={contentByKey}
+              overrides={scope === "company" ? overrides : {}}
               selectedKey={editing?.focusZoneKey}
               onZoneClick={(zoneKey) => setEditing({ ...target, focusZoneKey: zoneKey })}
             />
@@ -254,6 +300,17 @@ export default function TemplateContent() {
           onSaved={() => {}}
         />
       )}
+
+      <ConfirmModal
+        open={!!clearing}
+        onClose={() => setClearing(null)}
+        onConfirm={doClearOverrides}
+        title={`Clear pinned content for “${clearing?.zoneKey}”?`}
+        message={`${clearing?.count || 0} screen/location override(s) for this box will be removed — those screens fall back to the company-wide setting. This can't be undone.`}
+        danger
+        confirmLabel="Clear pins"
+        loading={clearBusy}
+      />
     </div>
   );
 }

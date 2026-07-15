@@ -63,3 +63,9 @@ export const uploadCompanyMedia = (zoneKey, file, onProgress) => {
   fd.append("file", file);
   return uploadWithProgress(`/company/template-content/${zoneKey}/media`, fd, onProgress);
 };
+
+// Which zones are pinned at a more-specific scope (location/screen) and shadow
+// the company default — so a company edit looks like it "didn't update".
+export const getContentOverrides = () => safeGet("/company/template-content/overrides");
+export const clearZoneOverrides = (zoneKey) =>
+  safeDelete(`/company/template-content/${zoneKey}/overrides`);

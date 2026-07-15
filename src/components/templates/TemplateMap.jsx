@@ -69,7 +69,7 @@ function previewOf(z, payload) {
   return null;
 }
 
-export default function TemplateMap({ template, contentByKey = {}, selectedKey, onZoneClick }) {
+export default function TemplateMap({ template, contentByKey = {}, overrides = {}, selectedKey, onZoneClick }) {
   const zones = template?.zones || [];
   const dw = template?.design_width || 1920;
   const dh = template?.design_height || 1080;
@@ -95,6 +95,8 @@ export default function TemplateMap({ template, contentByKey = {}, selectedKey, 
           const hasContent = !!contentByKey[z.key];
           const selected = z.key === selectedKey;
           const preview = previewOf(z, contentByKey[z.key]);
+          const pin = overrides[z.key];
+          const pinCount = pin ? (pin.shops?.length || 0) + (pin.devices?.length || 0) : 0;
           return (
             <button
               key={z.key}
@@ -143,6 +145,14 @@ export default function TemplateMap({ template, contentByKey = {}, selectedKey, 
                   }}
                 >
                   {hasContent ? "✓ set" : "+ add"}
+                </span>
+              )}
+              {pinCount > 0 && (
+                <span
+                  title={`Pinned on ${pinCount} screen/location override(s) — these win over the company setting`}
+                  style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10, background: "var(--accent)", color: "#0a1628" }}
+                >
+                  📌 {pinCount}
                 </span>
               )}
             </button>
