@@ -239,6 +239,18 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                           busy={busy} pct={pct} fileRefs={fileRefs} onUpload={(f) => upload(zone, f)} />
                       </>
                     )}
+                    <div style={{ marginTop: 10 }}>
+                      <label htmlFor={`fit-${zone.key}`} style={lbl}>Fit</label>
+                      <select id={`fit-${zone.key}`} value={d.fit_mode || "cover"}
+                        onChange={(e) => setDraft(zone.key, { fit_mode: e.target.value })}
+                        style={inp}>
+                        <option value="cover">Fill the box (crops wide/tall edges)</option>
+                        <option value="contain">Show the whole image (no crop)</option>
+                      </select>
+                      <div style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 4 }}>
+                        Pick “Show the whole image” so a wide image isn’t cut off.
+                      </div>
+                    </div>
                   </>
                 )}
 
