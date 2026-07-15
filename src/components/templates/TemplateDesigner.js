@@ -271,6 +271,8 @@ export default function TemplateDesigner({ template: initial, onClose, onSaved }
         return (
           <TextRunsEditor
             zone={rz}
+            designWidth={template.design_width}
+            designHeight={template.design_height}
             onClose={() => setRunsZoneKey(null)}
             onSave={(runs) => {
               dispatch({ type: "UPDATE_ZONE", key: rz.key, patch: { content: { ...(rz.content || {}), runs } }, commit: true });
