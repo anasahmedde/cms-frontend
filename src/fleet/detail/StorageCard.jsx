@@ -1,12 +1,13 @@
-// Storage & memory card — GET /device/{id}/storage. The backend returns
-// {storage: null, error: …} when the columns/report don't exist yet; that is
-// a legitimate "not reported" state, never a crash (design doc §6).
+// Storage card — GET /device/{id}/storage. The backend returns storage:null
+// when the screen hasn't reported yet; that is a legitimate "not reported"
+// empty state, never a crash. Fields: total_bytes, used_bytes,
+// available_for_content_bytes, percent_used, storage_limit_percent (RAM and
+// per-media breakdown are not persisted server-side, so they aren't shown).
 import { useCallback, useEffect, useState } from "react";
 import { HardDrive } from "lucide-react";
 import { apiGet } from "../../lib/api";
 import { formatBytes, timeAgo } from "../../lib/format";
 import Card from "../../ui/Card";
-import Badge from "../../ui/Badge";
 import KeyValue from "../../ui/KeyValue";
 import ProgressBar from "../../ui/ProgressBar";
 import Skeleton from "../../ui/Skeleton";
@@ -47,13 +48,14 @@ export default function StorageCard({ mobileId }) {
       />
     );
   } else {
-    const { storage, ram, low_memory: lowMemory, is_tv: isTv, last_updated: lastUpdated } = state.data;
+    const { storage, last_updated: lastUpdated } = state.data;
     const pct = Number(storage.percent_used) || 0;
+    const limit = storage.storage_limit_percent ?? 80;
     body = (
       <>
         <ProgressBar
           value={pct}
-          tone={pct >= 95 ? "danger" : pct >= 80 ? "warn" : "success"}
+          tone={pct >= 95 ? "danger" : pct >= limit ? "warn" : "success"}
           label={`${Math.round(pct)}% used`}
         />
         <div style={{ marginTop: 12 }}>
@@ -61,22 +63,12 @@ export default function StorageCard({ mobileId }) {
             columns={2}
             items={[
               { label: "Total", value: formatBytes(storage.total_bytes), mono: true },
-              { label: "Available", value: formatBytes(storage.available_bytes), mono: true },
-              { label: "Used by media", value: formatBytes(storage.content_bytes), mono: true },
-              {
-                label: "RAM",
-                value: ram
-                  ? `${formatBytes(ram.available_bytes)} free of ${formatBytes(ram.total_bytes)}`
-                  : null,
-                mono: true,
-              },
+              { label: "Used", value: formatBytes(storage.used_bytes), mono: true },
+              { label: "Free for content", value: formatBytes(storage.available_for_content_bytes), mono: true },
+              { label: "Content limit", value: `${limit}% of disk` },
               { label: "Reported", value: timeAgo(lastUpdated) },
             ]}
           />
-        </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          {lowMemory && <Badge tone="warn">Low memory</Badge>}
-          {isTv && <Badge tone="neutral">TV device</Badge>}
         </div>
       </>
     );
