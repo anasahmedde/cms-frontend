@@ -5,9 +5,12 @@ import { useEffect, useId, useState } from "react";
 import { Plus } from "lucide-react";
 import Button from "../../ui/Button";
 import { Field, Input } from "../../ui/Field";
-import { fetchMediaList, KINDS } from "./lib";
+import { fetchMediaList, contentTypeOf, KINDS } from "./lib";
 
-export function MediaPicker({ kind, onAdd, exclude = [], label }) {
+// typeFilter narrows a stack by real media type: "video" keeps everything that
+// is NOT an image (video/html/pdf), "image" keeps only images. Used to split the
+// mixed /videos rotation stack into a Videos picker and an Images picker.
+export function MediaPicker({ kind, onAdd, exclude = [], label, typeFilter }) {
   const listId = useId();
   const [names, setNames] = useState([]);
   const [value, setValue] = useState("");
@@ -18,13 +21,20 @@ export function MediaPicker({ kind, onAdd, exclude = [], label }) {
     let alive = true;
     fetchMediaList(kind).then((res) => {
       if (!alive) return;
-      if (res.ok) setNames(res.items.map((it) => it.name));
-      else setLoadError(res.message);
+      if (res.ok) {
+        const items = typeFilter
+          ? res.items.filter((it) =>
+              typeFilter === "image"
+                ? contentTypeOf(it) === "image"
+                : contentTypeOf(it) !== "image")
+          : res.items;
+        setNames(items.map((it) => it.name));
+      } else setLoadError(res.message);
     });
     return () => {
       alive = false;
     };
-  }, [kind]);
+  }, [kind, typeFilter]);
 
   const available = names.filter((n) => !exclude.includes(n));
 

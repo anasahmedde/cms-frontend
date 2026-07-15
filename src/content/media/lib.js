@@ -58,11 +58,20 @@ export function fileNameSansExt(filename) {
   return (filename || "").replace(/\.[^/.]+$/, "");
 }
 
-// Effective content type: advertisement items are always images; video items
-// carry content_type (video default) — mirrors legacy Video.js fallbacks.
+// Effective content type: advertisement items are always images; video-stack
+// items carry a real content_type EXCEPT that legacy image rows were backfilled
+// to 'video' (the column's default). So when content_type is missing or the
+// generic 'video', fall back to the S3 file extension — an image uploaded to the
+// video stack still has a .jpg/.png object — so it classifies as an image even
+// on a not-yet-migrated row. (The backend backfill fixes the stored value too;
+// this keeps the UI correct in the meantime and for any edge case.)
 export function contentTypeOf(item) {
   if (!item) return "video";
-  return item.kind === "image" ? "image" : item.content_type || "video";
+  if (item.kind === "image") return "image";
+  const ct = item.content_type;
+  if (ct && ct !== "video") return ct; // explicit image / html / pdf — trust it
+  const byExt = inferContentType(item.s3_link || item.video_name || item.name || "");
+  return byExt !== "video" ? byExt : (ct || "video");
 }
 
 // Mirrors the backend's _detect_video_content_type so the upload form can
