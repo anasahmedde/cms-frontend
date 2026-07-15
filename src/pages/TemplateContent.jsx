@@ -16,8 +16,10 @@ import { apiGet, normalizeList } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import ZoneContentEditor from "../components/templates/ZoneContentEditor";
 import TemplateMap from "../components/templates/TemplateMap";
+import TemplateDesigner from "../components/templates/TemplateDesigner";
 import {
   getCompanyContent, getShopContent, getDeviceContent,
+  getCompanyTemplateDesign, updateCompanyTemplateDesign, publishCompanyTemplateDesign,
 } from "../components/templates/api";
 
 const SCOPES = [
@@ -26,10 +28,13 @@ const SCOPES = [
   { key: "device", label: "One screen", icon: MonitorPlay, hint: "Overrides its location + company" },
 ];
 
-function contentKeysOf(data) {
+// Keep the actual payload (not just a boolean) so the layout preview can show
+// what each editable zone is set to at this scope. Empty payloads are dropped,
+// so `!!byKey[zoneKey]` still reads as "has content set here".
+function contentByKeyOf(data) {
   const out = {};
   Object.entries(data?.content || {}).forEach(([k, v]) => {
-    if (v && v.payload && Object.keys(v.payload).length) out[k] = true;
+    if (v && v.payload && Object.keys(v.payload).length) out[k] = v.payload;
   });
   return out;
 }
@@ -44,20 +49,45 @@ export default function TemplateContent() {
   const [devicePick, setDevicePick] = useState("");
   const [contentByKey, setContentByKey] = useState({});
   const [editing, setEditing] = useState(null); // {scope, targetId, targetName, focusZoneKey}
-  const { user } = useAuth();
+  const [designerTpl, setDesignerTpl] = useState(null); // template loaded into the designer
+  const [designerBusy, setDesignerBusy] = useState(false);
+  const [notice, setNotice] = useState(null); // {kind:"error"|"info", text}
+  const { user, hasPermission } = useAuth();
   const companyName = user?.company?.name || "your company";
+  const canDesign = hasPermission("manage_company_settings");
 
-  useEffect(() => {
+  const loadTemplate = useCallback(() => {
     apiGet("/company/template").then((res) =>
       setTemplate(res.ok ? res.data?.template || null : null)
     );
+  }, []);
+
+  useEffect(() => {
+    loadTemplate();
     apiGet("/shops", { params: { limit: 1000, offset: 0 } }).then(
       (res) => res.ok && setShops(normalizeList(res.data, "items").items)
     );
     apiGet("/devices", { params: { limit: 500, offset: 0 } }).then(
       (res) => res.ok && setDevices(normalizeList(res.data, "items").items)
     );
+  }, [loadTemplate]);
+
+  const openDesigner = useCallback(async () => {
+    setDesignerBusy(true);
+    setNotice(null);
+    const res = await getCompanyTemplateDesign();
+    setDesignerBusy(false);
+    if (!res.ok || !res.data?.template) {
+      setNotice({ kind: "error", text: `Couldn't open the designer: ${res.message || "no template to edit"}` });
+      return;
+    }
+    setDesignerTpl(res.data.template);
   }, []);
+
+  const closeDesigner = useCallback(() => {
+    setDesignerTpl(null);
+    loadTemplate(); // a publish may have changed the live template/version
+  }, [loadTemplate]);
 
   const deviceMatches = useMemo(() => {
     const needle = deviceQuery.trim().toLowerCase();
@@ -85,7 +115,7 @@ export default function TemplateContent() {
       : target.scope === "shop"
         ? await getShopContent(target.targetId)
         : await getCompanyContent();
-    setContentByKey(res.ok ? contentKeysOf(res.data) : {});
+    setContentByKey(res.ok ? contentByKeyOf(res.data) : {});
   }, [target]);
 
   useEffect(() => { reloadContentState(); }, [reloadContentState]);
@@ -121,7 +151,23 @@ export default function TemplateContent() {
             <span className="u-faint">Screens resolve content as screen → location → company</span>
           </span>
         }
+        actions={
+          canDesign && (
+            <Button variant="secondary" icon={LayoutTemplate} onClick={openDesigner} disabled={designerBusy}>
+              {designerBusy ? "Opening…" : "Open designer"}
+            </Button>
+          )
+        }
       />
+
+      {notice && (
+        <Card>
+          <div className="u-flex" style={{ justifyContent: "space-between", gap: 8, color: notice.kind === "error" ? "var(--danger)" : "var(--text)" }}>
+            <span>{notice.text}</span>
+            <button onClick={() => setNotice(null)} aria-label="Dismiss message" style={{ border: "none", background: "none", cursor: "pointer", color: "inherit" }}>✕</button>
+          </div>
+        </Card>
+      )}
 
       <Card title="Editing content for">
         <div className="u-flex" style={{ flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
@@ -196,6 +242,16 @@ export default function TemplateContent() {
           targetName={editing.targetName}
           focusZoneKey={editing.focusZoneKey}
           onClose={() => { setEditing(null); reloadContentState(); }}
+        />
+      )}
+
+      {designerTpl && (
+        <TemplateDesigner
+          template={designerTpl}
+          saveApi={updateCompanyTemplateDesign}
+          publishApi={publishCompanyTemplateDesign}
+          onClose={closeDesigner}
+          onSaved={() => {}}
         />
       )}
     </div>

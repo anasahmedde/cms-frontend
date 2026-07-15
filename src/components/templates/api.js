@@ -25,6 +25,15 @@ export const linkCompanyTemplate = (companyId, templateId) =>
 
 // Company-dashboard side (shop content + device overrides)
 export const getCompanyTemplate = () => safeGet("/company/template");
+
+// Company-scoped designer: a company admin edits their OWN copy of the template.
+// The backend forks a private copy on first write and re-links the company on
+// publish. The (id) arg is ignored — the server derives the target from the
+// caller's tenant — but it's accepted so these are drop-in for the designer's
+// saveApi/publishApi(id, body) contract.
+export const getCompanyTemplateDesign = () => safeGet("/company/template/design");
+export const updateCompanyTemplateDesign = (_id, body) => safePut("/company/template/design", body);
+export const publishCompanyTemplateDesign = (_id) => safePost("/company/template/design/publish");
 export const getShopContent = (shopId) => safeGet(`/shop/${shopId}/template-content`);
 export const putShopContent = (shopId, zoneKey, payload) =>
   safePut(`/shop/${shopId}/template-content/${zoneKey}`, { payload });

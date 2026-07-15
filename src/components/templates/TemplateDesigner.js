@@ -19,7 +19,10 @@ const btn = (theme, kind = "default") => ({
   color: kind === "default" ? theme.text : "#0a1628",
 });
 
-export default function TemplateDesigner({ template: initial, onClose, onSaved }) {
+// saveApi/publishApi default to the platform endpoints; the company designer
+// passes company-scoped ones (same (id, body)/(id) contract and response shape).
+export default function TemplateDesigner({ template: initial, onClose, onSaved,
+                                          saveApi = updateTemplate, publishApi = publishTemplate }) {
   const [armedPreset, setArmedPreset] = React.useState(null);
   const armTimer = React.useRef(null);
   const [state, dispatch] = useReducer(designerReducer, initialDesignerState);
@@ -82,7 +85,7 @@ export default function TemplateDesigner({ template: initial, onClose, onSaved }
     }
     setSaving(true);
     setBanner(null);
-    const res = await updateTemplate(template.id, {
+    const res = await saveApi(template.id, {
       name: template.name,
       description: template.description || null,
       orientation: template.orientation,
@@ -105,7 +108,7 @@ export default function TemplateDesigner({ template: initial, onClose, onSaved }
     setConfirmPublish(false);
     if (!(await doSave())) return;
     setPublishing(true);
-    const res = await publishTemplate(template.id);
+    const res = await publishApi(template.id);
     setPublishing(false);
     if (!res.ok) {
       setBanner({ kind: "error", text: `Publish failed: ${typeof res.message === "string" ? res.message : JSON.stringify(res.message)}` });
