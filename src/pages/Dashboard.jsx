@@ -119,7 +119,6 @@ export default function Dashboard() {
     <div>
       <PageHeader
         title="Dashboard"
-        subtitle="Fleet overview — every screen, live"
         actions={
           <span className="u-flex">
             {lastUpdated && (
