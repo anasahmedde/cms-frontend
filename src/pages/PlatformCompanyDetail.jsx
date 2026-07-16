@@ -16,11 +16,90 @@ import { SkeletonText } from "../ui/Skeleton";
 import { Field, Input, Select, Switch } from "../ui/Field";
 import { useToast } from "../ui/Toast";
 import { useAuth } from "../lib/auth";
-import { apiDelete, apiGet, apiPut } from "../lib/api";
+import { apiDelete, apiGet, apiPost, apiPut } from "../lib/api";
 import { formatDateTime } from "../lib/format";
 import { effectiveStatus, expirationLabel } from "../platform/lib";
 import ExpirationModal from "../platform/ExpirationModal";
 import { FEATURE_LABELS, featureOn, invalidateFeatureCache } from "../lib/features";
+
+// Extra templates a company may assign per group/screen (mixed-resolution
+// fleets): list + add + remove. The DEFAULT stays on company.template_id above.
+function CompanyTemplateSet({ companyId, defaultId, allTemplates }) {
+  const toast = useToast();
+  const [linked, setLinked] = useState(null); // null = loading
+  const [pick, setPick] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    apiGet(`/platform/companies/${companyId}/templates`).then((r) =>
+      setLinked(r.ok ? (r.data?.items || []) : [])
+    );
+  }, [companyId]);
+  useEffect(() => { load(); }, [load]);
+
+  const extras = (linked || []).filter((t) => !t.is_default);
+  const addable = allTemplates.filter(
+    (t) => t.id !== defaultId && !(linked || []).some((l) => l.id === t.id)
+  );
+
+  const add = async () => {
+    if (!pick) return;
+    setBusy(true);
+    const res = await apiPost(`/platform/companies/${companyId}/templates/${pick}`);
+    setBusy(false);
+    if (!res.ok) return toast.error(res.message);
+    toast.success("Template added — the company can now assign it to groups/screens");
+    setPick("");
+    load();
+  };
+
+  const remove = async (t) => {
+    setBusy(true);
+    const res = await apiDelete(`/platform/companies/${companyId}/templates/${t.id}`);
+    setBusy(false);
+    if (!res.ok) return toast.error(res.message);
+    toast.success(`"${t.name}" removed — screens using it fall back to the default`);
+    load();
+  };
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+      <p className="u-muted" style={{ margin: "0 0 8px", fontSize: 12.5 }}>
+        <strong>Additional templates</strong> — for mixed screens (e.g. portrait totems next to
+        landscape TVs). The company assigns them per group or per screen.
+      </p>
+      {linked === null && <p className="u-muted" style={{ margin: 0 }}>Loading…</p>}
+      {linked !== null && extras.length === 0 && (
+        <p className="u-muted" style={{ margin: "0 0 8px" }}>None linked yet.</p>
+      )}
+      {extras.map((t) => (
+        <div key={t.id} className="u-flex" style={{ justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 13 }}>
+            {t.name} <span className="u-faint">· {t.orientation} {t.design_width}×{t.design_height} · v{t.version}</span>
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => remove(t)} disabled={busy} aria-label={`Remove ${t.name}`}>
+            Remove
+          </Button>
+        </div>
+      ))}
+      {addable.length > 0 && (
+        <div className="u-flex" style={{ gap: 8, marginTop: 8 }}>
+          <div style={{ flex: 1 }}>
+            <Select
+              id="cd-tpl-add"
+              aria-label="Template to add"
+              value={pick}
+              onChange={(e) => setPick(e.target.value)}
+              options={[{ value: "", label: "Add another template…" },
+                        ...addable.map((t) => ({ value: String(t.id), label: `${t.name} (v${t.version})` }))]}
+            />
+          </div>
+          <Button size="sm" onClick={add} loading={busy} disabled={!pick}>Add</Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function PlatformCompanyDetail() {
   const { slug } = useParams();
@@ -240,8 +319,8 @@ export default function PlatformCompanyDetail() {
           </div>
         </Card>
 
-        <Card title="Screen template">
-          <Field label="Linked template" hint="Published templates only; screens re-render on their next heartbeat" htmlFor="cd-tpl">
+        <Card title="Screen templates">
+          <Field label="Default template" hint="What every screen renders unless its group/screen picks another" htmlFor="cd-tpl">
             <Select
               id="cd-tpl"
               value={templateId}
@@ -252,6 +331,7 @@ export default function PlatformCompanyDetail() {
           <Button size="sm" onClick={saveTemplate} loading={savingTemplate} disabled={String(company.template_id || "") === templateId}>
             {templateId ? "Link template" : "Unlink template"}
           </Button>
+          <CompanyTemplateSet companyId={company.id} defaultId={company.template_id} allTemplates={templates} />
         </Card>
 
         <Card title="Danger zone">

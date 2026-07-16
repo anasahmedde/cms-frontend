@@ -91,3 +91,13 @@ export const getTemplatePreview = ({ scope = "company", shopId, deviceId, groupI
   if (groupId != null) q.set("group_id", groupId);
   return safeGet(`/company/template/preview?${q.toString()}`);
 };
+
+// ── Multi-template: several templates per company (mixed resolutions) ──
+// Assignment precedence mirrors content: screen > group > company default.
+export const getCompanyTemplates = () => safeGet("/company/templates");
+export const getGroupTemplate = (groupId) => safeGet(`/group/${groupId}/template`);
+export const setGroupTemplate = (groupId, templateId) =>
+  safePut(`/group/${groupId}/template`, { template_id: templateId });
+export const getDeviceTemplate = (deviceId) => safeGet(`/device-config/${deviceId}/template`);
+export const setDeviceTemplate = (deviceId, templateId) =>
+  safePut(`/device-config/${deviceId}/template`, { template_id: templateId });
