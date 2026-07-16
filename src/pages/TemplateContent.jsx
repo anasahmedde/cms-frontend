@@ -67,6 +67,7 @@ export default function TemplateContent() {
   const { user, hasPermission } = useAuth();
   const companyName = user?.company?.name || "your company";
   const canDesign = hasPermission("manage_company_settings");
+  const canBulk = hasPermission("manage_devices"); // bulk import creates/edits screens
 
   const loadTemplate = useCallback(() => {
     apiGet("/company/template").then((res) =>
@@ -198,9 +199,11 @@ export default function TemplateContent() {
         }
         actions={
           <div className="u-flex" style={{ gap: 8 }}>
-            <Button variant="secondary" icon={Upload} onClick={() => setBulkOpen(true)}>
-              Bulk upload
-            </Button>
+            {canBulk && (
+              <Button variant="secondary" icon={Upload} onClick={() => setBulkOpen(true)}>
+                Bulk upload
+              </Button>
+            )}
             {canDesign && (
               <Button variant="secondary" icon={LayoutTemplate} onClick={openDesigner} disabled={designerBusy}>
                 {designerBusy ? "Opening…" : "Open designer"}
