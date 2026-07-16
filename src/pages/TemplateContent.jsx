@@ -3,7 +3,7 @@
 // Screens resolve content as screen > location > company.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, MapPin, MonitorPlay, LayoutTemplate } from "lucide-react";
+import { Building2, MapPin, MonitorPlay, LayoutTemplate, Users } from "lucide-react";
 import PageHeader from "../ui/PageHeader";
 import Card from "../ui/Card";
 import Badge from "../ui/Badge";
@@ -20,15 +20,16 @@ import TemplateMap from "../components/templates/TemplateMap";
 import TemplatePreview from "../components/templates/TemplatePreview";
 import TemplateDesigner from "../components/templates/TemplateDesigner";
 import {
-  getCompanyContent, getShopContent, getDeviceContent,
+  getCompanyContent, getShopContent, getDeviceContent, getGroupContent,
   getCompanyTemplateDesign, updateCompanyTemplateDesign, publishCompanyTemplateDesign,
   getContentOverrides, clearZoneOverrides, getTemplatePreview,
 } from "../components/templates/api";
 
 const SCOPES = [
   { key: "company", label: "Whole company", icon: Building2, hint: "Default for every screen" },
+  { key: "group", label: "One group", icon: Users, hint: "Applies to every device in the group, wherever it's located — overrides the location + company defaults" },
   { key: "shop", label: "One location", icon: MapPin, hint: "Overrides the company default" },
-  { key: "device", label: "One screen", icon: MonitorPlay, hint: "Overrides its location + company" },
+  { key: "device", label: "One screen", icon: MonitorPlay, hint: "Overrides its group, location + company" },
 ];
 
 // Keep the actual payload (not just a boolean) so the layout preview can show
@@ -46,8 +47,10 @@ export default function TemplateContent() {
   const [template, setTemplate] = useState(undefined); // undefined=loading, null=none
   const [shops, setShops] = useState([]);
   const [devices, setDevices] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [scope, setScope] = useState("company");
   const [shopPick, setShopPick] = useState("");
+  const [groupPick, setGroupPick] = useState("");
   const [deviceQuery, setDeviceQuery] = useState("");
   const [devicePick, setDevicePick] = useState("");
   const [contentByKey, setContentByKey] = useState({});
@@ -81,6 +84,9 @@ export default function TemplateContent() {
     );
     apiGet("/devices", { params: { limit: 500, offset: 0 } }).then(
       (res) => res.ok && setDevices(normalizeList(res.data, "items").items)
+    );
+    apiGet("/groups", { params: { limit: 1000, offset: 0 } }).then(
+      (res) => res.ok && setGroups(normalizeList(res.data, "items").items)
     );
   }, [loadTemplate, loadOverrides]);
 
@@ -124,26 +130,33 @@ export default function TemplateContent() {
   // The resolved editing target for the chosen scope (null until a shop/screen picked).
   const target = useMemo(() => {
     if (scope === "company") return { scope: "company", targetId: null, targetName: companyName };
+    if (scope === "group") {
+      const g = groups.find((x) => String(x.id) === groupPick);
+      return g ? { scope: "group", targetId: g.id, targetName: g.gname } : null;
+    }
     if (scope === "shop") {
       const s = shops.find((x) => String(x.id) === shopPick);
       return s ? { scope: "shop", targetId: s.id, targetName: s.shop_name } : null;
     }
     const d = deviceMatches.find((x) => String(x.id ?? x.mobile_id) === devicePick);
     return d ? { scope: "device", targetId: d.id, targetName: d.device_name || d.mobile_id } : null;
-  }, [scope, shopPick, devicePick, shops, deviceMatches, companyName]);
+  }, [scope, shopPick, groupPick, devicePick, shops, groups, deviceMatches, companyName]);
 
   const reloadContentState = useCallback(async () => {
     if (!target) { setContentByKey({}); setPreview(null); return; }
     const res = target.scope === "device"
       ? await getDeviceContent(target.targetId)
-      : target.scope === "shop"
-        ? await getShopContent(target.targetId)
-        : await getCompanyContent();
+      : target.scope === "group"
+        ? await getGroupContent(target.targetId)
+        : target.scope === "shop"
+          ? await getShopContent(target.targetId)
+          : await getCompanyContent();
     setContentByKey(res.ok ? contentByKeyOf(res.data) : {});
     const pv = await getTemplatePreview({
       scope: target.scope,
       shopId: target.scope === "shop" ? target.targetId : undefined,
       deviceId: target.scope === "device" ? target.targetId : undefined,
+      groupId: target.scope === "group" ? target.targetId : undefined,
     });
     setPreview(pv.ok ? pv.data : null);
   }, [target]);
@@ -178,7 +191,7 @@ export default function TemplateContent() {
         subtitle={
           <span className="u-flex">
             Template <Badge tone="info">{template.name} · v{template.version}</Badge>
-            <span className="u-faint">Screens resolve content as screen → location → company</span>
+            <span className="u-faint">Screens resolve content as screen → group → location → company</span>
           </span>
         }
         actions={
@@ -213,6 +226,17 @@ export default function TemplateContent() {
             </Button>
           ))}
         </div>
+        {scope === "group" && (
+          <Field label={`Group (${groups.length})`} htmlFor="tc-group">
+            <Select
+              id="tc-group"
+              value={groupPick}
+              onChange={(e) => setGroupPick(e.target.value)}
+              placeholder="Select a group…"
+              options={groups.map((g) => ({ value: String(g.id), label: g.gname }))}
+            />
+          </Field>
+        )}
         {scope === "shop" && (
           <Field label="Location" htmlFor="tc-shop">
             <Select
@@ -254,12 +278,16 @@ export default function TemplateContent() {
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {Object.entries(overrides).map(([zoneKey, o]) => {
-              const nD = (o.devices || []).length, nS = (o.shops || []).length;
-              const parts = [nD && `${nD} screen${nD > 1 ? "s" : ""}`, nS && `${nS} location${nS > 1 ? "s" : ""}`].filter(Boolean);
+              const nD = (o.devices || []).length, nS = (o.shops || []).length, nG = (o.groups || []).length;
+              const parts = [
+                nD && `${nD} screen${nD > 1 ? "s" : ""}`,
+                nG && `${nG} group${nG > 1 ? "s" : ""}`,
+                nS && `${nS} location${nS > 1 ? "s" : ""}`,
+              ].filter(Boolean);
               return (
                 <div key={zoneKey} className="u-flex" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <span>📌 <strong>{zoneKey}</strong> — pinned on {parts.join(", ")}</span>
-                  <Button variant="secondary" size="sm" onClick={() => setClearing({ zoneKey, count: nD + nS })}>
+                  <Button variant="secondary" size="sm" onClick={() => setClearing({ zoneKey, count: nD + nS + nG })}>
                     Clear pins
                   </Button>
                 </div>
@@ -272,8 +300,8 @@ export default function TemplateContent() {
       <div style={{ marginTop: 16 }}>
         {!target ? (
           <EmptyState
-            icon={scope === "shop" ? MapPin : MonitorPlay}
-            title={scope === "shop" ? "Pick a location" : "Pick a screen"}
+            icon={scope === "shop" ? MapPin : scope === "group" ? Users : MonitorPlay}
+            title={scope === "shop" ? "Pick a location" : scope === "group" ? "Pick a group" : "Pick a screen"}
             hint="Choose one above to see its template layout and set content per box."
           />
         ) : (
@@ -325,7 +353,7 @@ export default function TemplateContent() {
         onClose={() => setClearing(null)}
         onConfirm={doClearOverrides}
         title={`Clear pinned content for “${clearing?.zoneKey}”?`}
-        message={`${clearing?.count || 0} screen/location override(s) for this box will be removed — those screens fall back to the company-wide setting. This can't be undone.`}
+        message={`${clearing?.count || 0} screen/group/location override(s) for this box will be removed — those screens fall back to the company-wide setting. This can't be undone.`}
         danger
         confirmLabel="Clear pins"
         loading={clearBusy}

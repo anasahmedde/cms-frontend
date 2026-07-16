@@ -53,6 +53,19 @@ export const uploadDeviceMedia = (deviceId, zoneKey, file, onProgress) => {
   return uploadWithProgress(`/device-config/${deviceId}/template-content/${zoneKey}/media`, fd, onProgress);
 };
 
+// Group-scoped content — applies to every device in the group regardless of
+// location. Resolves screen > group > location > company.
+export const getGroupContent = (groupId) => safeGet(`/group/${groupId}/template-content`);
+export const putGroupContent = (groupId, zoneKey, payload) =>
+  safePut(`/group/${groupId}/template-content/${zoneKey}`, { payload });
+export const deleteGroupContent = (groupId, zoneKey) =>
+  safeDelete(`/group/${groupId}/template-content/${zoneKey}`);
+export const uploadGroupMedia = (groupId, zoneKey, file, onProgress) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return uploadWithProgress(`/group/${groupId}/template-content/${zoneKey}/media`, fd, onProgress);
+};
+
 // Company-wide default content (lowest-precedence layer; endpoints landed with
 // the fleet-telemetry backend PR).
 export const getCompanyContent = () => safeGet("/company/template-content");
@@ -71,9 +84,10 @@ export const clearZoneOverrides = (zoneKey) =>
   safeDelete(`/company/template-content/${zoneKey}/overrides`);
 
 // Resolved + presigned zones for the WYSIWYG preview (how a screen actually renders).
-export const getTemplatePreview = ({ scope = "company", shopId, deviceId } = {}) => {
+export const getTemplatePreview = ({ scope = "company", shopId, deviceId, groupId } = {}) => {
   const q = new URLSearchParams({ scope });
   if (shopId != null) q.set("shop_id", shopId);
   if (deviceId != null) q.set("device_id", deviceId);
+  if (groupId != null) q.set("group_id", groupId);
   return safeGet(`/company/template/preview?${q.toString()}`);
 };

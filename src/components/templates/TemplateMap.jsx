@@ -96,7 +96,7 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
           const selected = z.key === selectedKey;
           const preview = previewOf(z, contentByKey[z.key]);
           const pin = overrides[z.key];
-          const pinCount = pin ? (pin.shops?.length || 0) + (pin.devices?.length || 0) : 0;
+          const pinCount = pin ? (pin.shops?.length || 0) + (pin.devices?.length || 0) + (pin.groups?.length || 0) : 0;
           return (
             <button
               key={z.key}
@@ -149,7 +149,7 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
               )}
               {pinCount > 0 && (
                 <span
-                  title={`Pinned on ${pinCount} screen/location override(s) — these win over the company setting`}
+                  title={`Pinned on ${pinCount} screen/group/location override(s) — these win over the company setting`}
                   style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10, background: "var(--accent)", color: "#0a1628" }}
                 >
                   📌 {pinCount}
