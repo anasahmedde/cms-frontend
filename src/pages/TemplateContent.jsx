@@ -3,7 +3,7 @@
 // Screens resolve content as screen > location > company.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Building2, MapPin, MonitorPlay, LayoutTemplate, Users } from "lucide-react";
+import { Building2, MapPin, MonitorPlay, LayoutTemplate, Users, Upload } from "lucide-react";
 import PageHeader from "../ui/PageHeader";
 import Card from "../ui/Card";
 import Badge from "../ui/Badge";
@@ -15,6 +15,7 @@ import { Field, Select } from "../ui/Field";
 import ConfirmModal from "../ui/ConfirmModal";
 import { apiGet, normalizeList } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import BulkImport from "../fleet/enroll/BulkImport";
 import ZoneContentEditor from "../components/templates/ZoneContentEditor";
 import TemplateMap from "../components/templates/TemplateMap";
 import TemplatePreview from "../components/templates/TemplatePreview";
@@ -62,6 +63,7 @@ export default function TemplateContent() {
   const [clearing, setClearing] = useState(null); // {zoneKey, count} pending confirm
   const [clearBusy, setClearBusy] = useState(false);
   const [preview, setPreview] = useState(null); // {template, zones} resolved WYSIWYG
+  const [bulkOpen, setBulkOpen] = useState(false); // bulk-import modal
   const { user, hasPermission } = useAuth();
   const companyName = user?.company?.name || "your company";
   const canDesign = hasPermission("manage_company_settings");
@@ -195,11 +197,16 @@ export default function TemplateContent() {
           </span>
         }
         actions={
-          canDesign && (
-            <Button variant="secondary" icon={LayoutTemplate} onClick={openDesigner} disabled={designerBusy}>
-              {designerBusy ? "Opening…" : "Open designer"}
+          <div className="u-flex" style={{ gap: 8 }}>
+            <Button variant="secondary" icon={Upload} onClick={() => setBulkOpen(true)}>
+              Bulk upload
             </Button>
-          )
+            {canDesign && (
+              <Button variant="secondary" icon={LayoutTemplate} onClick={openDesigner} disabled={designerBusy}>
+                {designerBusy ? "Opening…" : "Open designer"}
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -345,6 +352,22 @@ export default function TemplateContent() {
           publishApi={publishCompanyTemplateDesign}
           onClose={closeDesigner}
           onSaved={() => {}}
+        />
+      )}
+
+      {bulkOpen && (
+        <BulkImport
+          open
+          onClose={() => setBulkOpen(false)}
+          onImported={() => {
+            // New screens/locations/groups + per-screen content may have landed —
+            // refresh the pickers, the pinned-override list and the current preview.
+            loadOverrides();
+            reloadContentState();
+            apiGet("/shops", { params: { limit: 1000, offset: 0 } }).then((res) => res.ok && setShops(normalizeList(res.data, "items").items));
+            apiGet("/devices", { params: { limit: 500, offset: 0 } }).then((res) => res.ok && setDevices(normalizeList(res.data, "items").items));
+            apiGet("/groups", { params: { limit: 1000, offset: 0 } }).then((res) => res.ok && setGroups(normalizeList(res.data, "items").items));
+          }}
         />
       )}
 
