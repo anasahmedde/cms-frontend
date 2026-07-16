@@ -4,6 +4,7 @@
 // dimmed with a hint so operators see the whole layout. Percent geometry —
 // the same model the players render, so this preview matches the screen.
 import React from "react";
+import { zonePixelSize } from "./zoneTypes";
 
 const ZONE_TONE = {
   playlist: { bg: "rgba(16,185,129,0.22)", border: "var(--success)" },
@@ -97,13 +98,15 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
           const preview = previewOf(z, contentByKey[z.key]);
           const pin = overrides[z.key];
           const pinCount = pin ? (pin.shops?.length || 0) + (pin.devices?.length || 0) + (pin.groups?.length || 0) : 0;
+          const px = zonePixelSize(z, dw, dh);
+          const pxNote = px ? ` — ${px.label} on a ${dw}×${dh} screen` : "";
           return (
             <button
               key={z.key}
               type="button"
               disabled={!editable}
               onClick={() => editable && onZoneClick?.(z.key)}
-              title={editable ? `Set content for "${z.key}"` : `${TYPE_LABEL[z.type] || z.type} — set in the designer`}
+              title={editable ? `Set content for "${z.key}"${pxNote}` : `${TYPE_LABEL[z.type] || z.type} — set in the designer${pxNote}`}
               style={{
                 position: "absolute",
                 left: `${z.x}%`, top: `${z.y}%`, width: `${z.w}%`, height: `${z.h}%`,
@@ -147,6 +150,11 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
                   {hasContent ? "✓ set" : "+ add"}
                 </span>
               )}
+              {editable && px && (
+                <span style={{ fontSize: 8.5, opacity: 0.85, fontVariantNumeric: "tabular-nums", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>
+                  {px.w}×{px.h}px
+                </span>
+              )}
               {pinCount > 0 && (
                 <span
                   title={`Pinned on ${pinCount} screen/group/location override(s) — these win over the company setting`}
@@ -170,9 +178,13 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
           Click a highlighted box to set what it shows. <strong>✓ set</strong> means content
           exists at this level; <strong>+ add</strong> is empty (falls back to the wider scope).
         </p>
-        <p style={{ marginBottom: 0 }}>
+        <p>
           Dimmed boxes aren't editable here — the <em>rotation</em> plays the screen's playlist, and
           name/clock zones are fixed in the designer.
+        </p>
+        <p style={{ marginBottom: 0 }}>
+          Box sizes are shown for a <strong>{dw}×{dh}</strong> screen (the template's design size) —
+          make images/videos that size for the sharpest result. Boxes scale in % on other resolutions.
         </p>
       </div>
     </div>

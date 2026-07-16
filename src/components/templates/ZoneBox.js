@@ -1,7 +1,7 @@
 // A single zone on the designer canvas: pointer-drag to move, 8 handles to resize,
 // with snapping to canvas anchors and other zones' edges.
 import React, { useRef } from "react";
-import { ZONE_TYPES, zoneColor } from "./zoneTypes";
+import { ZONE_TYPES, zoneColor, zonePixelSize } from "./zoneTypes";
 import { clamp, snapValue } from "./zoneValidation";
 
 const HANDLES = [
@@ -29,7 +29,7 @@ export function zonePreviewText(zone) {
 }
 
 export default function ZoneBox({
-  zone, index, selected, canvasRef, snapTargets,
+  zone, index, selected, canvasRef, snapTargets, designWidth, designHeight,
   onSelect, onChange, onGestureStart, onGestureEnd, onEditRuns,
 }) {
   const gesture = useRef(null);
@@ -200,6 +200,12 @@ export default function ZoneBox({
           padding: "1px 4px", borderRadius: 3, pointerEvents: "none",
         }}>
           {Math.round(zone.x * 10) / 10},{Math.round(zone.y * 10) / 10} · {Math.round(zone.w * 10) / 10}×{Math.round(zone.h * 10) / 10}%
+          {(() => {
+            // Live pixel size while dragging/resizing — what the content
+            // creator actually needs ("make the image 1152×486").
+            const px = zonePixelSize(zone, designWidth, designHeight);
+            return px ? ` · ${px.w}×${px.h}px` : "";
+          })()}
         </span>
       )}
     </div>
