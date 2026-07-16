@@ -27,7 +27,9 @@ export default function LinkCompaniesModal({ template, onClose, onChanged }) {
       setError(`${linked ? "Unlink" : "Link"} failed for ${company.name}: ${res.message}`);
       return;
     }
-    setCompanies((cs) => cs.map((c) => (c.id === company.id ? { ...c, template_id: linked ? null : template.id } : c)));
+    setCompanies((cs) => cs.map((c) => (c.id === company.id
+      ? { ...c, template_id: linked ? null : template.id, template_source_id: null }
+      : c)));
     onChanged?.();
   };
 
@@ -54,13 +56,20 @@ export default function LinkCompaniesModal({ template, onClose, onChanged }) {
           {companies?.length === 0 && !error && <p style={{ color: theme.textSecondary, fontSize: 13 }}>No companies yet — onboard one from the Companies tab.</p>}
           {companies?.map((c) => {
             const linkedHere = c.template_id === template.id;
-            const linkedElsewhere = c.template_id != null && !linkedHere;
+            // Linked through the company's own published customized copy of
+            // THIS template (fork) — still "this template" to the platform.
+            const customizedHere = !linkedHere && c.template_source_id === template.id;
+            const linkedElsewhere = c.template_id != null && !linkedHere && !customizedHere;
             return (
               <div key={c.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderBottom: `1px solid ${theme.border}` }}>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{c.name}</div>
-                  <div style={{ fontSize: 12, color: theme.textSecondary }}>
-                    {c.slug}{linkedElsewhere ? " · linked to another template" : linkedHere ? " · linked to this template" : " · default screens (no template)"}
+                  <div style={{ fontSize: 12, color: customizedHere ? theme.success : theme.textSecondary }}>
+                    {c.slug}
+                    {linkedHere ? " · linked to this template"
+                      : customizedHere ? " · runs its own customized copy of this template"
+                      : linkedElsewhere ? " · linked to another template"
+                      : " · default screens (no template)"}
                   </div>
                 </div>
                 <button
@@ -73,7 +82,11 @@ export default function LinkCompaniesModal({ template, onClose, onChanged }) {
                     color: linkedHere ? "#fff" : "#0a1628",
                   }}
                 >
-                  {busyId === c.id ? "…" : linkedHere ? "Unlink" : linkedElsewhere ? "Switch here" : "Link"}
+                  {busyId === c.id ? "…"
+                    : linkedHere ? "Unlink"
+                    : customizedHere ? "Reset to original"
+                    : linkedElsewhere ? "Switch here"
+                    : "Link"}
                 </button>
               </div>
             );
