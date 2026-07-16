@@ -193,7 +193,7 @@ export default function ZoneBox({
           }}
         />
       ))}
-      {selected && (
+      {selected ? (
         <span style={{
           position: "absolute", bottom: 2, right: 4, fontSize: 9,
           background: "rgba(0,0,0,0.55)", color: "#fff",
@@ -207,7 +207,20 @@ export default function ZoneBox({
             return px ? ` · ${px.w}×${px.h}px` : "";
           })()}
         </span>
-      )}
+      ) : (() => {
+        // Every box carries its real pixel size at all times, so the whole
+        // layout is readable at a glance without clicking each zone.
+        const px = zonePixelSize(zone, designWidth, designHeight);
+        return px ? (
+          <span style={{
+            position: "absolute", bottom: 2, right: 4, fontSize: 9,
+            background: "rgba(0,0,0,0.45)", color: "#fff",
+            padding: "1px 4px", borderRadius: 3, pointerEvents: "none", zIndex: 2,
+          }}>
+            {px.w}×{px.h}px
+          </span>
+        ) : null;
+      })()}
     </div>
   );
 }
