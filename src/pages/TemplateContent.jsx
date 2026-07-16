@@ -63,6 +63,7 @@ export default function TemplateContent() {
   const [clearing, setClearing] = useState(null); // {zoneKey, count} pending confirm
   const [clearBusy, setClearBusy] = useState(false);
   const [preview, setPreview] = useState(null); // {template, zones} resolved WYSIWYG
+  const [scopeTemplate, setScopeTemplate] = useState(null); // effective template at the picked scope
   const [bulkOpen, setBulkOpen] = useState(false); // bulk-import modal
   const { user, hasPermission } = useAuth();
   const companyName = user?.company?.name || "your company";
@@ -146,7 +147,7 @@ export default function TemplateContent() {
   }, [scope, shopPick, groupPick, devicePick, shops, groups, deviceMatches, companyName]);
 
   const reloadContentState = useCallback(async () => {
-    if (!target) { setContentByKey({}); setPreview(null); return; }
+    if (!target) { setContentByKey({}); setPreview(null); setScopeTemplate(null); return; }
     const res = target.scope === "device"
       ? await getDeviceContent(target.targetId)
       : target.scope === "group"
@@ -155,6 +156,9 @@ export default function TemplateContent() {
           ? await getShopContent(target.targetId)
           : await getCompanyContent();
     setContentByKey(res.ok ? contentByKeyOf(res.data) : {});
+    // The scope's EFFECTIVE template (a group/screen may render a different one
+    // than the company default) — drives the layout map for this scope.
+    setScopeTemplate(res.ok ? res.data?.template || null : null);
     const pv = await getTemplatePreview({
       scope: target.scope,
       shopId: target.scope === "shop" ? target.targetId : undefined,
@@ -315,12 +319,12 @@ export default function TemplateContent() {
             hint="Choose one above to see its template layout and set content per box."
           />
         ) : (
-          <Card title={`Layout — ${target.targetName}`}>
+          <Card title={`Layout — ${target.targetName}${scopeTemplate && scopeTemplate.id !== template?.id ? ` · renders “${scopeTemplate.name}”` : ""}`}>
             <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
               <div>
                 <p className="u-faint" style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 600 }}>Click a box to set its content</p>
                 <TemplateMap
-                  template={template}
+                  template={scopeTemplate || template}
                   contentByKey={contentByKey}
                   overrides={scope === "company" ? overrides : {}}
                   selectedKey={editing?.focusZoneKey}

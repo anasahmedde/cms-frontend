@@ -13,6 +13,7 @@ import Skeleton from "../../ui/Skeleton";
 import { useToast } from "../../ui/Toast";
 import LayoutEditor from "../LayoutEditor";
 import ZoneContentEditor from "../../components/templates/ZoneContentEditor";
+import TemplateAssignSelect from "../../components/templates/TemplateAssignSelect";
 import PlaylistCard from "./PlaylistCard";
 import { isRealGroup } from "./useScreenDevice";
 import { useCompanyFeatures, featureOn } from "../../lib/features";
@@ -173,10 +174,12 @@ function TemplateContentCard({ device }) {
 
   const load = useCallback(async () => {
     setState((s) => ({ ...s, loading: true }));
-    const res = await apiGet("/company/template");
+    // The EFFECTIVE template for THIS screen (screen > group > company default)
+    // — with multiple templates linked, the company default may not be it.
+    const res = await apiGet(`/device-config/${device.id}/template-content`);
     if (res.ok) setState({ loading: false, error: null, template: res.data?.template || null });
     else setState({ loading: false, error: res.message, template: null });
-  }, []);
+  }, [device.id]);
 
   useEffect(() => {
     load();
@@ -213,6 +216,14 @@ function TemplateContentCard({ device }) {
             to this screen only, and empty fields fall back to the location's content.
           </p>
         </div>
+      </div>
+      <div style={{ maxWidth: 480, marginBottom: 12 }}>
+        <TemplateAssignSelect
+          scope="device"
+          targetId={device.id}
+          inheritLabel="Inherited — group / company default"
+          onChanged={load}
+        />
       </div>
       <Button variant="secondary" icon={Layers} onClick={() => setEditorOpen(true)}>
         Override for this screen

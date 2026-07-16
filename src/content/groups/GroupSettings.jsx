@@ -1,7 +1,7 @@
 // Group settings: rename + the guarded delete flows ported from Group.js
 // (simple confirm when empty; device-aware modal with "unassign only" vs
 // "unassign & delete"; 409 linked-resources force confirm).
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../ui/Button";
 import Card from "../../ui/Card";
@@ -9,8 +9,38 @@ import ConfirmModal from "../../ui/ConfirmModal";
 import Modal from "../../ui/Modal";
 import { Field, Input } from "../../ui/Field";
 import { useToast } from "../../ui/Toast";
-import { apiDelete, apiPost } from "../../lib/api";
+import { apiDelete, apiGet, apiPost, normalizeList } from "../../lib/api";
+import TemplateAssignSelect from "../../components/templates/TemplateAssignSelect";
 import { renameGroup } from "./useGroupAttachments";
+
+// The attachments API is keyed by group NAME; the template assignment is keyed
+// by id — resolve it once from the groups list.
+function GroupTemplateCard({ gname }) {
+  const [groupId, setGroupId] = useState(null); // null = loading, 0 = not found
+  useEffect(() => {
+    let alive = true;
+    apiGet("/groups", { params: { limit: 1000, offset: 0 } }).then((res) => {
+      if (!alive) return;
+      const items = res.ok ? normalizeList(res.data, "items").items : [];
+      const g = items.find((x) => x.gname === gname);
+      setGroupId(g ? g.id : 0);
+    });
+    return () => { alive = false; };
+  }, [gname]);
+  return (
+    <Card title="Screen template">
+      <p className="u-muted" style={{ marginTop: 0 }}>
+        Every screen in this group renders this template — handy when the group holds a
+        different screen shape (e.g. portrait totems). Screens with their own override keep it.
+      </p>
+      {groupId === null && <p className="u-muted" style={{ margin: 0 }}>Loading…</p>}
+      {groupId === 0 && <p style={{ color: "var(--danger)", margin: 0, fontSize: 13 }}>Couldn't resolve this group — reload the page.</p>}
+      {!!groupId && (
+        <TemplateAssignSelect scope="group" targetId={groupId} inheritLabel="Inherited — company default" />
+      )}
+    </Card>
+  );
+}
 
 export default function GroupSettings({ gname, attachments, reload }) {
   const toast = useToast();
@@ -77,6 +107,8 @@ export default function GroupSettings({ gname, attachments, reload }) {
           Rename
         </Button>
       </Card>
+
+      <GroupTemplateCard gname={gname} />
 
       <Card title="Danger zone">
         <p className="u-muted" style={{ marginTop: 0 }}>
