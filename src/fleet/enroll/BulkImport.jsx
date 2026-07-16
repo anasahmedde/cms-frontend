@@ -33,40 +33,52 @@ function Stat({ label, value, tone }) {
   );
 }
 
-const ROW_COLUMNS = [
-  { key: "row", label: "Row", width: 52, render: (r) => (r.row === 0 ? "—" : r.row) },
-  { key: "device_name", label: "Screen" },
-  { key: "shop_name", label: "Location" },
-  { key: "group_name", label: "Group", render: (r) => r.group_name || <span className="u-faint">Ungrouped</span> },
-  { key: "device_id", label: "Device ID", mono: true },
-  {
-    key: "action",
-    label: "Action",
-    render: (r) => <Badge tone={ACTION_TONE[r.action] || "neutral"}>{ACTION_LABEL[r.action] || r.action || "—"}</Badge>,
-  },
-  {
-    key: "changes",
-    label: "What changes",
-    render: (r) => {
-      if (!r.changes?.length) return r.action === "unchanged" ? <span className="u-faint">nothing</span> : "";
-      return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+// One preview row as a self-contained card: identity + action on top, then the
+// per-field diff in an aligned two-column grid (field | old → new). A card list
+// avoids the wide table's horizontal scroll, so every change is readable inline.
+function PreviewRow({ r }) {
+  const err = r.action === "error" || r.reason || r.error;
+  return (
+    <div style={{
+      border: `1px solid ${err ? "var(--danger)" : "var(--border)"}`,
+      borderRadius: "var(--radius-sm)", padding: "10px 12px", background: "var(--elevated)",
+    }}>
+      <div className="u-flex" style={{ alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span className="u-faint" style={{ fontSize: 12 }}>{r.row === 0 ? "—" : `Row ${r.row}`}</span>
+        <strong style={{ fontSize: 14 }}>{r.device_name || <span className="u-faint">(no name)</span>}</strong>
+        <Badge tone={ACTION_TONE[r.action] || "neutral"}>{ACTION_LABEL[r.action] || r.action || "—"}</Badge>
+        {r.device_id && (
+          <span className="u-faint" style={{ fontFamily: "monospace", fontSize: 12, marginLeft: "auto" }}>{r.device_id}</span>
+        )}
+      </div>
+      <div className="u-muted" style={{ fontSize: 12.5, marginTop: 2 }}>
+        {r.shop_name || "—"} · {r.group_name || <span className="u-faint">Ungrouped</span>}
+      </div>
+      {r.changes?.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "3px 12px", marginTop: 8, fontSize: 12.5, alignItems: "baseline" }}>
           {r.changes.map((c, i) => (
-            <span key={i} style={{ fontSize: 12 }}>
-              <b>{changeLabel(c.field)}:</b>{" "}
-              {c.from
-                ? <span className="u-faint" style={{ textDecoration: "line-through" }}>{c.from}</span>
-                : <span className="u-faint">(blank)</span>}
-              {" → "}
-              <span style={{ color: "var(--info)" }}>{c.to}</span>
-            </span>
+            <React.Fragment key={i}>
+              <div style={{ fontWeight: 600, whiteSpace: "nowrap", color: "var(--text-muted)" }}>{changeLabel(c.field)}</div>
+              <div style={{ minWidth: 0, wordBreak: "break-word" }}>
+                {c.from
+                  ? <span className="u-faint" style={{ textDecoration: "line-through" }}>{c.from}</span>
+                  : <span className="u-faint">(blank)</span>}
+                {" → "}
+                <span style={{ color: "var(--info)", fontWeight: 600 }}>{c.to}</span>
+              </div>
+            </React.Fragment>
           ))}
         </div>
-      );
-    },
-  },
-  { key: "reason", label: "Problem", render: (r) => r.reason || r.error || "" },
-];
+      )}
+      {r.action === "unchanged" && !r.changes?.length && (
+        <div className="u-faint" style={{ fontSize: 12.5, marginTop: 6 }}>No changes — already up to date.</div>
+      )}
+      {(r.reason || r.error) && (
+        <div style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 6 }}>{r.reason || r.error}</div>
+      )}
+    </div>
+  );
+}
 
 const ERROR_COLUMNS = [
   { key: "row", label: "Row", width: 52, render: (e) => (e.row === 0 ? "—" : e.row) },
@@ -219,8 +231,8 @@ export default function BulkImport({ open, onClose, onImported }) {
                 </p>
               )}
               {preview.rows?.length > 0 && (
-                <div style={{ maxHeight: 220, overflowY: "auto", marginBottom: 10 }}>
-                  <Table columns={ROW_COLUMNS} rows={preview.rows} rowKey={(r, i) => r.row ?? i} />
+                <div style={{ display: "grid", gap: 8, maxHeight: 340, overflowY: "auto", marginBottom: 10 }}>
+                  {preview.rows.map((r, i) => <PreviewRow key={r.row ?? i} r={r} />)}
                 </div>
               )}
               {preview.errors?.length > 0 && (
