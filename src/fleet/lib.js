@@ -24,6 +24,9 @@ export function deviceStatus(device) {
 // Badge props for a device's content_status. Tones match src/ui Badge.
 const CONTENT_STATUS_BADGES = {
   no_content: { tone: "neutral", label: "No content" },
+  // Screen renders the company's linked template (boxes/QR/text) — it just has
+  // no rotation videos, so "No content" would be wrong.
+  template: { tone: "info", label: "Template" },
   synced: { tone: "success", label: "Synced" },
   syncing: { tone: "info", label: "Syncing" },
   pending: { tone: "warn", label: "Pending" },
@@ -39,7 +42,7 @@ export function contentStatusBadge(device) {
 // online/offline flip doesn't leave a stale badge until the next reload.
 function computeContentStatus(device) {
   const videoCount = Number(device?.video_count) || 0;
-  if (videoCount === 0) return "no_content";
+  if (videoCount === 0) return device?.template_linked ? "template" : "no_content";
   if (device?.download_status) return "synced"; // synced stays synced offline
   return deviceStatus(device) === "online" ? "syncing" : "pending";
 }
