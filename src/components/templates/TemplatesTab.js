@@ -149,7 +149,9 @@ export default function TemplatesTab() {
                   {t.orientation} · {t.design_width}×{t.design_height} · {t.zones?.length || 0} zones
                 </div>
                 <div style={{ fontSize: 12, color: t.linked_companies ? theme.success : theme.textSecondary, marginTop: 2 }}>
-                  {t.linked_companies ? `🔗 ${t.linked_companies} compan${t.linked_companies === 1 ? "y" : "ies"} linked` : "Not linked yet"}
+                  {t.linked_companies
+                    ? `🔗 ${t.linked_companies} compan${t.linked_companies === 1 ? "y" : "ies"} linked${t.customized_companies ? ` (${t.customized_companies} customized)` : ""}`
+                    : "Not linked yet"}
                 </div>
               </div>
             </div>
@@ -226,7 +228,7 @@ export default function TemplatesTab() {
           <div onClick={(e) => e.stopPropagation()} style={{ width: "min(92vw, 420px)", background: theme.card, borderRadius: 12, padding: 20 }}>
             <h3 style={{ margin: "0 0 8px", color: theme.text, fontSize: 16 }}>Delete “{confirmDelete.name}”?</h3>
             <p style={{ margin: "0 0 16px", fontSize: 13, color: theme.textSecondary }}>
-              This permanently removes the template and its version history. Linked companies block deletion — unlink them first.
+              This permanently removes the template and its version history. Directly linked companies block deletion — unlink them first. Companies running their own customized copy keep it.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
               <button onClick={() => setConfirmDelete(null)} style={btn(theme.cardAlt, theme.text)}>Cancel</button>
