@@ -3,7 +3,7 @@
 // The zone list is driven entirely by the template — nothing is hardcoded.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { T as theme } from "./theme";
-import { ZONE_TYPES } from "./zoneTypes";
+import { ZONE_TYPES, zonePixelSize, parseResolution } from "./zoneTypes";
 import {
   getShopContent, putShopContent, uploadShopMedia,
   getDeviceContent, putDeviceContent, uploadDeviceMedia, deleteDeviceContent,
@@ -22,6 +22,7 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
   const [content, setContent] = useState({});
   const [drafts, setDrafts] = useState({});     // zoneKey → payload being edited
   const [linked, setLinked] = useState(true);
+  const [screenSize, setScreenSize] = useState(null); // {w,h,source:"screen"|"design"}
   const [error, setError] = useState("");
   const [savedKey, setSavedKey] = useState("");
   const [busyKey, setBusyKey] = useState("");
@@ -39,6 +40,12 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
     if (!res.ok) { setError(`Could not load screen content: ${res.message}`); setZones([]); return; }
     setLinked(res.data.template_linked);
     setZones(res.data.content_zones || []);
+    // Pixel-size hints: prefer THIS screen's reported resolution (device scope),
+    // fall back to the template's design size. Absent on older backends → no hint.
+    const reported = isDevice ? parseResolution(res.data.reported_resolution) : null;
+    const dw = res.data.design_width, dh = res.data.design_height;
+    setScreenSize(reported ? { ...reported, source: "screen" }
+      : dw && dh ? { w: dw, h: dh, source: "design" } : null);
     const loaded = {};
     Object.entries(res.data.content || {}).forEach(([k, v]) => { loaded[k] = v.payload || {}; });
     setContent(loaded);
@@ -159,6 +166,12 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
             const hasOverride = isDevice && !!saved;
             const busy = busyKey === zone.key;
             const pct = progress[zone.key];
+            const px = zonePixelSize(zone, screenSize?.w, screenSize?.h);
+            // A QR renders as a centered square on the box's smaller side.
+            const qrSide = px ? Math.min(px.w, px.h) : null;
+            const sizeBasis = screenSize?.source === "screen"
+              ? `this screen (${screenSize.w}×${screenSize.h})`
+              : `the template's ${screenSize?.w}×${screenSize?.h} design size`;
             return (
               <div key={zone.key} style={{ border: `1px solid ${theme.border}`, borderRadius: 10, padding: 14, marginBottom: 12, background: theme.cardAlt }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -172,6 +185,27 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                   )}
                   {savedKey === zone.key && <span style={{ marginLeft: isDevice ? 8 : "auto", fontSize: 12, color: theme.success, fontWeight: 600 }}>✓ Saved</span>}
                 </div>
+                {px && (zone.type === "media" || zone.type === "qr") && (
+                  <div style={{ fontSize: 12, color: theme.textSecondary, margin: "-2px 0 10px", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span aria-hidden="true">📐</span>
+                    {zone.type === "qr" ? (
+                      <span>
+                        The QR shows at <strong style={{ color: theme.text }}>{qrSide} × {qrSide} px</strong> (a square
+                        on the box's smaller side) on {sizeBasis}.
+                      </span>
+                    ) : (
+                      <span>
+                        Best size: <strong style={{ color: theme.text }}>{px.label}</strong> ({px.aspect}) —
+                        make the image/video this size for a pixel-perfect fit on {sizeBasis}.
+                      </span>
+                    )}
+                  </div>
+                )}
+                {px && (zone.type === "text" || zone.type === "ticker") && (
+                  <div style={{ fontSize: 12, color: theme.textSecondary, margin: "-2px 0 10px" }}>
+                    <span aria-hidden="true">📐</span> This box is <strong style={{ color: theme.text }}>{px.label}</strong> on {sizeBasis}.
+                  </div>
+                )}
 
                 {/* QR: uploaded image | link (generate) | external image/video URL */}
                 {zone.type === "qr" && (

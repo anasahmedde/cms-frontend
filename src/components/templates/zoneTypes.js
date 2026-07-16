@@ -91,6 +91,22 @@ export function aspectLabel(w, h) {
   return rw <= 64 && rh <= 64 ? `${rw}:${rh}` : `${(w / h).toFixed(2)}:1`;
 }
 
+// A zone's concrete pixel size on a screen of the given resolution (zones are
+// stored as % of the screen). Null when the zone or screen size is unknown.
+export function zonePixelSize(zone, screenW, screenH) {
+  if (!zone || !screenW || !screenH) return null;
+  const w = Math.round(((zone.w || 0) / 100) * screenW);
+  const h = Math.round(((zone.h || 0) / 100) * screenH);
+  if (!w || !h) return null;
+  return { w, h, label: `${w} × ${h} px`, aspect: aspectLabel(w, h) };
+}
+
+// Parse a device-reported resolution string like "1920x1080" (or "1920×1080").
+export function parseResolution(str) {
+  const m = /^\s*(\d{2,5})\s*[x×]\s*(\d{2,5})\s*$/i.exec(str || "");
+  return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
+}
+
 export const ZONE_PALETTE = [
   "rgba(59,130,246,0.55)",   // blue
   "rgba(16,185,129,0.55)",   // green

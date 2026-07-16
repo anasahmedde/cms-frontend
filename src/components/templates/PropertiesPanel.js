@@ -1,7 +1,7 @@
 // Right-hand properties panel for the selected zone (or template meta when
 // nothing is selected).
 import React from "react";
-import { ZONE_TYPES, BINDING_LABELS, CONTENT_SCOPES, CANVAS_PRESETS, CANVAS_MIN, CANVAS_MAX, normalizeCanvas, aspectLabel } from "./zoneTypes";
+import { ZONE_TYPES, BINDING_LABELS, CONTENT_SCOPES, CANVAS_PRESETS, CANVAS_MIN, CANVAS_MAX, normalizeCanvas, aspectLabel, zonePixelSize } from "./zoneTypes";
 import MediaLibraryPicker from "./MediaLibraryPicker";
 
 const row = { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 };
@@ -262,6 +262,27 @@ export default function PropertiesPanel({ theme, state, dispatch, onEditRuns }) 
         <NumField theme={theme} id="z-w" label="W" value={zone.w} onChange={(v) => patchZone({ w: v })} min={1} labelWidth={28} />
         <NumField theme={theme} id="z-h" label="H" value={zone.h} onChange={(v) => patchZone({ h: v })} min={1} labelWidth={28} />
       </div>
+      {(() => {
+        const px = zonePixelSize(zone, template.design_width, template.design_height);
+        return px ? (
+          <div
+            role="status"
+            style={{
+              padding: "8px 10px", borderRadius: 8, marginBottom: 8,
+              background: "rgba(245,158,11,0.10)", border: `1px solid ${theme.border}`,
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, color: theme.text }}>
+              📐 {px.label} <span style={{ fontWeight: 400, color: theme.textSecondary }}>· {px.aspect}</span>
+            </div>
+            <div style={{ fontSize: 11, color: theme.textSecondary, marginTop: 2 }}>
+              {zone.type === "media" || zone.type === "qr"
+                ? "Best size for this box's image/video"
+                : "This box's size"} on a {template.design_width}×{template.design_height} screen.
+            </div>
+          </div>
+        ) : null;
+      })()}
       <p style={{ fontSize: 11, color: theme.textSecondary, margin: "0 0 10px" }}>
         All values are % of the screen — the template fits any resolution automatically.
       </p>

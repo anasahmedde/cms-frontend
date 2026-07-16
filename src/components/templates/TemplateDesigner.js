@@ -248,6 +248,8 @@ export default function TemplateDesigner({ template: initial, onClose, onSaved,
                   index={i}
                   selected={state.selectedKey === z.key}
                   canvasRef={canvasRef}
+                  designWidth={template.design_width}
+                  designHeight={template.design_height}
                   snapTargets={snapTargets}
                   onSelect={(key) => dispatch({ type: "SELECT", key })}
                   onChange={(patch) => dispatch({ type: "UPDATE_ZONE", key: z.key, patch })}
