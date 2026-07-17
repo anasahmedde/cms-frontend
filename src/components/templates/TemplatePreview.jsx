@@ -61,13 +61,29 @@ function ZoneContent({ z }) {
   }
 
   switch (z.type) {
-    case "media":
-    case "qr": {
-      if (!c.media_url) return z.type === "qr" ? <span style={{ opacity: 0.7, fontSize: 10, color: "#888" }}>QR</span> : null;
-      const objFit = z.type === "qr" ? "contain" : fit;
+    case "media": {
+      if (!c.media_url) return null;
       return c.media_type === "video"
-        ? <video src={c.media_url} autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: objFit }} />
-        : <img src={c.media_url} alt="" style={{ width: "100%", height: "100%", objectFit: objFit }} />;
+        ? <video src={c.media_url} autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: fit }} />
+        : <img src={c.media_url} alt="" style={{ width: "100%", height: "100%", objectFit: fit }} />;
+    }
+    case "qr": {
+      // Same square quiet-zone card both players draw (TemplateRenderer /
+      // player.html fillQr): many QR pngs have a TRANSPARENT background, so a
+      // bare <img> on the black board renders black-on-black — invisible.
+      // Unset QR zones stay transparent on the device — mirror that here.
+      if (!c.media_url) return <span style={{ opacity: 0.7, fontSize: 10, color: "#888" }}>QR</span>;
+      const side = "min(100cqw, 100cqh)";
+      const padPct = (st.padding_pct ?? 6) / 100;
+      return (
+        <div style={{
+          width: side, height: side, background: c.bg_color || st.bg_color || "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: `calc(${side} * ${padPct})`, boxSizing: "border-box",
+        }}>
+          <img src={c.media_url} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        </div>
+      );
     }
     case "clock":
       return <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: textColor, fontSize }}><Clock fmt={st.format} /></div>;
