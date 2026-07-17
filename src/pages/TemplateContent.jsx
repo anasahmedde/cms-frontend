@@ -360,7 +360,8 @@ export default function TemplateContent() {
               <div>
                 <p className="u-faint" style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 600 }}>How it looks on screen</p>
                 {preview?.zones
-                  ? <TemplatePreview template={preview.template} zones={preview.zones} />
+                  ? <TemplatePreview template={preview.template} zones={preview.zones}
+                      overrides={scope === "company" ? overrides : {}} />
                   : <div style={{ width: 240, minHeight: 120 }}><SkeletonText lines={3} /></div>}
               </div>
             </div>
