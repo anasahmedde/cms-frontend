@@ -63,7 +63,7 @@ function ZoneContent({ z }) {
   switch (z.type) {
     case "media":
     case "qr": {
-      if (!c.media_url) return z.type === "qr" ? <span style={{ opacity: 0.4, fontSize: 10, color: "#000" }}>QR</span> : null;
+      if (!c.media_url) return z.type === "qr" ? <span style={{ opacity: 0.7, fontSize: 10, color: "#888" }}>QR</span> : null;
       const objFit = z.type === "qr" ? "contain" : fit;
       return c.media_type === "video"
         ? <video src={c.media_url} autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: objFit }} />
@@ -88,7 +88,23 @@ function ZoneContent({ z }) {
   }
 }
 
-export default function TemplatePreview({ template, zones }) {
+// Whether the RESOLVED zone shows anything at this scope — drives the
+// "set per screen" explainer chip for boxes that only have deeper-level content.
+function hasVisibleContent(z) {
+  const c = z.content || {};
+  switch (z.type) {
+    case "media":
+    case "qr":
+      return !!c.media_url;
+    case "text":
+    case "ticker":
+      return !!(c.text || (Array.isArray(c.runs) && c.runs.length));
+    default:
+      return true; // clock / playlist always render something
+  }
+}
+
+export default function TemplatePreview({ template, zones, overrides = {} }) {
   const dw = template?.design_width || 1920;
   const dh = template?.design_height || 1080;
   const landscape = dw >= dh;
@@ -101,7 +117,11 @@ export default function TemplatePreview({ template, zones }) {
       position: "relative", width: boardW, height: boardH, flexShrink: 0,
       background: "#000", borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)",
     }}>
-      {sorted.map((z) => (
+      {sorted.map((z) => {
+        const pin = overrides[z.key];
+        const pinCount = pin ? (pin.shops?.length || 0) + (pin.devices?.length || 0) + (pin.groups?.length || 0) : 0;
+        const pinnedOnly = pinCount > 0 && !hasVisibleContent(z);
+        return (
         <div key={z.key} style={{
           position: "absolute", left: `${z.x}%`, top: `${z.y}%`, width: `${z.w}%`, height: `${z.h}%`,
           overflow: "hidden", containerType: "size",
@@ -109,8 +129,22 @@ export default function TemplatePreview({ template, zones }) {
           ...bgStyle(z.content, z.style),
         }}>
           <ZoneContent z={z} />
+          {pinnedOnly && (
+            <span
+              title={`Nothing set at this level — this box has its own content on ${pinCount} screen/group/location(s) (e.g. from an Excel upload), so it's NOT empty there.`}
+              style={{
+                position: "absolute", fontSize: 10, fontWeight: 600, lineHeight: 1,
+                padding: "3px 7px", borderRadius: 10, whiteSpace: "nowrap",
+                background: "rgba(0,0,0,0.55)", color: "rgba(255,255,255,0.9)",
+                border: "1px solid rgba(255,255,255,0.3)",
+              }}
+            >
+              set on {pinCount} screen{pinCount > 1 ? "s" : ""}
+            </span>
+          )}
         </div>
-      ))}
+        );
+      })}
       {(!zones || zones.length === 0) && (
         <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
           Nothing to preview yet
