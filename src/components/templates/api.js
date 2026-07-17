@@ -101,3 +101,8 @@ export const setGroupTemplate = (groupId, templateId) =>
 export const getDeviceTemplate = (deviceId) => safeGet(`/device-config/${deviceId}/template`);
 export const setDeviceTemplate = (deviceId, templateId) =>
   safePut(`/device-config/${deviceId}/template`, { template_id: templateId });
+
+// Remove a template from a company's ADDITIONAL set (platform side). The
+// default link stays managed via linkCompanyTemplate.
+export const unlinkCompanyExtraTemplate = (companyId, templateId) =>
+  safeDelete(`/platform/companies/${companyId}/templates/${templateId}`);
