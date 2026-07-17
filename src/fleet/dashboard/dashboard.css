@@ -1,0 +1,335 @@
+/* Dashboard (fleet monitor) styles. Tokens only — no hardcoded colors. */
+
+/* ---- Alerts strip ------------------------------------------------------ */
+.fleet-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.fleet-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.fleet-alert--danger {
+  border-left-color: var(--danger);
+}
+
+.fleet-alert--danger .fleet-alert-icon {
+  color: var(--danger);
+}
+
+.fleet-alert-icon {
+  color: var(--warn);
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.fleet-alert a {
+  margin-left: auto;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/* ---- KPI grids ---------------------------------------------------------- */
+.fleet-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.fleet-kpis--totals {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  margin-bottom: 16px;
+}
+
+/* ---- Filter bar ---------------------------------------------------------- */
+.fleet-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.fleet-filters-note {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Table sits inside the dashboard card — drop its own border/radius. */
+.fleet-table-wrap {
+  border: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: transparent;
+}
+
+/* ---- Table cells --------------------------------------------------------- */
+.fleet-screen-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 180px;
+}
+
+.fleet-screen-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fleet-screen-id {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.fleet-screen-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.fleet-chip {
+  display: inline-block;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--elevated);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+a.fleet-chip:hover {
+  text-decoration: underline;
+}
+
+.fleet-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  max-width: 220px;
+}
+
+.fleet-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--info-soft);
+  color: var(--info);
+  font-size: 11px;
+}
+
+.fleet-slot--image {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.fleet-slot--empty {
+  background: var(--elevated);
+  color: var(--text-faint);
+}
+
+.fleet-playing {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.fleet-playing-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.fleet-progress-file {
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fleet-telemetry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 170px;
+}
+
+.fleet-actions {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* ---- Expanded link rows --------------------------------------------------- */
+.fleet-expanded td {
+  background: var(--elevated);
+  padding: 0;
+}
+
+.fleet-linkrows {
+  padding: 12px 16px 14px 44px;
+}
+
+.fleet-linkrows-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+.fleet-linkrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.fleet-linkrow:last-of-type {
+  border-bottom: none;
+}
+
+.fleet-linkrow-meta {
+  color: var(--text-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ---- Preview modal --------------------------------------------------------- */
+.fleet-preview-stage {
+  background: #000;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  position: relative;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fleet-preview-grid {
+  display: grid;
+  gap: 2px;
+  height: min(60vh, 520px);
+  width: 100%;
+}
+
+.fleet-preview-slot {
+  position: relative;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.fleet-preview-slot-label {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  max-width: 85%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fleet-preview-empty-slot {
+  color: var(--text-faint);
+  font-size: 12px;
+  text-align: center;
+}
+
+.fleet-preview-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.fleet-preview-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.fleet-preview-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.fleet-preview-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  background: var(--border-strong);
+  cursor: pointer;
+}
+
+.fleet-preview-dot--active {
+  background: var(--accent);
+}
+
+
+.fleet-filters--single {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fleet-filters--single > :first-child {
+  flex: 1;
+  min-width: 260px;
+  max-width: 480px;
+}

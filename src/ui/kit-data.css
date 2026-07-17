@@ -1,0 +1,280 @@
+/* kit-data — Table, Pagination, Breadcrumbs, PageHeader, CopyButton,
+   ProgressBar, KeyValue. Tokens only; no hardcoded colors. */
+
+/* ---- Table ------------------------------------------------------------- */
+.ui-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ui-table th {
+  background: var(--table-head);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.ui-table-sticky th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.ui-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.ui-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ui-table tbody tr:hover td {
+  background: var(--row-hover);
+}
+
+.ui-table-row-clickable {
+  cursor: pointer;
+}
+.ui-table-row-clickable:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+
+.ui-table-cell-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.ui-table-empty {
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ---- Pagination -------------------------------------------------------- */
+.ui-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 2px;
+  flex-wrap: wrap;
+}
+
+.ui-pagination-info {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ui-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ui-pagination-num {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ui-pagination-num:hover {
+  background: var(--elevated);
+  color: var(--text);
+}
+.ui-pagination-num-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---- Breadcrumbs ------------------------------------------------------- */
+.ui-breadcrumbs ol {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+.ui-breadcrumbs li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ui-breadcrumbs a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.ui-breadcrumbs a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.ui-breadcrumbs-current {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.ui-breadcrumbs-sep {
+  color: var(--text-faint);
+}
+
+/* ---- PageHeader --------------------------------------------------------- */
+.ui-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.ui-page-header-breadcrumbs {
+  margin-bottom: 6px;
+}
+
+.ui-page-header-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.ui-page-header-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.ui-page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ---- CopyButton --------------------------------------------------------- */
+.ui-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--card);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ui-copy-btn:hover {
+  background: var(--elevated);
+  color: var(--text);
+}
+.ui-copy-btn-small {
+  padding: 3px 7px;
+  font-size: 11px;
+  gap: 4px;
+}
+.ui-copy-btn-copied {
+  color: var(--success);
+  border-color: var(--success);
+}
+.ui-copy-btn-copied:hover {
+  color: var(--success);
+}
+
+/* ---- ProgressBar -------------------------------------------------------- */
+.ui-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.ui-progress-track {
+  flex: 1;
+  min-width: 0;
+  background: var(--elevated);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.ui-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.ui-progress-label {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+/* ---- KeyValue ----------------------------------------------------------- */
+.ui-kv {
+  display: grid;
+  gap: 14px 20px;
+  margin: 0;
+}
+
+.ui-kv-item {
+  min-width: 0;
+}
+
+.ui-kv-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.ui-kv-value {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+
+.ui-kv-value-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
