@@ -143,11 +143,17 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
                 <span
                   style={{
                     fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 10,
-                    background: hasContent ? "var(--success)" : "rgba(255,255,255,0.9)",
-                    color: hasContent ? "#062" : "var(--brand-navy)",
+                    background: hasContent ? "var(--success)"
+                      : pinCount > 0 ? "var(--accent)" : "rgba(255,255,255,0.9)",
+                    color: hasContent ? "#062" : pinCount > 0 ? "#0a1628" : "var(--brand-navy)",
                   }}
+                  title={!hasContent && pinCount > 0
+                    ? `No company-wide content, but ${pinCount} screen/group/location(s) have their own (e.g. set via Excel or per-screen edits) — the box IS showing content there.`
+                    : undefined}
                 >
-                  {hasContent ? "✓ set" : "+ add"}
+                  {hasContent ? "✓ set"
+                    : pinCount > 0 ? `✓ on ${pinCount} screen${pinCount > 1 ? "s" : ""}`
+                    : "+ add"}
                 </span>
               )}
               {editable && px && (
@@ -155,9 +161,9 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
                   {px.w}×{px.h}px
                 </span>
               )}
-              {pinCount > 0 && (
+              {hasContent && pinCount > 0 && (
                 <span
-                  title={`Pinned on ${pinCount} screen/group/location override(s) — these win over the company setting`}
+                  title={`Pinned on ${pinCount} screen/group/location override(s) — these win over the company setting there`}
                   style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10, background: "var(--accent)", color: "#0a1628" }}
                 >
                   📌 {pinCount}
@@ -176,7 +182,9 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
       <div style={{ fontSize: 12, color: "var(--text-muted)", maxWidth: 260 }}>
         <p style={{ marginTop: 0 }}>
           Click a highlighted box to set what it shows. <strong>✓ set</strong> means content
-          exists at this level; <strong>+ add</strong> is empty (falls back to the wider scope).
+          exists at this level; <strong>✓ on N screens</strong> means content lives only on
+          specific screens/groups/locations (e.g. from an Excel upload) — set it here to also
+          cover the rest; <strong>+ add</strong> is empty everywhere at or above this level.
         </p>
         <p>
           Dimmed boxes aren't editable here — the <em>rotation</em> plays the screen's playlist, and
