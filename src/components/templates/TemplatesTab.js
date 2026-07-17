@@ -150,7 +150,9 @@ export default function TemplatesTab() {
                 </div>
                 <div style={{ fontSize: 12, color: t.linked_companies ? theme.success : theme.textSecondary, marginTop: 2 }}>
                   {t.linked_companies
-                    ? `🔗 ${t.linked_companies} compan${t.linked_companies === 1 ? "y" : "ies"} linked${t.customized_companies ? ` (${t.customized_companies} customized)` : ""}`
+                    ? `🔗 ${t.linked_companies} compan${t.linked_companies === 1 ? "y" : "ies"} linked`
+                      + (t.customized_companies ? ` (${t.customized_companies} customized)` : "")
+                      + (t.additional_companies ? ` · ${t.additional_companies} as extra` : "")
                     : "Not linked yet"}
                 </div>
               </div>
