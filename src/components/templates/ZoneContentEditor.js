@@ -299,6 +299,15 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                 {/* Text / ticker zones: text + text color + background (color/gradient/image) */}
                 {(zone.type === "text" || zone.type === "ticker") && (
                   <>
+                    {(zone.binding?.source || "static") !== "content" && (
+                      <p style={{ margin: "0 0 8px", fontSize: 12, color: theme.textSecondary }}>
+                        This box normally shows {
+                          { "company.name": "the company name", "shop.name": "the location name",
+                            "device.name": "the screen name" }[zone.binding?.source]
+                          || "the text composed in the designer"
+                        } — a text set here overrides it (leave blank to keep the default).
+                      </p>
+                    )}
                     <label htmlFor={`txt-${zone.key}`} style={lbl}>Text</label>
                     <input id={`txt-${zone.key}`} value={d.text || ""} maxLength={5000}
                       onChange={(e) => setDraft(zone.key, { text: e.target.value })}

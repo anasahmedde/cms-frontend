@@ -24,8 +24,12 @@ const TYPE_LABEL = {
   clock: "Clock",
 };
 
+// Mirrors the backend's takes_tenant_content(): content-bound zones, plus
+// text/ticker zones on EVERY binding — their designed/bound text is only the
+// default and an explicit per-scope text overrides it.
 function isEditable(z) {
-  return (z.binding?.source || "static") === "content";
+  const src = z.binding?.source || "static";
+  return src === "content" || z.type === "text" || z.type === "ticker";
 }
 
 const NAME_PLACEHOLDER = {
@@ -46,16 +50,18 @@ function previewOf(z, payload) {
   const src = z.binding?.source || "static";
   const zc = z.content || {};
   if (z.type === "text" || z.type === "ticker" || z.type === "clock") {
-    if (NAME_PLACEHOLDER[src]) return { text: NAME_PLACEHOLDER[src], muted: true };
-    if (src === "content") {
-      if (payload?.runs?.length) return { text: runsText(payload.runs) };
+    if (z.type !== "clock") {
+      // Precedence mirrors the backend resolver: tenant text set at this scope
+      // beats the designed items, which beat the bound-name/static default.
       if (payload?.text) return { text: payload.text };
-    } else {
+      if (payload?.runs?.length) return { text: runsText(payload.runs) };
       if (Array.isArray(zc.runs) && zc.runs.length) return { text: runsText(zc.runs) };
+      if (NAME_PLACEHOLDER[src]) return { text: NAME_PLACEHOLDER[src], muted: true };
       if (zc.text) return { text: zc.text };
+      return null;
     }
-    if (z.type === "clock") return { text: "🕐 " + (z.style?.format || "HH:mm"), muted: true };
-    return null;
+    if (NAME_PLACEHOLDER[src]) return { text: NAME_PLACEHOLDER[src], muted: true };
+    return { text: "🕐 " + (z.style?.format || "HH:mm"), muted: true };
   }
   if (z.type === "media") {
     if (payload?.media_url || payload?.media_s3 || payload?.media_type) {
@@ -188,7 +194,8 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
         </p>
         <p>
           Dimmed boxes aren't editable here — the <em>rotation</em> plays the screen's playlist, and
-          name/clock zones are fixed in the designer.
+          clock zones are fixed in the designer. Text boxes are always editable: setting a text
+          overrides what the designer composed (or the bound name) on the screens at this level.
         </p>
         <p style={{ marginBottom: 0 }}>
           Box sizes are shown for a <strong>{dw}×{dh}</strong> screen (the template's design size) —
