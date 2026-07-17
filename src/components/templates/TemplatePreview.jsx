@@ -120,7 +120,14 @@ export default function TemplatePreview({ template, zones, overrides = {} }) {
       {sorted.map((z) => {
         const pin = overrides[z.key];
         const pinCount = pin ? (pin.shops?.length || 0) + (pin.devices?.length || 0) + (pin.groups?.length || 0) : 0;
-        const pinnedOnly = pinCount > 0 && !hasVisibleContent(z);
+        // The backend samples one representative payload for boxes whose content
+        // lives only on specific screens — label its source; the bare
+        // "set on N screens" chip stays as the no-sample fallback.
+        const sampled = z.sampled_from;
+        const pinnedOnly = !sampled && pinCount > 0 && !hasVisibleContent(z);
+        const chip = sampled
+          ? `from ${sampled.scope} “${sampled.name}”${pinCount > 1 ? ` +${pinCount - 1} more` : ""}`
+          : pinnedOnly ? `set on ${pinCount} screen${pinCount > 1 ? "s" : ""}` : null;
         return (
         <div key={z.key} style={{
           position: "absolute", left: `${z.x}%`, top: `${z.y}%`, width: `${z.w}%`, height: `${z.h}%`,
@@ -129,17 +136,21 @@ export default function TemplatePreview({ template, zones, overrides = {} }) {
           ...bgStyle(z.content, z.style),
         }}>
           <ZoneContent z={z} />
-          {pinnedOnly && (
+          {chip && (
             <span
-              title={`Nothing set at this level — this box has its own content on ${pinCount} screen/group/location(s) (e.g. from an Excel upload), so it's NOT empty there.`}
+              title={sampled
+                ? `This box has no company-wide content — showing what plays on ${sampled.scope} “${sampled.name}”. Set content at this level to cover every screen.`
+                : `Nothing set at this level — this box has its own content on ${pinCount} screen/group/location(s) (e.g. from an Excel upload), so it's NOT empty there.`}
               style={{
-                position: "absolute", fontSize: 10, fontWeight: 600, lineHeight: 1,
+                position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)",
+                maxWidth: "94%", overflow: "hidden", textOverflow: "ellipsis",
+                fontSize: 10, fontWeight: 600, lineHeight: 1,
                 padding: "3px 7px", borderRadius: 10, whiteSpace: "nowrap",
                 background: "rgba(0,0,0,0.55)", color: "rgba(255,255,255,0.9)",
                 border: "1px solid rgba(255,255,255,0.3)",
               }}
             >
-              set on {pinCount} screen{pinCount > 1 ? "s" : ""}
+              {chip}
             </span>
           )}
         </div>
