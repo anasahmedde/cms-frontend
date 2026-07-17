@@ -37,6 +37,7 @@ function CompanyTemplateSet({ companyId, defaultId, allTemplates }) {
   }, [companyId]);
   useEffect(() => { load(); }, [load]);
 
+  const defaults = (linked || []).filter((t) => t.is_default);
   const extras = (linked || []).filter((t) => !t.is_default);
   const addable = allTemplates.filter(
     (t) => t.id !== defaultId && !(linked || []).some((l) => l.id === t.id)
@@ -65,20 +66,29 @@ function CompanyTemplateSet({ companyId, defaultId, allTemplates }) {
   return (
     <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
       <p className="u-muted" style={{ margin: "0 0 8px", fontSize: 12.5 }}>
-        <strong>Additional templates</strong> — for mixed screens (e.g. portrait totems next to
-        landscape TVs). The company assigns them per group or per screen.
+        <strong>Linked templates</strong> — everything this company can render. Extras exist for
+        mixed screens (e.g. portrait totems next to landscape TVs); the company assigns them per
+        group or per screen.
       </p>
       {linked === null && <p className="u-muted" style={{ margin: 0 }}>Loading…</p>}
-      {linked !== null && extras.length === 0 && (
-        <p className="u-muted" style={{ margin: "0 0 8px" }}>None linked yet.</p>
-      )}
-      {extras.map((t) => (
+      {defaults.map((t) => (
         <div key={t.id} className="u-flex" style={{ justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 13 }}>
             {t.name} <span className="u-faint">· {t.orientation} {t.design_width}×{t.design_height} · v{t.version}</span>
           </span>
-          <Button variant="ghost" size="sm" onClick={() => remove(t)} disabled={busy} aria-label={`Remove ${t.name}`}>
-            Remove
+          <Badge tone="info">default</Badge>
+        </div>
+      ))}
+      {linked !== null && defaults.length === 0 && extras.length === 0 && (
+        <p className="u-muted" style={{ margin: "0 0 8px" }}>No templates linked yet.</p>
+      )}
+      {extras.map((t) => (
+        <div key={t.id} className="u-flex" style={{ justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 13 }}>
+            {t.name} <span className="u-faint">· {t.orientation} {t.design_width}×{t.design_height} · v{t.version} · extra</span>
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => remove(t)} disabled={busy} aria-label={`Unlink ${t.name}`}>
+            Unlink
           </Button>
         </div>
       ))}
