@@ -296,7 +296,9 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                   </>
                 )}
 
-                {/* Text / ticker zones: text + text color + background (color/gradient/image) */}
+                {/* Text / ticker zones: WORDS ONLY. Colors, background, size,
+                    weight and position are designer-owned, always — the same
+                    rule as the Excel sheet, so there are no styling controls. */}
                 {(zone.type === "text" || zone.type === "ticker") && (
                   <>
                     {(zone.binding?.source || "static") !== "content" && (
@@ -305,20 +307,16 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                           { "company.name": "the company name", "shop.name": "the location name",
                             "device.name": "the screen name" }[zone.binding?.source]
                           || "the text composed in the designer"
-                        } — a text set here overrides it (leave blank to keep the default).
+                        } — a text set here replaces those words (leave blank to keep the default).
                       </p>
                     )}
                     <label htmlFor={`txt-${zone.key}`} style={lbl}>Text</label>
                     <input id={`txt-${zone.key}`} value={d.text || ""} maxLength={5000}
                       onChange={(e) => setDraft(zone.key, { text: e.target.value })}
                       style={{ ...inp, marginBottom: 10 }} placeholder="Shown on the screen" />
-                    <div style={{ marginBottom: 10 }}>
-                      <label htmlFor={`fg-${zone.key}`} style={lbl}>Text color</label>
-                      <input id={`fg-${zone.key}`} type="color" value={d.text_color || "#ffffff"}
-                        onChange={(e) => setDraft(zone.key, { text_color: e.target.value })}
-                        style={{ width: 44, height: 30, padding: 0, border: `1px solid ${theme.inputBorder}`, borderRadius: 6, background: theme.inputBg, cursor: "pointer" }} />
-                    </div>
-                    <BgControl zoneKey={zone.key} d={d} setDraft={setDraft} theme={theme} lbl={lbl} inp={inp} />
+                    <p style={{ margin: "0 0 4px", fontSize: 12, color: theme.textSecondary }}>
+                      Colors, size and background come from the template designer — this sets only the words.
+                    </p>
                   </>
                 )}
 
@@ -463,47 +461,3 @@ function UrlField({ zone, value, placeholder, theme, lbl, onChange }) {
   );
 }
 
-function BgControl({ zoneKey, d, setDraft, theme, lbl, inp }) {
-  const mode = d.bg_image_url ? "image" : d.bg_gradient ? "gradient" : "color";
-  const grad = d.bg_gradient || { stops: ["#0a1628", "#f59e0b"], angle: 135 };
-  const swatch = { width: 44, height: 30, padding: 0, border: `1px solid ${theme.inputBorder}`, borderRadius: 6, background: theme.inputBg, cursor: "pointer" };
-  const setMode = (m) => {
-    if (m === "color") setDraft(zoneKey, { bg_color: d.bg_color || "#111827", bg_gradient: undefined, bg_image_url: undefined });
-    else if (m === "gradient") setDraft(zoneKey, { bg_gradient: grad, bg_color: undefined, bg_image_url: undefined });
-    else setDraft(zoneKey, { bg_image_url: "", bg_color: undefined, bg_gradient: undefined });
-  };
-  return (
-    <div>
-      <label htmlFor={`bgtype-${zoneKey}`} style={lbl}>Background</label>
-      <select id={`bgtype-${zoneKey}`} value={mode} onChange={(e) => setMode(e.target.value)}
-        style={{ ...inp, marginBottom: 8 }}>
-        <option value="color">Solid color</option>
-        <option value="gradient">Gradient</option>
-        <option value="image">Image</option>
-      </select>
-      {mode === "color" && (
-        <input aria-label="Background color" type="color" value={d.bg_color || "#111827"}
-          onChange={(e) => setDraft(zoneKey, { bg_color: e.target.value })} style={swatch} />
-      )}
-      {mode === "gradient" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <input aria-label="Gradient start" type="color" value={grad.stops[0]}
-            onChange={(e) => setDraft(zoneKey, { bg_gradient: { ...grad, stops: [e.target.value, grad.stops[1]] } })} style={swatch} />
-          <input aria-label="Gradient end" type="color" value={grad.stops[1] || "#f59e0b"}
-            onChange={(e) => setDraft(zoneKey, { bg_gradient: { ...grad, stops: [grad.stops[0], e.target.value] } })} style={swatch} />
-          <label style={{ fontSize: 12, color: theme.textSecondary }}>Angle
-            <input type="range" min="0" max="360" value={grad.angle ?? 135}
-              onChange={(e) => setDraft(zoneKey, { bg_gradient: { ...grad, angle: Number(e.target.value) } })}
-              style={{ verticalAlign: "middle", marginLeft: 6 }} /> {grad.angle ?? 135}°
-          </label>
-          <span style={{ width: 60, height: 26, borderRadius: 6, border: `1px solid ${theme.inputBorder}`,
-            background: `linear-gradient(${grad.angle ?? 135}deg, ${grad.stops[0]}, ${grad.stops[1] || "#f59e0b"})` }} />
-        </div>
-      )}
-      {mode === "image" && (
-        <input aria-label="Background image URL" value={d.bg_image_url || ""} placeholder="https://cdn…/background.jpg"
-          onChange={(e) => setDraft(zoneKey, { bg_image_url: e.target.value })} style={inp} />
-      )}
-    </div>
-  );
-}
