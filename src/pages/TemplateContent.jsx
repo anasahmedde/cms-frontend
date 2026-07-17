@@ -170,6 +170,25 @@ export default function TemplateContent() {
 
   useEffect(() => { reloadContentState(); }, [reloadContentState]);
 
+  // Content changes arrive from OUTSIDE this tab too — an Excel upload in
+  // another window, a teammate's edit, a bulk commit. Refetch whenever the
+  // tab regains focus so the map/preview can't sit stale ("I updated on
+  // Excel and the screen changed but this page didn't").
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState === "visible") {
+        reloadContentState();
+        loadOverrides();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [reloadContentState, loadOverrides]);
+
   if (template === undefined) {
     return (
       <div>
@@ -319,7 +338,14 @@ export default function TemplateContent() {
             hint="Choose one above to see its template layout and set content per box."
           />
         ) : (
-          <Card title={`Layout — ${target.targetName}${scopeTemplate && scopeTemplate.id !== template?.id ? ` · renders “${scopeTemplate.name}”` : ""}`}>
+          <Card
+            title={`Layout — ${target.targetName}${scopeTemplate && scopeTemplate.id !== template?.id ? ` · renders “${scopeTemplate.name}”` : ""}`}
+            actions={
+              <Button variant="secondary" size="sm" onClick={() => { reloadContentState(); loadOverrides(); }}>
+                Refresh
+              </Button>
+            }
+          >
             <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
               <div>
                 <p className="u-faint" style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 600 }}>Click a box to set its content</p>
