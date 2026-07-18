@@ -15,9 +15,12 @@ import EmptyState from "../../ui/EmptyState";
 import ErrorState from "../../ui/ErrorState";
 import { useToast } from "../../ui/Toast";
 import AddLinkForm from "./AddLinkForm";
+import { useAuth } from "../../lib/auth";
 
 export default function PlaylistCard({ device, links, loading, error, reload, onDeviceReload }) {
   const toast = useToast();
+  const { hasPermission } = useAuth();
+  const canAssign = hasPermission("manage_links"); // editors keep playlist edits; viewers read-only
   const [removeTarget, setRemoveTarget] = useState(null); // link row pending confirm
   const [removing, setRemoving] = useState(false);
 
@@ -75,7 +78,7 @@ export default function PlaylistCard({ device, links, loading, error, reload, on
         ),
     },
     { key: "updated_at", label: "Updated", render: (row) => timeAgo(row.updated_at) },
-    {
+    ...(canAssign ? [{
       key: "actions",
       label: "",
       width: 48,
@@ -88,7 +91,7 @@ export default function PlaylistCard({ device, links, loading, error, reload, on
           onClick={() => setRemoveTarget(row)}
         />
       ),
-    },
+    }] : []),
   ];
 
   return (
@@ -120,6 +123,7 @@ export default function PlaylistCard({ device, links, loading, error, reload, on
         />
       )}
 
+      {canAssign && (
       <div style={{ marginTop: 16, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
         <AddLinkForm
           device={device}
@@ -131,6 +135,7 @@ export default function PlaylistCard({ device, links, loading, error, reload, on
           }}
         />
       </div>
+      )}
 
       <ConfirmModal
         open={!!removeTarget}

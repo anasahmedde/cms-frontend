@@ -110,7 +110,7 @@ export default function AppRoutes() {
         <Route index element={<ErrorBoundary><HomeRedirect /></ErrorBoundary>} />
         <Route
           path="/screens"
-          element={<ErrorBoundary><RequirePerm perm="manage_devices"><Screens /></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><Screens /></ErrorBoundary>}
         />
         <Route
           path="/screens/pending"
@@ -118,23 +118,23 @@ export default function AppRoutes() {
         />
         <Route
           path="/screens/:mobileId"
-          element={<ErrorBoundary><RequirePerm perm="manage_devices"><ScreenDetail /></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><ScreenDetail /></ErrorBoundary>}
         />
         <Route
           path="/groups"
-          element={<ErrorBoundary><RequirePerm perm="manage_groups"><Groups /></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><Groups /></ErrorBoundary>}
         />
         <Route
           path="/groups/:gname"
-          element={<ErrorBoundary><RequirePerm perm="manage_groups"><GroupDetail /></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><GroupDetail /></ErrorBoundary>}
         />
         <Route
           path="/locations"
-          element={<ErrorBoundary><RequirePerm perm="manage_shops"><Locations /></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><Locations /></ErrorBoundary>}
         />
         <Route
           path="/locations/:shopName"
-          element={<ErrorBoundary><RequirePerm perm="manage_shops"><LocationDetail /></RequirePerm></ErrorBoundary>}
+          element={<ErrorBoundary><LocationDetail /></ErrorBoundary>}
         />
         <Route
           path="/media"

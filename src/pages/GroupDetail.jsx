@@ -7,10 +7,14 @@ import Badge from "../ui/Badge";
 import PlaylistEditor from "../content/groups/PlaylistEditor";
 import GroupScreens from "../content/groups/GroupScreens";
 import GroupSettings from "../content/groups/GroupSettings";
+import { useAuth } from "../lib/auth";
 import { useGroupAttachments } from "../content/groups/useGroupAttachments";
 
 export default function GroupDetail() {
   const { gname } = useParams();
+  const { hasPermission } = useAuth();
+  // The Settings tab is pure group management (rename/template/delete/unassign).
+  const canManageGroups = hasPermission("manage_groups");
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") || "playlist";
   const { attachments, loading, error, reload } = useGroupAttachments(gname);
@@ -35,7 +39,7 @@ export default function GroupDetail() {
         tabs={[
           { key: "playlist", label: "Playlist", icon: ListVideo },
           { key: "screens", label: "Screens", icon: MonitorPlay, badge: screens || undefined },
-          { key: "settings", label: "Settings", icon: Settings2 },
+          ...(canManageGroups ? [{ key: "settings", label: "Settings", icon: Settings2 }] : []),
         ]}
         active={tab}
         onChange={(key) => setParams({ tab: key }, { replace: true })}
@@ -45,7 +49,7 @@ export default function GroupDetail() {
         {tab === "screens" && (
           <GroupScreens gname={gname} attachments={attachments} loading={loading} error={error} reload={reload} />
         )}
-        {tab === "settings" && <GroupSettings gname={gname} attachments={attachments} reload={reload} />}
+        {tab === "settings" && canManageGroups && <GroupSettings gname={gname} attachments={attachments} reload={reload} />}
       </div>
     </div>
   );

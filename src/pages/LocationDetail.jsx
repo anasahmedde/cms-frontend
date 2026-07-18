@@ -8,7 +8,6 @@ import AssignScreensModal from "../content/locations/AssignScreensModal";
 import { MapPinOff, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { formatDateTime } from "../lib/format";
-import PermissionDenied from "./PermissionDenied";
 import PageHeader from "../ui/PageHeader";
 import Button from "../ui/Button";
 import IconButton from "../ui/IconButton";
@@ -58,8 +57,9 @@ export default function LocationDetail() {
     load();
   }, [load]);
 
-  // Same gate the legacy Shops page lived behind (App.js manage_shops).
-  if (!hasPermission("manage_shops")) return <PermissionDenied />;
+  // Open to every role — location changes stay behind manage_shops.
+  const canManageShops = hasPermission("manage_shops");
+  const canManageDevices = hasPermission("manage_devices");
 
   if (loading) {
     return (
@@ -97,21 +97,29 @@ export default function LocationDetail() {
         title={
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             {shop.shop_name}
-            <IconButton label="Rename location" icon={Pencil} size="sm" onClick={() => setRenameOpen(true)} />
+            {canManageShops && (
+              <IconButton label="Rename location" icon={Pencil} size="sm" onClick={() => setRenameOpen(true)} />
+            )}
           </span>
         }
         subtitle={`Location ID ${shop.id}${shop.created_at ? ` · Created ${formatDateTime(shop.created_at)}` : ""}`}
         actions={
           <>
-            <Link to={`/screens?add=1&location=${encodeURIComponent(shop.shop_name)}`}>
-              <Button variant="secondary">Add screen here</Button>
-            </Link>
-            <Button variant="secondary" onClick={() => setAssignOpen(true)}>
-              Move screen here
-            </Button>
-            <Button variant="danger" icon={Trash2} onClick={() => setDel(shop)}>
-              Delete location
-            </Button>
+            {canManageDevices && (
+              <Link to={`/screens?add=1&location=${encodeURIComponent(shop.shop_name)}`}>
+                <Button variant="secondary">Add screen here</Button>
+              </Link>
+            )}
+            {canManageShops && (
+              <Button variant="secondary" onClick={() => setAssignOpen(true)}>
+                Move screen here
+              </Button>
+            )}
+            {canManageShops && (
+              <Button variant="danger" icon={Trash2} onClick={() => setDel(shop)}>
+                Delete location
+              </Button>
+            )}
           </>
         }
       />

@@ -13,11 +13,14 @@ import Modal from "../ui/Modal";
 import { Field, Input } from "../ui/Field";
 import { useToast } from "../ui/Toast";
 import { apiGet, apiPost } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { useGroups } from "../content/groups/useGroupAttachments";
 
 const COUNTS_CAP = 30;
 
 export default function Groups() {
+  const { hasPermission } = useAuth();
+  const canManageGroups = hasPermission("manage_groups");
   const toast = useToast();
   const { groups, loading, error, reload } = useGroups();
   const [q, setQ] = useState("");
@@ -88,7 +91,7 @@ export default function Groups() {
       <PageHeader
         title="Groups"
         subtitle="Screens in a group share one playlist"
-        actions={<Button icon={Plus} onClick={() => { setCreating(true); setCreateError(""); }}>New group</Button>}
+        actions={canManageGroups && <Button icon={Plus} onClick={() => { setCreating(true); setCreateError(""); }}>New group</Button>}
       />
       <div style={{ maxWidth: 320, marginBottom: 14 }}>
         <SearchInput value={q} onChange={setQ} placeholder="Search groups…" />

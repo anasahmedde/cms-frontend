@@ -11,8 +11,11 @@ import EmptyState from "../../ui/EmptyState";
 import ErrorState from "../../ui/ErrorState";
 import Skeleton from "../../ui/Skeleton";
 import ZoneContentEditor from "../../components/templates/ZoneContentEditor";
+import { useAuth, CONTENT_EDIT_PERMS } from "../../lib/auth";
 
 export default function TemplateContentCard({ shop, template }) {
+  const { hasPermission } = useAuth();
+  const canEditContent = CONTENT_EDIT_PERMS.some((perm) => hasPermission(perm));
   // template: {loading, error, template|null, reload} from useCompanyTemplate.
   const [editorOpen, setEditorOpen] = useState(false);
 
@@ -36,14 +39,16 @@ export default function TemplateContentCard({ shop, template }) {
             change a single screen, use "Override for this screen" in the Screens list above —
             overrides win over the location's content.
           </p>
-          <Button
-            variant="secondary"
-            icon={Layers}
-            onClick={() => setEditorOpen(true)}
-            title="Fill in the QR code, images and texts shown on this location's screens"
-          >
-            Edit screen content
-          </Button>
+          {canEditContent && (
+            <Button
+              variant="secondary"
+              icon={Layers}
+              onClick={() => setEditorOpen(true)}
+              title="Fill in the QR code, images and texts shown on this location's screens"
+            >
+              Edit screen content
+            </Button>
+          )}
           {editorOpen && (
             <div className="legacy-page">
               <ZoneContentEditor

@@ -13,11 +13,14 @@ import IconButton from "../../ui/IconButton";
 import Button from "../../ui/Button";
 import { Input } from "../../ui/Field";
 import { useToast } from "../../ui/Toast";
+import { useAuth } from "../../lib/auth";
 import { contentStatusBadge, deviceStatus } from "../lib";
 import HeaderActions from "./HeaderActions";
 
 function NameEditor({ device, onPatched }) {
   const toast = useToast();
+  const { hasPermission } = useAuth();
+  const canRename = hasPermission("manage_devices");
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
@@ -51,7 +54,7 @@ function NameEditor({ device, onPatched }) {
     return (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
         {device.device_name || <span style={{ color: "var(--text-faint)" }}>Unnamed screen</span>}
-        <IconButton label="Rename screen" icon={Pencil} size="sm" onClick={start} />
+        {canRename && <IconButton label="Rename screen" icon={Pencil} size="sm" onClick={start} />}
       </span>
     );
   }
@@ -79,6 +82,13 @@ function NameEditor({ device, onPatched }) {
   );
 }
 
+// The whole action row (refresh/mute/activate/delete) is device management.
+function GatedHeaderActions(props) {
+  const { hasPermission } = useAuth();
+  if (!hasPermission("manage_devices")) return null;
+  return <HeaderActions {...props} />;
+}
+
 export default function ScreenHeader({ device, shopName, onPatched, onChanged }) {
   const status = deviceStatus(device);
   const content = contentStatusBadge(device);
@@ -95,7 +105,7 @@ export default function ScreenHeader({ device, shopName, onPatched, onChanged })
           { label: device.device_name || device.mobile_id },
         ]}
         title={<NameEditor device={device} onPatched={onPatched} />}
-        actions={<HeaderActions device={device} onPatched={onPatched} onChanged={onChanged} />}
+        actions={<GatedHeaderActions device={device} onPatched={onPatched} onChanged={onChanged} />}
       />
       <div
         style={{

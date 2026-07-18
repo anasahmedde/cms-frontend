@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { MonitorPlay, Plus, RefreshCw, Trash2, Upload, Hourglass, X } from "lucide-react";
 import { apiGet, apiDelete, normalizeList } from "../lib/api";
+import { useAuth, CONTENT_EDIT_PERMS } from "../lib/auth";
 import { timeAgo } from "../lib/format";
 import { wsClient } from "../lib/ws";
 import { contentStatusBadge, deviceStatus } from "../fleet/lib";
@@ -125,7 +126,7 @@ function buildColumns(onDelete) {
         );
       },
     },
-    {
+    ...(onDelete ? [{
       key: "actions", label: "", align: "right",
       render: (d) => (
         <span onClick={stop} onKeyDown={stop}>
@@ -138,13 +139,18 @@ function buildColumns(onDelete) {
           />
         </span>
       ),
-    },
+    }] : []),
   ];
 }
 
 export default function Screens() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { hasPermission } = useAuth();
+  // Page is open to every role: viewers browse read-only, editors keep the
+  // (content-only, approval-aware) bulk sheet; fleet changes need manage_devices.
+  const canManage = hasPermission("manage_devices");
+  const canEditContent = CONTENT_EDIT_PERMS.some((p) => hasPermission(p));
   const [searchParams, setSearchParams] = useSearchParams();
   const q = searchParams.get("q") || "";
   const statusFilter = searchParams.get("status") || "";
@@ -237,7 +243,10 @@ export default function Screens() {
     toast.error(res.message || "Could not delete the screen");
   };
 
-  const columns = useMemo(() => buildColumns((row) => setDel({ row, linked: null })), []);
+  const columns = useMemo(
+    () => buildColumns(canManage ? (row) => setDel({ row, linked: null }) : null),
+    [canManage]
+  );
   const delName = del?.row ? del.row.device_name || del.row.mobile_id : "";
 
   return (
@@ -247,14 +256,16 @@ export default function Screens() {
         subtitle={loading && total === 0 ? "Loading your fleet…" : `${total} screen${total === 1 ? "" : "s"} enrolled`}
         actions={
           <>
-            {(pendingCount === null || pendingCount > 0) && (
+            {canManage && (pendingCount === null || pendingCount > 0) && (
               <Button variant="secondary" icon={Hourglass} onClick={() => navigate("/screens/pending")}>
                 {pendingCount === null ? "Pending screens" : `${pendingCount} pending`}
               </Button>
             )}
             <Button variant="secondary" icon={RefreshCw} onClick={load} disabled={loading}>Refresh</Button>
-            <Button variant="secondary" icon={Upload} onClick={() => setBulkOpen(true)}>Bulk import</Button>
-            <Button icon={Plus} onClick={() => setWizardOpen(true)}>Add screen</Button>
+            {canEditContent && (
+              <Button variant="secondary" icon={Upload} onClick={() => setBulkOpen(true)}>Bulk import</Button>
+            )}
+            {canManage && <Button icon={Plus} onClick={() => setWizardOpen(true)}>Add screen</Button>}
           </>
         }
       />
@@ -342,7 +353,7 @@ export default function Screens() {
         </>
       )}
 
-      <AddScreenWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onCreated={() => { load(); loadPending(); }} initialLocation={searchParams.get("location") || ""} initialGroup={searchParams.get("group") || ""} />
+      <AddScreenWizard open={canManage && wizardOpen} onClose={() => setWizardOpen(false)} onCreated={() => { load(); loadPending(); }} initialLocation={searchParams.get("location") || ""} initialGroup={searchParams.get("group") || ""} />
       {bulkOpen && (
         <BulkImport open onClose={() => setBulkOpen(false)} onImported={() => { load(); loadPending(); }} />
       )}
