@@ -15,6 +15,7 @@ import { Field, Select } from "../ui/Field";
 import ConfirmModal from "../ui/ConfirmModal";
 import { apiGet, normalizeList } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { timeAgo } from "../lib/format";
 import BulkImport from "../fleet/enroll/BulkImport";
 import ZoneContentEditor from "../components/templates/ZoneContentEditor";
 import TemplateMap from "../components/templates/TemplateMap";
@@ -32,6 +33,15 @@ const SCOPES = [
   { key: "shop", label: "One location", icon: MapPin, hint: "Overrides the company default" },
   { key: "device", label: "One screen", icon: MonitorPlay, hint: "Overrides its group, location + company" },
 ];
+
+// Mirror of the backend's _CONTENT_EDIT_PERMS: any of these makes the user a
+// content editor here; none (the viewer role) = read-only page.
+const CONTENT_EDIT_PERMS = [
+  "manage_company_settings", "manage_devices", "manage_shops",
+  "upload_videos", "manage_videos", "manage_links",
+];
+
+const STATUS_TONES = { pending: "warn", approved: "success", rejected: "danger", cancelled: "neutral", expired: "neutral" };
 
 // Keep the actual payload (not just a boolean) so the layout preview can show
 // what each editable zone is set to at this scope. Empty payloads are dropped,
@@ -65,10 +75,12 @@ export default function TemplateContent() {
   const [preview, setPreview] = useState(null); // {template, zones} resolved WYSIWYG
   const [scopeTemplate, setScopeTemplate] = useState(null); // effective template at the picked scope
   const [bulkOpen, setBulkOpen] = useState(false); // bulk-import modal
+  const [contentRequests, setContentRequests] = useState([]); // template_content approval requests
   const { user, hasPermission } = useAuth();
   const companyName = user?.company?.name || "your company";
   const canDesign = hasPermission("manage_company_settings");
   const canBulk = hasPermission("manage_devices"); // bulk import creates/edits screens
+  const canEdit = CONTENT_EDIT_PERMS.some((p) => hasPermission(p)); // viewer role → read-only
 
   const loadTemplate = useCallback(() => {
     apiGet("/company/template").then((res) =>
@@ -80,9 +92,23 @@ export default function TemplateContent() {
     getContentOverrides().then((res) => setOverrides(res.ok ? res.data?.overrides || {} : {}));
   }, []);
 
+  // Template-content approval requests: drive the per-zone ⏳ badges and the
+  // requester's own submissions strip. Older backends without the
+  // request_type filter just return an unfiltered list — harmless.
+  const loadContentRequests = useCallback(() => {
+    apiGet("/content-changes", {
+      params: { status: "all", request_type: "template_content", limit: 100 },
+    }).then((res) => {
+      if (!res.ok) { setContentRequests([]); return; }
+      const items = res.data?.requests || [];
+      setContentRequests(items.filter((r) => r.request_type === "template_content"));
+    });
+  }, []);
+
   useEffect(() => {
     loadTemplate();
     loadOverrides();
+    loadContentRequests();
     apiGet("/shops", { params: { limit: 1000, offset: 0 } }).then(
       (res) => res.ok && setShops(normalizeList(res.data, "items").items)
     );
@@ -92,7 +118,7 @@ export default function TemplateContent() {
     apiGet("/groups", { params: { limit: 1000, offset: 0 } }).then(
       (res) => res.ok && setGroups(normalizeList(res.data, "items").items)
     );
-  }, [loadTemplate, loadOverrides]);
+  }, [loadTemplate, loadOverrides, loadContentRequests]);
 
   const doClearOverrides = useCallback(async () => {
     if (!clearing) return;
@@ -102,9 +128,14 @@ export default function TemplateContent() {
     const zk = clearing.zoneKey;
     setClearing(null);
     if (!res.ok) { setNotice({ kind: "error", text: `Couldn't clear pins for “${zk}”: ${res.message}` }); return; }
+    if (res.data?.status === "pending_approval") {
+      setNotice({ kind: "info", text: `Clearing the pins for “${zk}” was submitted for approval — nothing changes until a manager or admin approves it.` });
+      loadContentRequests();
+      return;
+    }
     setNotice({ kind: "info", text: `Cleared ${res.data?.cleared ?? 0} pinned override(s) for “${zk}”. Screens fall back to the company setting within ~30s.` });
     loadOverrides();
-  }, [clearing, loadOverrides]);
+  }, [clearing, loadOverrides, loadContentRequests]);
 
   const openDesigner = useCallback(async () => {
     setDesignerBusy(true);
@@ -179,6 +210,7 @@ export default function TemplateContent() {
       if (document.visibilityState === "visible") {
         reloadContentState();
         loadOverrides();
+        loadContentRequests();
       }
     };
     window.addEventListener("focus", onFocus);
@@ -187,7 +219,35 @@ export default function TemplateContent() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, [reloadContentState, loadOverrides]);
+  }, [reloadContentState, loadOverrides, loadContentRequests]);
+
+  // Zones with a change waiting for approval at the CURRENTLY selected
+  // scope/target — shown as ⏳ on the layout map (any requester's).
+  const pendingKeys = useMemo(() => {
+    const keys = new Set();
+    if (!target) return keys;
+    contentRequests.forEach((r) => {
+      if (r.status !== "pending") return;
+      const cd = r.change_data || {};
+      if (cd.scope !== target.scope) return;
+      const cdTarget = cd.device_id ?? cd.group_id ?? cd.shop_id ?? null;
+      const matches = target.scope === "company"
+        ? true
+        : String(cdTarget) === String(target.targetId);
+      if (matches && cd.zone_key) keys.add(cd.zone_key);
+    });
+    return keys;
+  }, [contentRequests, target]);
+
+  // The user's own submissions (editors under the approval requirement):
+  // everything pending plus the latest decided ones, so a rejection with its
+  // note is never invisible to the person who asked.
+  const mySubmissions = useMemo(() => {
+    const mine = contentRequests.filter((r) => r.requested_by === user?.id);
+    const pending = mine.filter((r) => r.status === "pending");
+    const decided = mine.filter((r) => r.status !== "pending").slice(0, 5);
+    return { pending, decided, any: pending.length + decided.length > 0 };
+  }, [contentRequests, user?.id]);
 
   if (template === undefined) {
     return (
@@ -242,6 +302,35 @@ export default function TemplateContent() {
             <span>{notice.text}</span>
             <button onClick={() => setNotice(null)} aria-label="Dismiss message" style={{ border: "none", background: "none", cursor: "pointer", color: "inherit" }}>✕</button>
           </div>
+        </Card>
+      )}
+
+      {mySubmissions.any && (
+        <Card title="Your submitted changes">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[...mySubmissions.pending, ...mySubmissions.decided].map((r) => {
+              const cd = r.change_data || {};
+              return (
+                <div key={r.id} className="u-flex" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <Badge tone={STATUS_TONES[r.status] || "neutral"}>{r.status}</Badge>
+                  <span>
+                    <strong>{cd.zone_label || cd.zone_key}</strong>
+                    {r.target_name ? <> on <strong>{r.target_name}</strong></> : null}
+                    {cd.action === "delete" || cd.action === "clear_overrides" ? " (clear content)" : ""}
+                  </span>
+                  <span className="u-faint">{timeAgo(r.requested_at)}</span>
+                  {r.status === "rejected" && r.review_note && (
+                    <span className="u-muted">— “{r.review_note}”</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {mySubmissions.pending.length > 0 && (
+            <p className="u-muted" style={{ margin: "10px 0 0" }}>
+              Pending changes apply to screens only after a manager or admin approves them.
+            </p>
+          )}
         </Card>
       )}
 
@@ -320,9 +409,11 @@ export default function TemplateContent() {
               return (
                 <div key={zoneKey} className="u-flex" style={{ justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <span>📌 <strong>{zoneKey}</strong> — pinned on {parts.join(", ")}</span>
-                  <Button variant="secondary" size="sm" onClick={() => setClearing({ zoneKey, count: nD + nS + nG })}>
-                    Clear pins
-                  </Button>
+                  {canEdit && (
+                    <Button variant="secondary" size="sm" onClick={() => setClearing({ zoneKey, count: nD + nS + nG })}>
+                      Clear pins
+                    </Button>
+                  )}
                 </div>
               );
             })}
@@ -348,13 +439,17 @@ export default function TemplateContent() {
           >
             <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
               <div>
-                <p className="u-faint" style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 600 }}>Click a box to set its content</p>
+                <p className="u-faint" style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 600 }}>
+                  {canEdit ? "Click a box to set its content" : "The template's boxes and what they show"}
+                </p>
                 <TemplateMap
                   template={scopeTemplate || template}
                   contentByKey={contentByKey}
                   overrides={scope === "company" ? overrides : {}}
                   selectedKey={editing?.focusZoneKey}
-                  onZoneClick={(zoneKey) => setEditing({ ...target, focusZoneKey: zoneKey })}
+                  readOnly={!canEdit}
+                  pendingKeys={pendingKeys}
+                  onZoneClick={(zoneKey) => canEdit && setEditing({ ...target, focusZoneKey: zoneKey })}
                 />
               </div>
               <div>
@@ -375,7 +470,8 @@ export default function TemplateContent() {
           targetId={editing.targetId}
           targetName={editing.targetName}
           focusZoneKey={editing.focusZoneKey}
-          onClose={() => { setEditing(null); reloadContentState(); }}
+          onPendingSubmitted={loadContentRequests}
+          onClose={() => { setEditing(null); reloadContentState(); loadContentRequests(); }}
         />
       )}
 
