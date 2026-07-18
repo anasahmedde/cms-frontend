@@ -223,7 +223,11 @@ function FleetRowWithExpansion({ row, expanded, onChanged, ...rest }) {
       {expanded && (
         <tr className="fleet-expanded">
           <td colSpan={HEADERS.length}>
-            <LinkRows mobileId={row.mobile_id} onChanged={onChanged} />
+            <LinkRows
+              mobileId={row.mobile_id}
+              templateLinked={!!row.template_linked}
+              onChanged={onChanged}
+            />
           </td>
         </tr>
       )}

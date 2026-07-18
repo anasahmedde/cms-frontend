@@ -76,7 +76,10 @@ function previewOf(z, payload) {
   return null;
 }
 
-export default function TemplateMap({ template, contentByKey = {}, overrides = {}, selectedKey, onZoneClick }) {
+// readOnly: viewer mode — the layout renders with all its badges but nothing
+// is clickable. pendingKeys: zones with a change waiting for approval at the
+// current scope/target (amber ⏳ chip).
+export default function TemplateMap({ template, contentByKey = {}, overrides = {}, selectedKey, onZoneClick, readOnly = false, pendingKeys }) {
   const zones = template?.zones || [];
   const dw = template?.design_width || 1920;
   const dh = template?.design_height || 1080;
@@ -98,12 +101,13 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
       >
         {zones.map((z) => {
           const tone = ZONE_TONE[z.type] || ZONE_TONE.text;
-          const editable = isEditable(z);
+          const editable = isEditable(z) && !readOnly;
           const hasContent = !!contentByKey[z.key];
           const selected = z.key === selectedKey;
           const preview = previewOf(z, contentByKey[z.key]);
           const pin = overrides[z.key];
           const pinCount = pin ? (pin.shops?.length || 0) + (pin.devices?.length || 0) + (pin.groups?.length || 0) : 0;
+          const isPending = !!pendingKeys?.has?.(z.key);
           const px = zonePixelSize(z, dw, dh);
           const pxNote = px ? ` — ${px.label} on a ${dw}×${dh} screen` : "";
           return (
@@ -112,7 +116,9 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
               type="button"
               disabled={!editable}
               onClick={() => editable && onZoneClick?.(z.key)}
-              title={editable ? `Set content for "${z.key}"${pxNote}` : `${TYPE_LABEL[z.type] || z.type} — set in the designer${pxNote}`}
+              title={editable ? `Set content for "${z.key}"${pxNote}`
+                : readOnly && isEditable(z) ? `"${z.key}"${pxNote}`
+                : `${TYPE_LABEL[z.type] || z.type} — set in the designer${pxNote}`}
               style={{
                 position: "absolute",
                 left: `${z.x}%`, top: `${z.y}%`, width: `${z.w}%`, height: `${z.h}%`,
@@ -123,7 +129,7 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
                 color: "#fff", textAlign: "center", overflow: "hidden",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                 gap: 2, fontSize: 11, lineHeight: 1.2,
-                opacity: editable ? 1 : 0.7,
+                opacity: isEditable(z) ? 1 : 0.7,
                 boxShadow: selected ? "0 0 0 3px rgba(245,158,11,0.4)" : "none",
               }}
             >
@@ -145,7 +151,7 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
               ) : (
                 <span style={{ fontSize: 9.5, opacity: 0.85 }}>{TYPE_LABEL[z.type] || z.type}</span>
               )}
-              {editable && (
+              {isEditable(z) && (
                 <span
                   style={{
                     fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 10,
@@ -159,10 +165,19 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
                 >
                   {hasContent ? "✓ set"
                     : pinCount > 0 ? `✓ on ${pinCount} screen${pinCount > 1 ? "s" : ""}`
-                    : "+ add"}
+                    : readOnly ? "empty" : "+ add"}
                 </span>
               )}
-              {editable && px && (
+              {isPending && (
+                <span
+                  title="A change for this box is waiting for a manager/admin to approve it"
+                  style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 10,
+                           background: "var(--warn, #f59e0b)", color: "#0a1628" }}
+                >
+                  ⏳ pending
+                </span>
+              )}
+              {isEditable(z) && px && (
                 <span style={{ fontSize: 8.5, opacity: 0.85, fontVariantNumeric: "tabular-nums", textShadow: "0 1px 2px rgba(0,0,0,0.6)" }}>
                   {px.w}×{px.h}px
                 </span>
@@ -187,10 +202,20 @@ export default function TemplateMap({ template, contentByKey = {}, overrides = {
 
       <div style={{ fontSize: 12, color: "var(--text-muted)", maxWidth: 260 }}>
         <p style={{ marginTop: 0 }}>
-          Click a highlighted box to set what it shows. <strong>✓ set</strong> means content
-          exists at this level; <strong>✓ on N screens</strong> means content lives only on
-          specific screens/groups/locations (e.g. from an Excel upload) — set it here to also
-          cover the rest; <strong>+ add</strong> is empty everywhere at or above this level.
+          {readOnly ? (
+            <>
+              You can view what each box shows, but your role can't change content.{" "}
+              <strong>✓ set</strong> means content exists at this level; <strong>✓ on N screens</strong>{" "}
+              means content lives only on specific screens/groups/locations.
+            </>
+          ) : (
+            <>
+              Click a highlighted box to set what it shows. <strong>✓ set</strong> means content
+              exists at this level; <strong>✓ on N screens</strong> means content lives only on
+              specific screens/groups/locations (e.g. from an Excel upload) — set it here to also
+              cover the rest; <strong>+ add</strong> is empty everywhere at or above this level.
+            </>
+          )}
         </p>
         <p>
           Dimmed boxes aren't editable here — the <em>rotation</em> plays the screen's playlist, and
