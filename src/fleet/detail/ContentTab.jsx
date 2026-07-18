@@ -16,6 +16,7 @@ import ZoneContentEditor from "../../components/templates/ZoneContentEditor";
 import TemplateAssignSelect from "../../components/templates/TemplateAssignSelect";
 import PlaylistCard from "./PlaylistCard";
 import { isRealGroup } from "./useScreenDevice";
+import { useAuth, CONTENT_EDIT_PERMS } from "../../lib/auth";
 import { useCompanyFeatures, featureOn } from "../../lib/features";
 
 function fmtBytes(n) {
@@ -29,6 +30,8 @@ function fmtBytes(n) {
 // filling up) and the Clear-cache action, which tells the screen to delete its
 // downloaded media and re-download. Storage numbers come from GET /device/:id/storage.
 function StorageCard({ device }) {
+  const { hasPermission } = useAuth();
+  const canWipe = hasPermission("manage_devices");
   const toast = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -108,9 +111,11 @@ function StorageCard({ device }) {
         screen then re-downloads its assigned playlist. Nothing is deleted from the Media Library and no
         assignments change.
       </p>
-      <Button variant="danger" icon={Eraser} loading={clearing} onClick={() => setConfirmOpen(true)}>
-        Clear cache &amp; free storage
-      </Button>
+      {canWipe && (
+        <Button variant="danger" icon={Eraser} loading={clearing} onClick={() => setConfirmOpen(true)}>
+          Clear cache &amp; free storage
+        </Button>
+      )}
       <ConfirmModal
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
@@ -169,6 +174,9 @@ function MiniTemplatePreview({ template }) {
   );
 }
 function TemplateContentCard({ device }) {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("manage_devices");
+  const canEditContent = CONTENT_EDIT_PERMS.some((perm) => hasPermission(perm));
   const [state, setState] = useState({ loading: true, error: null, template: null });
   const [editorOpen, setEditorOpen] = useState(false);
 
@@ -217,17 +225,21 @@ function TemplateContentCard({ device }) {
           </p>
         </div>
       </div>
-      <div style={{ maxWidth: 480, marginBottom: 12 }}>
-        <TemplateAssignSelect
-          scope="device"
-          targetId={device.id}
-          inheritLabel="Inherited — group / company default"
-          onChanged={load}
-        />
-      </div>
-      <Button variant="secondary" icon={Layers} onClick={() => setEditorOpen(true)}>
-        Override for this screen
-      </Button>
+      {canManage && (
+        <div style={{ maxWidth: 480, marginBottom: 12 }}>
+          <TemplateAssignSelect
+            scope="device"
+            targetId={device.id}
+            inheritLabel="Inherited — group / company default"
+            onChanged={load}
+          />
+        </div>
+      )}
+      {canEditContent && (
+        <Button variant="secondary" icon={Layers} onClick={() => setEditorOpen(true)}>
+          Override for this screen
+        </Button>
+      )}
       {editorOpen && (
         <div className="legacy-page">
           <ZoneContentEditor
@@ -244,6 +256,8 @@ function TemplateContentCard({ device }) {
 
 export default function ContentTab({ device, links, linksLoading, linksError, reloadLinks, onDeviceReload }) {
   const { features } = useCompanyFeatures();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("manage_devices");
   const gname = isRealGroup(device.group_name) ? device.group_name : null;
 
   return (
@@ -257,7 +271,7 @@ export default function ContentTab({ device, links, linksLoading, linksError, re
         onDeviceReload={onDeviceReload}
       />
 
-      {featureOn(features, "grid") && (
+      {featureOn(features, "grid") && canManage && (
         <Card title="Layout">
           <LayoutEditor
             mobileId={device.mobile_id}

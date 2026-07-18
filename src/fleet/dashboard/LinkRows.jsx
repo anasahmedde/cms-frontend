@@ -16,6 +16,7 @@ import {
   Clock,
 } from "lucide-react";
 import { apiGet, apiDelete } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
 import { timeAgo } from "../../lib/format";
 import IconButton from "../../ui/IconButton";
 import ConfirmModal from "../../ui/ConfirmModal";
@@ -131,6 +132,8 @@ function TemplateZones({ mobileId, onPlaylistZone }) {
 
 export default function LinkRows({ mobileId, templateLinked = false, onChanged }) {
   const toast = useToast();
+  const { hasPermission } = useAuth();
+  const canAssign = hasPermission("manage_links"); // viewers see the list read-only
   const [links, setLinks] = useState(null); // null = loading
   const [error, setError] = useState(null);
   const [deleting, setDeleting] = useState(null); // link row pending confirm
@@ -231,15 +234,17 @@ export default function LinkRows({ mobileId, templateLinked = false, onChanged }
                   <span className="fleet-linkrow-meta">
                     Added {timeAgo(l.created_at)}
                   </span>
-                  <span style={{ marginLeft: "auto" }}>
-                    <IconButton
-                      label={`Remove ${l.video_name} from this screen`}
-                      icon={Trash2}
-                      size="sm"
-                      variant="danger"
-                      onClick={() => setDeleting(l)}
-                    />
-                  </span>
+                  {canAssign && (
+                    <span style={{ marginLeft: "auto" }}>
+                      <IconButton
+                        label={`Remove ${l.video_name} from this screen`}
+                        icon={Trash2}
+                        size="sm"
+                        variant="danger"
+                        onClick={() => setDeleting(l)}
+                      />
+                    </span>
+                  )}
                 </div>
               );
             })

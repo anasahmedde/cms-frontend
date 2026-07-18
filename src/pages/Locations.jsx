@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MapPin, Plus, RefreshCw } from "lucide-react";
 import { useAuth } from "../lib/auth";
-import PermissionDenied from "./PermissionDenied";
 import PageHeader from "../ui/PageHeader";
 import Button from "../ui/Button";
 import SearchInput from "../ui/SearchInput";
@@ -68,8 +67,8 @@ export default function Locations() {
     load();
   };
 
-  // Same gate the legacy Shops page lived behind (App.js manage_shops).
-  if (!hasPermission("manage_shops")) return <PermissionDenied />;
+  // Open to every role — location changes stay behind manage_shops.
+  const canManageShops = hasPermission("manage_shops");
 
   return (
     <div>
@@ -85,9 +84,11 @@ export default function Locations() {
             <Button variant="secondary" icon={RefreshCw} onClick={refresh} disabled={loading}>
               Refresh
             </Button>
-            <Button icon={Plus} onClick={() => setCreateOpen(true)}>
-              Add location
-            </Button>
+            {canManageShops && (
+              <Button icon={Plus} onClick={() => setCreateOpen(true)}>
+                Add location
+              </Button>
+            )}
           </>
         }
       />
@@ -127,7 +128,7 @@ export default function Locations() {
       ) : (
         <div className="u-grid-cards">
           {items.map((shop) => (
-            <LocationCard key={shop.id} shop={shop} onDelete={setDel} />
+            <LocationCard key={shop.id} shop={shop} onDelete={canManageShops ? setDel : null} />
           ))}
         </div>
       )}

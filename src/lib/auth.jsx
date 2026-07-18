@@ -26,6 +26,14 @@ export const ROLE_PERMISSIONS = {
   viewer: ["view_dashboard", "view_reports"],
 };
 
+// Mirror of the backend's _CONTENT_EDIT_PERMS: any of these makes the user a
+// template-content editor (editor role and up); none = the viewer role,
+// which is read-only everywhere.
+export const CONTENT_EDIT_PERMS = [
+  "manage_company_settings", "manage_devices", "manage_shops",
+  "upload_videos", "manage_videos", "manage_links",
+];
+
 function clearAuthStorage() {
   [TOKEN_KEY, LEGACY_TOKEN_KEY, USER_KEY, SESSION_KEY, TENANT_KEY, IMPERSONATE_KEY]
     .forEach((k) => localStorage.removeItem(k));

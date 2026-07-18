@@ -17,7 +17,6 @@ import OverviewTab from "../fleet/detail/OverviewTab";
 import ContentTab from "../fleet/detail/ContentTab";
 import TelemetryTab from "../fleet/detail/TelemetryTab";
 import SettingsTab from "../fleet/detail/SettingsTab";
-import PermissionDenied from "./PermissionDenied";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: Activity },
@@ -46,8 +45,10 @@ export default function ScreenDetail() {
     if (error && deviceRef.current) toast.error(error, { retryLabel: "Retry", onRetry: reload });
   }, [error, toast, reload]);
 
-  // Same gate the legacy Devices page lived behind (App.js manage_devices).
-  if (!hasPermission("manage_devices")) return <PermissionDenied />;
+  // Open to every role: viewers/editors browse read-only (mutating controls
+  // are gated inside the header/tabs); the Settings tab is pure device config,
+  // so it only exists for manage_devices holders.
+  const canManage = hasPermission("manage_devices");
 
   if (loading && !device) {
     return (
@@ -96,7 +97,7 @@ export default function ScreenDetail() {
       <ScreenHeader device={device} shopName={links.shopName} onPatched={patch} onChanged={onChanged} />
 
       <div style={{ marginBottom: 16 }}>
-        <Tabs tabs={TABS} active={tab} onChange={setTab} />
+        <Tabs tabs={canManage ? TABS : TABS.filter((t) => t.key !== "settings")} active={tab} onChange={setTab} />
       </div>
 
       {tab === "overview" && <OverviewTab device={device} shopName={links.shopName} />}
@@ -111,7 +112,7 @@ export default function ScreenDetail() {
         />
       )}
       {tab === "telemetry" && <TelemetryTab device={device} />}
-      {tab === "settings" && <SettingsTab device={device} onDeviceReload={reload} />}
+      {tab === "settings" && canManage && <SettingsTab device={device} onDeviceReload={reload} />}
     </div>
   );
 }

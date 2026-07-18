@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { MonitorPlay, Plus } from "lucide-react";
 import Button from "../../ui/Button";
-import Badge from "../../ui/Badge";
 import Table from "../../ui/Table";
 import Modal from "../../ui/Modal";
 import ConfirmModal from "../../ui/ConfirmModal";
@@ -13,8 +12,12 @@ import ErrorState from "../../ui/ErrorState";
 import { Field, Select } from "../../ui/Field";
 import { useToast } from "../../ui/Toast";
 import { apiGet, apiPost, normalizeList } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
 
 export default function GroupScreens({ gname, attachments, loading, error, reload }) {
+  const { hasPermission } = useAuth();
+  const canManageGroups = hasPermission("manage_groups");
+  const canManageDevices = hasPermission("manage_devices");
   const toast = useToast();
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState(null); // device row
@@ -94,17 +97,21 @@ export default function GroupScreens({ gname, attachments, loading, error, reloa
       <div className="u-between" style={{ marginBottom: 12 }}>
         <span className="u-muted">{members.length} screens inherit this group's playlist</span>
         <div className="u-flex">
-          {members.length > 0 && (
+          {canManageGroups && members.length > 0 && (
             <Button variant="secondary" size="sm" onClick={() => setUnassignAll(true)}>
               Unassign all
             </Button>
           )}
-          <Link to={`/screens?add=1&group=${encodeURIComponent(gname)}`}>
-            <Button size="sm" variant="secondary">Enroll new screen</Button>
-          </Link>
-          <Button size="sm" icon={Plus} onClick={() => setAdding(true)}>
-            Add screen
-          </Button>
+          {canManageDevices && (
+            <Link to={`/screens?add=1&group=${encodeURIComponent(gname)}`}>
+              <Button size="sm" variant="secondary">Enroll new screen</Button>
+            </Link>
+          )}
+          {canManageGroups && (
+            <Button size="sm" icon={Plus} onClick={() => setAdding(true)}>
+              Add screen
+            </Button>
+          )}
         </div>
       </div>
 
@@ -120,7 +127,7 @@ export default function GroupScreens({ gname, attachments, loading, error, reloa
             ),
           },
           { key: "mobile_id", label: "Device ID", mono: true },
-          {
+          ...(canManageGroups ? [{
             key: "actions",
             label: "",
             align: "right",
@@ -129,7 +136,7 @@ export default function GroupScreens({ gname, attachments, loading, error, reloa
                 Remove
               </Button>
             ),
-          },
+          }] : []),
         ]}
         rows={members}
         rowKey={(r) => r.mobile_id}

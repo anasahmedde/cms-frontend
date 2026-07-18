@@ -84,15 +84,17 @@ export default function LocationCard({ shop, onDelete }) {
             {shop.shop_name}
           </Link>
         </span>
-        <span onClick={stop} onKeyDown={stop}>
-          <IconButton
-            label={`Delete location ${shop.shop_name}`}
-            icon={Trash2}
-            variant="danger"
-            size="sm"
-            onClick={() => onDelete(shop)}
-          />
-        </span>
+        {onDelete && (
+          <span onClick={stop} onKeyDown={stop}>
+            <IconButton
+              label={`Delete location ${shop.shop_name}`}
+              icon={Trash2}
+              variant="danger"
+              size="sm"
+              onClick={() => onDelete(shop)}
+            />
+          </span>
+        )}
       </div>
       <span className="u-faint mono">ID: {shop.id}</span>
       <ScreenCount shopName={shop.shop_name} />
