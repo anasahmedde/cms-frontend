@@ -5,6 +5,7 @@ import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Download, X } from "lucide-react";
 import { apiGet, apiPost } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
 import Modal from "../../ui/Modal";
 import Button from "../../ui/Button";
 import Badge from "../../ui/Badge";
@@ -87,6 +88,12 @@ const ERROR_COLUMNS = [
 
 export default function BulkImport({ open, onClose, onImported }) {
   const toast = useToast();
+  const { hasPermission } = useAuth();
+  // Content editors (no manage_devices) get the content-only bulk: the sheet
+  // updates content on existing screens; the backend errors rows that would
+  // add screens or change fleet fields, and diverts the batch to approval
+  // when the company's approval requirement applies to this user.
+  const canManageDevices = hasPermission("manage_devices");
   const fileRef = useRef(null);
   const [tab, setTab] = useState("import");
   const [busy, setBusy] = useState(false);
@@ -132,6 +139,11 @@ export default function BulkImport({ open, onClose, onImported }) {
     if (!res.ok) return setError(`Import failed: ${res.message}`);
     setResult(res.data);
     setPreview(null);
+    if (res.data?.status === "pending_approval") {
+      // Nothing changed live — the batch waits in the approval queue.
+      toast.info(`Submitted for approval — ${res.data.content_changes} content change(s)`);
+      return;
+    }
     const made = Number(res.data?.created || 0) + Number(res.data?.pending || 0);
     const upd = Number(res.data?.content_updated_existing || 0);
     toast.success(`Applied — ${made} new${upd ? `, ${upd} updated` : ""}`);
@@ -144,16 +156,20 @@ export default function BulkImport({ open, onClose, onImported }) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Bulk screen enrollment"
+      title={canManageDevices ? "Bulk screen enrollment" : "Bulk content update"}
       size="lg"
       footer={<Button variant="secondary" onClick={onClose}>Done</Button>}
     >
       <p className="u-muted" style={{ marginTop: 0 }}>
-        Import many screens from a spreadsheet — validate first, then create.
+        {canManageDevices
+          ? "Import many screens from a spreadsheet — validate first, then create."
+          : "Update template content on many screens from a spreadsheet — your role changes the content columns of existing screens (rows that would add screens are flagged)."}
       </p>
 
       <Tabs
-        tabs={[{ key: "import", label: "Import file" }, { key: "pending", label: "Pending screens" }]}
+        tabs={canManageDevices
+          ? [{ key: "import", label: "Import file" }, { key: "pending", label: "Pending screens" }]
+          : [{ key: "import", label: "Import file" }]}
         active={tab}
         onChange={setTab}
       />
@@ -172,8 +188,17 @@ export default function BulkImport({ open, onClose, onImported }) {
           <section>
             <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>1. Download the template</h3>
             <p className="u-muted" style={{ margin: "0 0 10px" }}>
-              One row per screen. <b>device_name</b> and <b>shop_name</b> are required. Add the <b>device_id</b> (shown on the screen)
-              if you know it and the screen auto-enrolls when it powers on; leave it blank to create a pending screen you claim on site.
+              {canManageDevices ? (
+                <>
+                  One row per screen. <b>device_name</b> and <b>shop_name</b> are required. Add the <b>device_id</b> (shown on the screen)
+                  if you know it and the screen auto-enrolls when it powers on; leave it blank to create a pending screen you claim on site.
+                </>
+              ) : (
+                <>
+                  The sheet exports your current screens with a column per content box — edit the <b>content</b> columns and re-upload.
+                  Leave everything else as exported.
+                </>
+              )}
             </p>
             <div className="u-flex">
               <Button variant="secondary" size="sm" icon={Download} onClick={() => download("xlsx")}>Excel (.xlsx)</Button>
@@ -196,7 +221,17 @@ export default function BulkImport({ open, onClose, onImported }) {
             </div>
           </section>
 
-          {result && (
+          {result && result.status === "pending_approval" && (
+            <section role="status" style={{ background: "rgba(245,158,11,0.12)", border: "1px solid var(--warn, #f59e0b)", borderRadius: "var(--radius-sm)", padding: 12 }}>
+              <div style={{ fontWeight: 700, color: "var(--warn, #b45309)", marginBottom: 4 }}>⏳ Submitted for approval</div>
+              <div>
+                <b>{result.content_changes}</b> content change(s) on <b>{result.screens}</b> screen(s) are waiting
+                for a manager or admin to review. Screens keep their current content until the batch is approved.
+              </div>
+            </section>
+          )}
+
+          {result && result.status !== "pending_approval" && (
             <section role="status" style={{ background: "var(--success-soft)", border: "1px solid var(--success)", borderRadius: "var(--radius-sm)", padding: 12 }}>
               <div style={{ fontWeight: 700, color: "var(--success)", marginBottom: 4 }}>Import complete</div>
               <div>
@@ -219,11 +254,13 @@ export default function BulkImport({ open, onClose, onImported }) {
                 <Stat label="Pending" value={s.will_pending} tone="warn" />
                 <Stat label="Errors" value={s.error_rows} tone={s.error_rows ? "danger" : undefined} />
               </div>
-              <p style={{ margin: "0 0 10px", color: s.quota?.ok ? "var(--text-muted)" : "var(--danger)" }}>
-                Quota: {s.quota?.existing} existing + {s.quota?.new} new = <b>{s.quota?.after}</b>
-                {s.quota?.max > 0 ? <> / {s.quota.max}</> : <> (unlimited)</>}
-                {!s.quota?.ok && " — over the limit"}
-              </p>
+              {!s.content_only && (
+                <p style={{ margin: "0 0 10px", color: s.quota?.ok ? "var(--text-muted)" : "var(--danger)" }}>
+                  Quota: {s.quota?.existing} existing + {s.quota?.new} new = <b>{s.quota?.after}</b>
+                  {s.quota?.max > 0 ? <> / {s.quota.max}</> : <> (unlimited)</>}
+                  {!s.quota?.ok && " — over the limit"}
+                </p>
+              )}
               {(s.new_shops?.length > 0 || s.new_groups?.length > 0) && (
                 <p className="u-muted" style={{ margin: "0 0 10px" }}>
                   {s.new_shops?.length > 0 && <>Locations referenced: {s.new_shops.join(", ")}. </>}
@@ -242,8 +279,9 @@ export default function BulkImport({ open, onClose, onImported }) {
               )}
               <div className="u-flex">
                 <Button onClick={commit} disabled={!s.valid} loading={busy}>
-                  Apply — {Number(s.will_create || 0) + Number(s.will_pending || 0)} new
-                  {s.will_update ? `, ${s.will_update} updated` : ""}
+                  {s.content_only
+                    ? `Apply ${s.will_update || 0} content update${(s.will_update || 0) === 1 ? "" : "s"}`
+                    : `Apply — ${Number(s.will_create || 0) + Number(s.will_pending || 0)} new${s.will_update ? `, ${s.will_update} updated` : ""}`}
                 </Button>
                 {!s.valid && <span className="u-danger">Fix the errors above and re-upload before importing.</span>}
               </div>

@@ -79,8 +79,11 @@ export default function TemplateContent() {
   const { user, hasPermission } = useAuth();
   const companyName = user?.company?.name || "your company";
   const canDesign = hasPermission("manage_company_settings");
-  const canBulk = hasPermission("manage_devices"); // bulk import creates/edits screens
   const canEdit = CONTENT_EDIT_PERMS.some((p) => hasPermission(p)); // viewer role → read-only
+  // Every content editor gets the sheet: manage_devices holders do full bulk
+  // (enroll + content); editors get content-only bulk, approval-aware — the
+  // backend enforces both modes server-side.
+  const canBulk = canEdit;
 
   const loadTemplate = useCallback(() => {
     apiGet("/company/template").then((res) =>
