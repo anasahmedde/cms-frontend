@@ -1,18 +1,17 @@
-// "What needs me" strip: pending approvals (live via WS) and offline screens.
+// "What needs me" strip: pending approvals (live via WS).
 // Renders nothing when there is nothing to act on.
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ClipboardCheck, WifiOff, AlertTriangle } from "lucide-react";
+import { ClipboardCheck, AlertTriangle } from "lucide-react";
 import { apiGet } from "../../lib/api";
 import { wsClient } from "../../lib/ws";
 import { useAuth } from "../../lib/auth";
 import Button from "../../ui/Button";
-import { deviceStatus } from "../lib";
 import "./dashboard.css";
 
 const APPROVER_ROLES = ["admin", "manager", "company_admin", "content_manager"];
 
-export default function AlertsStrip({ devices }) {
+export default function AlertsStrip() {
   const { user } = useAuth();
   const canApprove =
     APPROVER_ROLES.includes(user?.role) || user?.user_type === "platform";
@@ -47,11 +46,9 @@ export default function AlertsStrip({ devices }) {
     return off;
   }, [canApprove]);
 
-  const offline = devices.filter((d) => deviceStatus(d) === "offline").length;
-
   const showApprovals = canApprove && pending > 0;
   const showApprovalsError = canApprove && pendingError;
-  if (!showApprovals && !showApprovalsError && offline === 0) return null;
+  if (!showApprovals && !showApprovalsError) return null;
 
   return (
     <div className="fleet-alerts">
@@ -81,17 +78,6 @@ export default function AlertsStrip({ devices }) {
           >
             Retry
           </Button>
-        </div>
-      )}
-      {offline > 0 && (
-        <div className="fleet-alert fleet-alert--danger">
-          <span className="fleet-alert-icon">
-            <WifiOff size={16} aria-hidden="true" />
-          </span>
-          <span>
-            {offline} {offline === 1 ? "screen is" : "screens are"} offline
-          </span>
-          <Link to="/screens?status=offline">View offline screens</Link>
         </div>
       )}
     </div>

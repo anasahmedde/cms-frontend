@@ -2,16 +2,7 @@
 // list) plus entity totals. Counts are over ACTIVE screens — inactive ones
 // are hidden from the fleet table and called out separately in the filters.
 import { useNavigate } from "react-router-dom";
-import {
-  Wifi,
-  WifiOff,
-  RefreshCw,
-  Unlink,
-  MonitorPlay,
-  Boxes,
-  MapPin,
-  Film,
-} from "lucide-react";
+import { Wifi, WifiOff, RefreshCw, Unlink } from "lucide-react";
 import StatCard from "../../ui/StatCard";
 import { deviceStatus } from "../lib";
 import "./dashboard.css";
