@@ -140,9 +140,11 @@ export default function AppRoutes() {
           path="/media"
           element={<ErrorBoundary><RequireAnyPerm perms={["manage_videos", "upload_videos"]}><Media /></RequireAnyPerm></ErrorBoundary>}
         />
+        {/* Open to every company role: viewers browse read-only, editors submit
+            changes for approval — the page + backend gate the writes. */}
         <Route
           path="/template-content"
-          element={<ErrorBoundary><RequireAnyPerm perms={["manage_company_settings", "manage_shops", "manage_devices"]}><TemplateContent /></RequireAnyPerm></ErrorBoundary>}
+          element={<ErrorBoundary><TemplateContent /></ErrorBoundary>}
         />
         <Route
           path="/assign"

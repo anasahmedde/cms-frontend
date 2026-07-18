@@ -139,6 +139,9 @@ export default function Approvals() {
               render: (r) => (
                 <div>
                   <strong>{REQUEST_TYPE_LABELS[r.request_type] || r.request_type}</strong>
+                  {r.request_type === "template_content" && (r.change_data?.zone_label || r.change_data?.zone_key) && (
+                    <span className="u-faint"> · box “{r.change_data.zone_label || r.change_data.zone_key}”</span>
+                  )}
                   {r.request_note && <div className="u-faint">"{r.request_note}"</div>}
                   {r.execution_error && <Badge tone="danger">execution failed</Badge>}
                 </div>
@@ -154,12 +157,14 @@ export default function Approvals() {
               label: "Requested by",
               render: (r) => (
                 <span>
-                  {r.requester_name || r.requested_by || "—"}
-                  {r.requester_role && <span className="u-faint"> · {r.requester_role}</span>}
+                  {r.requested_by_name || r.requester_name || r.requested_by || "—"}
+                  {(r.requested_by_role || r.requester_role) && (
+                    <span className="u-faint"> · {r.requested_by_role || r.requester_role}</span>
+                  )}
                 </span>
               ),
             },
-            { key: "created_at", label: "When", render: (r) => timeAgo(r.created_at) },
+            { key: "created_at", label: "When", render: (r) => timeAgo(r.requested_at || r.created_at) },
             {
               key: "status",
               label: "Status",

@@ -21,7 +21,9 @@ const COMPANY_NAV = [
   { to: "/locations", label: "Locations", icon: MapPin, perm: "manage_shops" },
   { to: "/media", label: "Media", icon: Film, anyPerm: ["manage_videos", "upload_videos"] },
   { to: "/assign", label: "Assign content", icon: Link2, perm: "manage_links" },
-  { to: "/template-content", label: "Template content", icon: LayoutTemplate, anyPerm: ["manage_company_settings", "manage_shops", "manage_devices"] },
+  // Every company role can SEE template content (viewers read-only, editors
+  // submit-for-approval) — writes are permission-gated server-side.
+  { to: "/template-content", label: "Template content", icon: LayoutTemplate },
   { to: "/approvals", label: "Approvals", icon: CheckCircle2, approvals: true },
   { to: "/reports", label: "Reports", icon: BarChart3, perm: "view_reports" },
   { to: "/team", label: "Team", icon: UsersRound, perm: "manage_users" },

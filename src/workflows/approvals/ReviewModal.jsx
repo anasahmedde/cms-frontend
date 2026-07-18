@@ -6,7 +6,7 @@ import Badge from "../../ui/Badge";
 import Spinner from "../../ui/Spinner";
 import KeyValue from "../../ui/KeyValue";
 import { Field, Textarea } from "../../ui/Field";
-import { apiPost } from "../../lib/api";
+import { apiGet, apiPost } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
 
 export const REQUEST_TYPE_LABELS = {
@@ -18,9 +18,96 @@ export const REQUEST_TYPE_LABELS = {
   device_settings: "Screen settings",
   advertisement_change: "Image change",
   link_content: "Assign content to group",
+  template_content: "Template content",
 };
 
-export const TARGET_TYPE_LABELS = { device: "Screen", group: "Group", shop: "Location" };
+export const TARGET_TYPE_LABELS = { device: "Screen", group: "Group", shop: "Location", company: "Company" };
+
+const TC_SCOPE_SENTENCE = {
+  company: "the company-wide default (every screen without a more specific setting)",
+  shop: "every screen at this location",
+  group: "every screen in this group",
+  device: "this screen only",
+};
+
+// What a template-content request will change: the zone, where it applies,
+// and the proposed payload — with the actual media so reviewers see what
+// they put on screens, not an S3 path.
+function TemplateContentChange({ request }) {
+  const cd = request.change_data || {};
+  const payload = cd.payload || {};
+  const [media, setMedia] = useState(null); // {media_url, media_type, qr_url} | {none:true}
+  const [mediaError, setMediaError] = useState("");
+
+  const wantsMedia = !!(payload.media_s3 || payload.qr_generated_s3 || payload.bg_image_s3);
+  useEffect(() => {
+    if (!wantsMedia) { setMedia({ none: true }); return; }
+    let alive = true;
+    apiGet(`/content-changes/${request.id}/media-urls`).then((res) => {
+      if (!alive) return;
+      if (res.ok) setMedia(res.data || { none: true });
+      else setMediaError(res.message);
+    });
+    return () => { alive = false; };
+  }, [request.id, wantsMedia]);
+
+  const action = cd.action === "delete" ? "Clear this box's content"
+    : cd.action === "clear_overrides" ? "Clear every screen/location/group override for this box"
+    : "Set this box's content";
+  const mediaUrl = media?.media_url || media?.qr_url;
+  const isVideo = (payload.media_type || media?.media_type) === "video" && !media?.qr_url;
+
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <div className="u-flex" style={{ flexWrap: "wrap" }}>
+        <Badge tone="info">Box: {cd.zone_label || cd.zone_key}</Badge>
+        <span className="u-muted">applies to {TC_SCOPE_SENTENCE[cd.scope] || cd.scope}</span>
+      </div>
+      <div><strong>{action}</strong></div>
+      {typeof payload.text === "string" && payload.text !== "" && (
+        <div>
+          <div className="u-faint">Text to show</div>
+          <p style={{ margin: "4px 0 0" }}>“{payload.text}”</p>
+        </div>
+      )}
+      {payload.qr_link && (
+        <div>
+          <div className="u-faint">QR code linking to</div>
+          <p style={{ margin: "4px 0 0", wordBreak: "break-all" }}>{payload.qr_link}</p>
+        </div>
+      )}
+      {payload.media_url && (
+        <div>
+          <div className="u-faint">External media URL ({payload.media_type || "image"})</div>
+          <p style={{ margin: "4px 0 0", wordBreak: "break-all" }}>
+            <a href={payload.media_url} target="_blank" rel="noreferrer">{payload.media_url}</a>
+          </p>
+        </div>
+      )}
+      {wantsMedia && (
+        mediaError ? (
+          <span className="u-danger">Media preview unavailable — {mediaError}</span>
+        ) : !media ? (
+          <span className="u-flex"><Spinner size={14} /> Loading media preview…</span>
+        ) : mediaUrl ? (
+          <figure style={{ margin: 0 }}>
+            {isVideo ? (
+              <video src={mediaUrl} controls muted style={{ width: 220, height: 124, objectFit: "cover", borderRadius: 6, background: "#000" }} />
+            ) : (
+              <img src={mediaUrl} alt={`Proposed content for ${cd.zone_label || cd.zone_key}`} style={{ maxWidth: 220, maxHeight: 124, borderRadius: 6 }} />
+            )}
+            <figcaption className="u-faint">Proposed {isVideo ? "video" : "image"}</figcaption>
+          </figure>
+        ) : (
+          <span className="u-faint">Media preview unavailable.</span>
+        )
+      )}
+      {payload.fit_mode && (
+        <span className="u-muted">Fit: {payload.fit_mode === "contain" ? "show the whole image (no crop)" : "fill the box (crop edges)"}</span>
+      )}
+    </div>
+  );
+}
 
 export const STATUS_TONES = {
   pending: "warn",
@@ -56,6 +143,9 @@ function MediaPreviews({ request }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.id]);
 
+  if (request.request_type === "template_content") {
+    return <TemplateContentChange request={request} />;
+  }
   if (!PREVIEWABLE.has(request.request_type)) {
     return <KeyValue columns={1} items={Object.entries(change).map(([k, v]) => ({ label: k.replace(/_/g, " "), value: typeof v === "string" ? v : JSON.stringify(v) }))} />;
   }
@@ -126,6 +216,12 @@ export default function ReviewModal({ request, onClose, onDecided }) {
       setError(res.message);
       return;
     }
+    // An approve whose apply step failed must never read as success — the
+    // backend surfaces it as execution_error on the review response.
+    if (res.data?.execution_error) {
+      setError(`Approved, but applying the change FAILED: ${res.data.execution_error}`);
+      return;
+    }
     onDecided(action);
   };
 
@@ -153,8 +249,8 @@ export default function ReviewModal({ request, onClose, onDecided }) {
           items={[
             { label: "Type", value: REQUEST_TYPE_LABELS[request.request_type] || request.request_type },
             { label: "Target", value: `${TARGET_TYPE_LABELS[request.target_type] || request.target_type}${request.target_name ? ` · ${request.target_name}` : ""}` },
-            { label: "Requested by", value: `${request.requester_name || request.requested_by || "—"}${request.requester_role ? ` (${request.requester_role})` : ""}` },
-            { label: "Requested at", value: formatDateTime(request.created_at) },
+            { label: "Requested by", value: `${request.requested_by_name || request.requester_name || request.requested_by || "—"}${(request.requested_by_role || request.requester_role) ? ` (${request.requested_by_role || request.requester_role})` : ""}` },
+            { label: "Requested at", value: formatDateTime(request.requested_at || request.created_at) },
           ]}
         />
         {request.request_note && (
@@ -180,7 +276,7 @@ export default function ReviewModal({ request, onClose, onDecided }) {
           <div>
             <Badge tone={STATUS_TONES[request.status] || "neutral"}>{request.status}</Badge>{" "}
             <span className="u-muted">
-              by <strong>{request.reviewer_name || "—"}</strong>
+              by <strong>{request.reviewed_by_name || request.reviewer_name || "—"}</strong>
               {request.reviewed_at ? ` on ${formatDateTime(request.reviewed_at)}` : ""}
             </span>
             <p className="u-muted" style={{ margin: "6px 0 0" }}>

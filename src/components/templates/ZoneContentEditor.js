@@ -11,13 +11,15 @@ import {
   getGroupContent, putGroupContent, uploadGroupMedia,
 } from "./api";
 import { apiGet, normalizeList } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
 
 const ACCEPT = "image/jpeg,image/png,image/gif,image/webp,video/mp4";
 
-export default function ZoneContentEditor({ scope, targetId, targetName, onClose, focusZoneKey }) {
+export default function ZoneContentEditor({ scope, targetId, targetName, onClose, focusZoneKey, onPendingSubmitted }) {
   const isDevice = scope === "device";
   const isCompany = scope === "company";
   const isGroup = scope === "group";
+  const { user } = useAuth();
   const [zones, setZones] = useState(null);
   const [content, setContent] = useState({});
   const [drafts, setDrafts] = useState({});     // zoneKey → payload being edited
@@ -27,7 +29,30 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
   const [savedKey, setSavedKey] = useState("");
   const [busyKey, setBusyKey] = useState("");
   const [progress, setProgress] = useState({});
+  const [pendingKeys, setPendingKeys] = useState(() => new Set()); // zones submitted for approval
+  const [needsApproval, setNeedsApproval] = useState(false); // best-effort label hint; server decides
   const fileRefs = useRef({});
+
+  // Mirror of the server's approval gate, for honest button labels ("Submit
+  // for approval" instead of "Save"). The server is authoritative either way —
+  // we also handle a pending_approval response when this guess is wrong.
+  useEffect(() => {
+    if (user?.user_type === "platform") return;
+    let alive = true;
+    apiGet("/company/approval-settings").then((res) => {
+      if (!alive || !res.ok) return;
+      const auto = res.data?.auto_approve_roles || ["admin", "manager"];
+      setNeedsApproval(!!res.data?.require_content_approval && !auto.includes(user?.role));
+    });
+    return () => { alive = false; };
+  }, [user?.role, user?.user_type]);
+
+  // A write that came back as a pending approval: nothing changed live — keep
+  // the draft so the editor sees their proposal, mark the zone, tell the parent.
+  const notePending = (key) => {
+    setPendingKeys((s) => new Set(s).add(key));
+    onPendingSubmitted?.(key);
+  };
 
   const load = useCallback(async () => {
     const res = isDevice
@@ -78,6 +103,10 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
       setError(`Could not save “${key}”: ${msgs}`);
       return;
     }
+    if (res.data?.status === "pending_approval") {
+      notePending(key);
+      return;
+    }
     setContent((c) => ({ ...c, [key]: res.data.payload }));
     setDrafts((d) => ({ ...d, [key]: res.data.payload }));
     setSavedKey(key);
@@ -101,6 +130,10 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
       setError(`Upload failed for “${key}”: ${res.data?.detail || res.message}`);
       return;
     }
+    if (res.data?.status === "pending_approval") {
+      notePending(key);
+      return;
+    }
     setContent((c) => ({ ...c, [key]: res.data.payload }));
     setDrafts((d) => ({ ...d, [key]: res.data.payload }));
     setSavedKey(key);
@@ -112,6 +145,10 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
     const res = await deleteDeviceContent(targetId, zone.key);
     setBusyKey("");
     if (!res.ok) { setError(`Could not clear the override: ${res.message}`); return; }
+    if (res.data?.status === "pending_approval") {
+      notePending(zone.key);
+      return;
+    }
     await load();
   };
 
@@ -184,7 +221,18 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                     </span>
                   )}
                   {savedKey === zone.key && <span style={{ marginLeft: isDevice ? 8 : "auto", fontSize: 12, color: theme.success, fontWeight: 600 }}>✓ Saved</span>}
+                  {pendingKeys.has(zone.key) && (
+                    <span style={{ marginLeft: isDevice || savedKey === zone.key ? 8 : "auto", fontSize: 12, color: theme.warning, fontWeight: 600 }}>
+                      ⏳ Waiting for approval
+                    </span>
+                  )}
                 </div>
+                {pendingKeys.has(zone.key) && (
+                  <div style={{ padding: 8, borderRadius: 8, background: "rgba(245,158,11,0.12)", color: theme.warning, fontSize: 12, marginBottom: 10 }}>
+                    Submitted for approval — a manager or admin will review it. The screens keep
+                    their current content until it's approved.
+                  </div>
+                )}
                 {px && (zone.type === "media" || zone.type === "qr") && (
                   <div style={{ fontSize: 12, color: theme.textSecondary, margin: "-2px 0 10px", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     <span aria-hidden="true">📐</span>
@@ -322,7 +370,9 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
 
                 <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
                   <button onClick={() => save(zone)} disabled={busy} style={btn(theme.accent)}>
-                    {busy ? "Saving…" : "Save"}
+                    {busy
+                      ? (needsApproval ? "Submitting…" : "Saving…")
+                      : (needsApproval ? "Submit for approval" : "Save")}
                   </button>
                   {hasOverride && (
                     <button onClick={() => clearOverride(zone)} disabled={busy} style={btn("transparent", theme.danger)}>
@@ -336,7 +386,11 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
         </div>
 
         <div style={{ padding: "10px 16px", borderTop: `1px solid ${theme.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 11.5, color: theme.textSecondary }}>Screens pick up changes within ~30 seconds.</span>
+          <span style={{ fontSize: 11.5, color: theme.textSecondary }}>
+            {needsApproval
+              ? "Your changes need a manager/admin approval before screens update."
+              : "Screens pick up changes within ~30 seconds."}
+          </span>
           <button onClick={onClose} style={btn(theme.cardAlt, theme.text)}>Done</button>
         </div>
       </div>
