@@ -19,6 +19,7 @@ export const REQUEST_TYPE_LABELS = {
   advertisement_change: "Image change",
   link_content: "Assign content to group",
   template_content: "Template content",
+  template_content_bulk: "Template content (bulk sheet)",
 };
 
 export const TARGET_TYPE_LABELS = { device: "Screen", group: "Group", shop: "Location", company: "Company" };
@@ -146,6 +147,9 @@ function MediaPreviews({ request }) {
   if (request.request_type === "template_content") {
     return <TemplateContentChange request={request} />;
   }
+  if (request.request_type === "template_content_bulk") {
+    return <TemplateContentBulkChange request={request} />;
+  }
   if (!PREVIEWABLE.has(request.request_type)) {
     return <KeyValue columns={1} items={Object.entries(change).map(([k, v]) => ({ label: k.replace(/_/g, " "), value: typeof v === "string" ? v : JSON.stringify(v) }))} />;
   }
@@ -189,6 +193,51 @@ function MediaPreviews({ request }) {
         </div>
       )}
       {vids.length === 0 && ads.length === 0 && <span className="u-muted">No videos or images in this request.</span>}
+    </div>
+  );
+}
+
+// One-line summary of a bulk item's proposed payload.
+function bulkItemSummary(payload) {
+  if (!payload) return "—";
+  if (typeof payload.text === "string" && payload.text !== "") {
+    return `“${payload.text.length > 60 ? `${payload.text.slice(0, 60)}…` : payload.text}”`;
+  }
+  if (payload.qr_link) return `QR → ${payload.qr_link}`;
+  if (payload.media_url) return `${payload.media_type === "video" ? "Video" : "Image"} URL`;
+  if (payload.media_s3) return payload.media_type === "video" ? "Video (from library/upload)" : "Image (from library/upload)";
+  if (payload.fit_mode) return `Fit: ${payload.fit_mode}`;
+  return "Content update";
+}
+
+const BULK_PREVIEW_LIMIT = 12;
+
+// A bulk-sheet content batch: every per-screen zone change an editor uploaded.
+function TemplateContentBulkChange({ request }) {
+  const items = request.change_data?.items || [];
+  const screens = new Set(items.map((i) => i.device_id)).size;
+  const shown = items.slice(0, BULK_PREVIEW_LIMIT);
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <div className="u-flex" style={{ flexWrap: "wrap" }}>
+        <Badge tone="info">{items.length} change{items.length === 1 ? "" : "s"}</Badge>
+        <span className="u-muted">across {screens} screen{screens === 1 ? "" : "s"} (per-screen content overrides)</span>
+      </div>
+      <div style={{ display: "grid", gap: 6, maxHeight: 260, overflowY: "auto" }}>
+        {shown.map((it, i) => (
+          <div key={i} className="u-flex" style={{ gap: 8, flexWrap: "wrap", alignItems: "baseline" }}>
+            <strong>{it.device_name || it.device_id}</strong>
+            <Badge tone="neutral">{it.zone_label || it.zone_key}</Badge>
+            <span style={{ wordBreak: "break-word" }}>{bulkItemSummary(it.payload)}</span>
+          </div>
+        ))}
+      </div>
+      {items.length > BULK_PREVIEW_LIMIT && (
+        <span className="u-faint">…and {items.length - BULK_PREVIEW_LIMIT} more change(s) in this batch.</span>
+      )}
+      <span className="u-faint">
+        Approving applies every change above; screens refresh within ~30 seconds.
+      </span>
     </div>
   );
 }
