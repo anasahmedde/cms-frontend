@@ -16,9 +16,12 @@ import "./shell.css";
 
 const COMPANY_NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/screens", label: "Screens", icon: MonitorPlay, perm: "manage_devices" },
-  { to: "/groups", label: "Groups", icon: Layers, perm: "manage_groups" },
-  { to: "/locations", label: "Locations", icon: MapPin, perm: "manage_shops" },
+  // Fleet pages are open to every company role: viewers browse read-only,
+  // editors additionally keep content/playlist actions — mutation affordances
+  // are gated in-page and every endpoint is permission-checked server-side.
+  { to: "/screens", label: "Screens", icon: MonitorPlay },
+  { to: "/groups", label: "Groups", icon: Layers },
+  { to: "/locations", label: "Locations", icon: MapPin },
   { to: "/media", label: "Media", icon: Film, anyPerm: ["manage_videos", "upload_videos"] },
   { to: "/assign", label: "Assign content", icon: Link2, perm: "manage_links" },
   // Every company role can SEE template content (viewers read-only, editors

@@ -65,25 +65,29 @@ function useGroupPlaylist(gname) {
   return { ...state, error, load };
 }
 
+// onRemove/picker may be null (viewer read-only): chips render without the X
+// and the add-picker row disappears.
 function ChipPanel({ icon: Icon, title, hint, names, onRemove, picker }) {
   return (
     <Card title={<span className="u-flex"><Icon size={16} aria-hidden="true" /> {title} ({names.length})</span>}>
       {hint && <p className="u-muted" style={{ margin: "0 0 8px", fontSize: 12 }}>{hint}</p>}
       <div className="u-flex" style={{ flexWrap: "wrap", minHeight: 34, marginBottom: 10 }}>
         {names.length === 0 ? (
-          <span className="u-faint">Nothing selected — add below.</span>
+          <span className="u-faint">{onRemove ? "Nothing selected — add below." : "Nothing assigned."}</span>
         ) : (
           names.map((n) => (
             <Badge key={n} tone="neutral">
               {n}
-              <button
-                type="button"
-                aria-label={`Remove ${n}`}
-                onClick={() => onRemove(n)}
-                style={{ border: "none", background: "none", cursor: "pointer", color: "inherit", padding: 0, marginLeft: 4, display: "inline-flex" }}
-              >
-                <X size={12} aria-hidden="true" />
-              </button>
+              {onRemove && (
+                <button
+                  type="button"
+                  aria-label={`Remove ${n}`}
+                  onClick={() => onRemove(n)}
+                  style={{ border: "none", background: "none", cursor: "pointer", color: "inherit", padding: 0, marginLeft: 4, display: "inline-flex" }}
+                >
+                  <X size={12} aria-hidden="true" />
+                </button>
+              )}
             </Badge>
           ))
         )}
@@ -95,7 +99,9 @@ function ChipPanel({ icon: Icon, title, hint, names, onRemove, picker }) {
 
 export default function PlaylistEditor({ gname, onSaved }) {
   const toast = useToast();
-  const { user, isPlatform } = useAuth();
+  const { user, isPlatform, hasPermission } = useAuth();
+  // Viewers see the playlist read-only; editors keep the approval-aware save.
+  const canAssign = hasPermission("manage_links");
   const { rotVideos: origVideos, rotImages: origImages, ads: origAds, rotOrder: origRotOrder, error: loadError, load } = useGroupPlaylist(gname);
   const [videos, setVideos] = useState([]);        // rotation videos
   const [rotImages, setRotImages] = useState([]);  // rotation images (same stack)
@@ -236,24 +242,24 @@ export default function PlaylistEditor({ gname, onSaved }) {
         title="Videos"
         hint="Play in the rotation loop on every screen in this group."
         names={videos}
-        onRemove={(n) => setVideos(videos.filter((x) => x !== n))}
-        picker={<MediaPicker kind="video" typeFilter="video" exclude={inRotation} onAdd={(n) => setVideos([...videos, n])} />}
+        onRemove={canAssign ? (n) => setVideos(videos.filter((x) => x !== n)) : null}
+        picker={canAssign ? <MediaPicker kind="video" typeFilter="video" exclude={inRotation} onAdd={(n) => setVideos([...videos, n])} /> : null}
       />
       <ChipPanel
         icon={ImageIcon}
         title="Images"
         hint="Still images shown in the same rotation loop (each for its display duration)."
         names={rotImages}
-        onRemove={(n) => setRotImages(rotImages.filter((x) => x !== n))}
-        picker={<MediaPicker kind="video" typeFilter="image" exclude={inRotation} onAdd={(n) => setRotImages([...rotImages, n])} />}
+        onRemove={canAssign ? (n) => setRotImages(rotImages.filter((x) => x !== n)) : null}
+        picker={canAssign ? <MediaPicker kind="video" typeFilter="image" exclude={inRotation} onAdd={(n) => setRotImages([...rotImages, n])} /> : null}
       />
       <ChipPanel
         icon={LayoutGrid}
         title="Layout images (grid slots)"
         hint="Images placed in fixed grid/split-screen slots — separate from the rotation above."
         names={layoutImages}
-        onRemove={(n) => setLayoutImages(layoutImages.filter((x) => x !== n))}
-        picker={<MediaPicker kind="image" exclude={layoutImages} onAdd={(n) => setLayoutImages([...layoutImages, n])} />}
+        onRemove={canAssign ? (n) => setLayoutImages(layoutImages.filter((x) => x !== n)) : null}
+        picker={canAssign ? <MediaPicker kind="image" exclude={layoutImages} onAdd={(n) => setLayoutImages([...layoutImages, n])} /> : null}
       />
 
       {needsApproval && (
@@ -286,15 +292,19 @@ export default function PlaylistEditor({ gname, onSaved }) {
       {pendingInfo && <Badge tone="warn">{pendingInfo}</Badge>}
 
       <div className="u-flex">
-        <Button onClick={submit} loading={saving} disabled={!delta?.any}>
-          {needsApproval ? "Submit for approval" : "Save playlist"}
-        </Button>
-        {delta?.any && (
+        {canAssign && (
+          <Button onClick={submit} loading={saving} disabled={!delta?.any}>
+            {needsApproval ? "Submit for approval" : "Save playlist"}
+          </Button>
+        )}
+        {canAssign && delta?.any && (
           <Badge tone="info">
             +{delta.added} −{delta.removed} vs current
           </Badge>
         )}
-        <span className="u-faint">Playing on every screen in {title}</span>
+        <span className="u-faint">
+          {canAssign ? `Playing on every screen in ${title}` : `Playing on every screen in ${title} — your role can view but not change it`}
+        </span>
       </div>
 
       <ConfirmModal

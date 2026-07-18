@@ -14,7 +14,7 @@ import { SkeletonText } from "../ui/Skeleton";
 import { Field, Select } from "../ui/Field";
 import ConfirmModal from "../ui/ConfirmModal";
 import { apiGet, normalizeList } from "../lib/api";
-import { useAuth } from "../lib/auth";
+import { useAuth, CONTENT_EDIT_PERMS } from "../lib/auth";
 import { timeAgo } from "../lib/format";
 import BulkImport from "../fleet/enroll/BulkImport";
 import ZoneContentEditor from "../components/templates/ZoneContentEditor";
@@ -32,13 +32,6 @@ const SCOPES = [
   { key: "group", label: "One group", icon: Users, hint: "Applies to every device in the group, wherever it's located — overrides the location + company defaults" },
   { key: "shop", label: "One location", icon: MapPin, hint: "Overrides the company default" },
   { key: "device", label: "One screen", icon: MonitorPlay, hint: "Overrides its group, location + company" },
-];
-
-// Mirror of the backend's _CONTENT_EDIT_PERMS: any of these makes the user a
-// content editor here; none (the viewer role) = read-only page.
-const CONTENT_EDIT_PERMS = [
-  "manage_company_settings", "manage_devices", "manage_shops",
-  "upload_videos", "manage_videos", "manage_links",
 ];
 
 const STATUS_TONES = { pending: "warn", approved: "success", rejected: "danger", cancelled: "neutral", expired: "neutral" };
