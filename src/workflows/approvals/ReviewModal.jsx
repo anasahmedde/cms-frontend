@@ -212,20 +212,47 @@ function bulkItemSummary(payload) {
 
 const BULK_PREVIEW_LIMIT = 12;
 
+// 56×36 media thumbnail so the reviewer SEES what lands on the screen —
+// image, muted video, or the generated QR — not just "media from library".
+function ItemThumb({ media, alt }) {
+  const url = media?.media_url || media?.qr_url;
+  if (!url) return null;
+  const isVideo = media.media_type === "video" && !media.qr_url;
+  const style = { width: 56, height: 36, objectFit: "cover", borderRadius: 4, background: "#000", flexShrink: 0 };
+  return isVideo
+    ? <video src={url} muted playsInline preload="metadata" style={style} aria-label={alt} />
+    : <img src={url} alt={alt} style={style} />;
+}
+
 // A bulk-sheet content batch: every per-screen zone change an editor uploaded.
 function TemplateContentBulkChange({ request }) {
   const items = request.change_data?.items || [];
   const screens = new Set(items.map((i) => i.device_id)).size;
   const shown = items.slice(0, BULK_PREVIEW_LIMIT);
+  const [media, setMedia] = useState(null); // {items: {idx: {media_url, media_type, qr_url}}}
+
+  const anyMedia = items.some((it) => it.payload?.media_s3 || it.payload?.media_url || it.payload?.qr_generated_s3);
+  useEffect(() => {
+    if (!anyMedia) { setMedia({ items: {} }); return; }
+    let alive = true;
+    apiGet(`/content-changes/${request.id}/media-urls`).then((res) => {
+      if (alive) setMedia(res.ok ? (res.data || { items: {} }) : { items: {} });
+    });
+    return () => { alive = false; };
+  }, [request.id, anyMedia]);
+
   return (
     <div style={{ display: "grid", gap: 8 }}>
       <div className="u-flex" style={{ flexWrap: "wrap" }}>
         <Badge tone="info">{items.length} change{items.length === 1 ? "" : "s"}</Badge>
         <span className="u-muted">across {screens} screen{screens === 1 ? "" : "s"} (per-screen content overrides)</span>
       </div>
-      <div style={{ display: "grid", gap: 6, maxHeight: 260, overflowY: "auto" }}>
+      <div style={{ display: "grid", gap: 6, maxHeight: 300, overflowY: "auto" }}>
         {shown.map((it, i) => (
-          <div key={i} className="u-flex" style={{ gap: 8, flexWrap: "wrap", alignItems: "baseline" }}>
+          <div key={i} className="u-flex" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <ItemThumb media={media?.items?.[String(i)]}
+              alt={`Proposed content for ${it.zone_label || it.zone_key} on ${it.device_name || it.device_id}`} />
+            {anyMedia && !media && <Spinner size={12} />}
             <strong>{it.device_name || it.device_id}</strong>
             <Badge tone="neutral">{it.zone_label || it.zone_key}</Badge>
             <span style={{ wordBreak: "break-word" }}>{bulkItemSummary(it.payload)}</span>
