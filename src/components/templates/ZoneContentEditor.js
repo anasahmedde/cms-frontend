@@ -396,6 +396,8 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                       }
                       const setItem = (i, v) => {
                         if (i === 1) { setDraft(zone.key, { text: v }); return; }
+                        // Any per-item value = composition editing (all designed
+                        // items stay); text alone = your text takes the box over.
                         const rt = { ...(d.run_texts || {}) };
                         if (v) rt[String(i)] = v; else delete rt[String(i)];
                         setDraft(zone.key, { run_texts: Object.keys(rt).length ? rt : undefined });
@@ -415,10 +417,26 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                         );
                       });
                     })()}
+                    {zone.type === "text" && (
+                      <div style={{ margin: "2px 0 10px" }}>
+                        <label htmlFor={`textfit-${zone.key}`} style={lbl}>Text size</label>
+                        <select id={`textfit-${zone.key}`} value={d.text_fit || ""}
+                          onChange={(e) => setDraft(zone.key, { text_fit: e.target.value || undefined })}
+                          style={inp}>
+                          <option value="">Designer’s setting</option>
+                          <option value="fill">Auto-fit — grow to fill the box, centered</option>
+                          <option value="none">Fixed — the designed size</option>
+                        </select>
+                        <div style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 4 }}>
+                          In Excel this is the fit column for this box: auto, none, or blank.
+                        </div>
+                      </div>
+                    )}
                     <p style={{ margin: "0 0 4px", fontSize: 12, color: theme.textSecondary }}>
                       Colors, size and background come from the template designer — this sets only the words.
-                      {Array.isArray(zone.content?.runs) && zone.content.runs.length >= 2 &&
-                        " Leave an item blank to keep its designed words."}
+                      {Array.isArray(zone.content?.runs) && zone.content.runs.length >= 2
+                        ? " Setting only “Text item 1” shows JUST your text (the other designed items hide); fill the other item fields to keep or change them too."
+                        : " Your text replaces all the words in the box."}
                     </p>
                   </>
                 )}
