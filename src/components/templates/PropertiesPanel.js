@@ -334,6 +334,18 @@ export default function PropertiesPanel({ theme, state, dispatch, onEditRuns }) 
       <BackgroundSection theme={theme} zone={zone} patchStyle={patchStyle} patchZone={patchZone} />
       <ColorField theme={theme} id="z-fg" label="Text color" value={zone.style?.text_color} onChange={(v) => patchStyle("text_color", v)} />
 
+      {zone.type === "text" && (
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, margin: "8px 0" }}>
+          <input id="z-textfit" type="checkbox" checked={zone.style?.text_fit === "fill"}
+            onChange={(e) => patchStyle("text_fit", e.target.checked ? "fill" : undefined)}
+            style={{ marginTop: 2 }} />
+          <label htmlFor="z-textfit" style={{ fontSize: 12, color: theme.textSecondary, cursor: "pointer" }}>
+            <strong style={{ color: theme.text }}>Auto-fit text</strong> — the words scale to the
+            largest size that fits and center in the box (like image Stretch). Font size below
+            is ignored while this is on.
+          </label>
+        </div>
+      )}
       {(zone.type === "text" || zone.type === "ticker") && (
         <>
           <NumField theme={theme} id="z-font" label="Font size (vh)" value={zone.style?.font_size_vh ?? 50}
