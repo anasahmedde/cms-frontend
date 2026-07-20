@@ -1,7 +1,42 @@
 // A to-scale WYSIWYG preview of the resolved template — mirrors what a screen
 // actually renders. Fed by GET /company/template/preview (resolved + presigned
 // zones), so images/videos/text appear as they do on the device.
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+
+// Auto-fit & center (style.text_fit = "fill"): the text twin of media
+// fit=fill — binary-search the largest font size whose wrapped text still
+// fits the zone box, then center it. Mirrors player.html fitTextFill and the
+// Android renderer.
+function FitText({ text, color, bold, direction }) {
+  const boxRef = useRef(null);
+  const innerRef = useRef(null);
+  useLayoutEffect(() => {
+    const box = boxRef.current, inner = innerRef.current;
+    if (!box || !inner || !text) return;
+    const fits = (px) => {
+      inner.style.fontSize = `${px}px`;
+      return inner.scrollWidth <= box.clientWidth + 1 && inner.scrollHeight <= box.clientHeight + 1;
+    };
+    let lo = 4, hi = Math.max(12, box.clientHeight);
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (fits(mid)) lo = mid; else hi = mid - 1;
+    }
+    inner.style.fontSize = `${lo}px`;
+  }, [text]);
+  return (
+    <div ref={boxRef} style={{
+      width: "100%", height: "100%", display: "flex", alignItems: "center",
+      justifyContent: "center", overflow: "hidden", color,
+      fontWeight: bold ? 700 : 400, direction: direction === "rtl" ? "rtl" : "ltr",
+    }}>
+      <span ref={innerRef} style={{
+        display: "block", maxWidth: "100%", whiteSpace: "pre-wrap",
+        wordBreak: "break-word", lineHeight: 1.1, textAlign: "center",
+      }}>{text}</span>
+    </div>
+  );
+}
 
 function bgStyle(c = {}, st = {}) {
   const s = {};
@@ -40,7 +75,9 @@ function Clock({ fmt }) {
 function ZoneContent({ z }) {
   const c = z.content || {};
   const st = z.style || {};
-  const fit = st.fit_mode === "contain" ? "contain" : "cover";
+  // style.fit_mode → CSS object-fit ("fill" = stretch to the whole box, no
+  // crop/bars); unknown/unset falls back to cover, matching the players.
+  const fit = ["contain", "fill", "none"].includes(st.fit_mode) ? st.fit_mode : "cover";
   const textColor = c.text_color || st.text_color || "#fff";
   const fontSize = `min(${st.font_size_vh || 45}cqh, 40cqw)`;
 
@@ -73,6 +110,13 @@ function ZoneContent({ z }) {
       // bare <img> on the black board renders black-on-black — invisible.
       // Unset QR zones stay transparent on the device — mirror that here.
       if (!c.media_url) return <span style={{ opacity: 0.7, fontSize: 10, color: "#888" }}>QR</span>;
+      // An explicit fit renders the box like a media zone (no card) — mirror
+      // the players' sheet/dashboard fit behavior.
+      if (st.fit_mode) {
+        return c.media_type === "video"
+          ? <video src={c.media_url} autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: fit }} />
+          : <img src={c.media_url} alt="" style={{ width: "100%", height: "100%", objectFit: fit }} />;
+      }
       const side = "min(100cqw, 100cqh)";
       const padPct = (st.padding_pct ?? 6) / 100;
       return (
@@ -90,6 +134,9 @@ function ZoneContent({ z }) {
     case "ticker":
       return <div style={{ width: "100%", height: "100%", overflow: "hidden", whiteSpace: "nowrap", display: "flex", alignItems: "center", color: textColor, fontSize: `min(${st.font_size_vh || 60}cqh, 12cqw)` }}>{c.text || ""}</div>;
     case "text":
+      if (st.text_fit === "fill" && c.text) {
+        return <FitText text={c.text} color={textColor} bold={st.bold} direction={st.direction} />;
+      }
       return <div style={{
         width: "100%", height: "100%", display: "flex",
         alignItems: st.valign === "top" ? "flex-start" : st.valign === "bottom" ? "flex-end" : "center",
