@@ -380,6 +380,7 @@ export default function PropertiesPanel({ theme, state, dispatch, onEditRuns }) 
             onChange={(e) => patchStyle("fit_mode", e.target.value)} style={inp(theme)}>
             <option value="cover">cover (fill, may crop)</option>
             <option value="contain">contain (letterbox)</option>
+            <option value="fill">stretch (fill, may distort)</option>
           </select>
         </div>
       )}

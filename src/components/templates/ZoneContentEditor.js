@@ -336,9 +336,13 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                         style={inp}>
                         <option value="cover">Fill the box (crops wide/tall edges)</option>
                         <option value="contain">Show the whole image (no crop)</option>
+                        <option value="fill">Stretch to fill the box (no crop, may distort)</option>
                       </select>
                       <div style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 4 }}>
-                        Pick “Show the whole image” so a wide image isn’t cut off.
+                        Pick “Show the whole image” so a wide image isn’t cut off, or “Stretch”
+                        to cover the box edge-to-edge with no bars — a mismatched shape gets
+                        squashed or stretched. In Excel this is the fit column: cover, contain
+                        or stretch.
                       </div>
                     </div>
                   </>

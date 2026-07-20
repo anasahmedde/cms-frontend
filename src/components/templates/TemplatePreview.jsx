@@ -40,7 +40,9 @@ function Clock({ fmt }) {
 function ZoneContent({ z }) {
   const c = z.content || {};
   const st = z.style || {};
-  const fit = st.fit_mode === "contain" ? "contain" : "cover";
+  // style.fit_mode → CSS object-fit ("fill" = stretch to the whole box, no
+  // crop/bars); unknown/unset falls back to cover, matching the players.
+  const fit = ["contain", "fill", "none"].includes(st.fit_mode) ? st.fit_mode : "cover";
   const textColor = c.text_color || st.text_color || "#fff";
   const fontSize = `min(${st.font_size_vh || 45}cqh, 40cqw)`;
 
