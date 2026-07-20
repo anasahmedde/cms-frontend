@@ -75,6 +75,13 @@ function ZoneContent({ z }) {
       // bare <img> on the black board renders black-on-black — invisible.
       // Unset QR zones stay transparent on the device — mirror that here.
       if (!c.media_url) return <span style={{ opacity: 0.7, fontSize: 10, color: "#888" }}>QR</span>;
+      // An explicit fit renders the box like a media zone (no card) — mirror
+      // the players' sheet/dashboard fit behavior.
+      if (st.fit_mode) {
+        return c.media_type === "video"
+          ? <video src={c.media_url} autoPlay loop muted playsInline style={{ width: "100%", height: "100%", objectFit: fit }} />
+          : <img src={c.media_url} alt="" style={{ width: "100%", height: "100%", objectFit: fit }} />;
+      }
       const side = "min(100cqw, 100cqh)";
       const padPct = (st.padding_pct ?? 6) / 100;
       return (

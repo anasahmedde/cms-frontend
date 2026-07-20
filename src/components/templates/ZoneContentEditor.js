@@ -282,6 +282,22 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                       <MediaField zone={zone} d={d} saved={saved} theme={theme} lbl={lbl} btn={btn}
                         busy={busy} pct={pct} fileRefs={fileRefs} onUpload={(f) => upload(zone, f)} />
                     )}
+                    <div style={{ marginTop: 10 }}>
+                      <label htmlFor={`fit-${zone.key}`} style={lbl}>Fit</label>
+                      <select id={`fit-${zone.key}`} value={d.fit_mode || ""}
+                        onChange={(e) => setDraft(zone.key, { fit_mode: e.target.value || undefined })}
+                        style={inp}>
+                        <option value="">QR card (square white backing — scans best)</option>
+                        <option value="cover">Fill the box (crops wide/tall edges)</option>
+                        <option value="contain">Show the whole image (no crop)</option>
+                        <option value="fill">Stretch to fill the box (no crop, may distort)</option>
+                      </select>
+                      <div style={{ fontSize: 11.5, color: theme.textSecondary, marginTop: 4 }}>
+                        Leave on “QR card” for scannable codes. Any other fit drops the card and
+                        fills the whole box like a media box — in Excel this is the fit column
+                        (blank = card, stretch = edge-to-edge).
+                      </div>
+                    </div>
                   </>
                 )}
 
