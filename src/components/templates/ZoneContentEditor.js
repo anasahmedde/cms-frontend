@@ -378,12 +378,47 @@ export default function ZoneContentEditor({ scope, targetId, targetName, onClose
                         } — a text set here replaces those words (leave blank to keep the default).
                       </p>
                     )}
-                    <label htmlFor={`txt-${zone.key}`} style={lbl}>Text</label>
-                    <input id={`txt-${zone.key}`} value={d.text || ""} maxLength={5000}
-                      onChange={(e) => setDraft(zone.key, { text: e.target.value })}
-                      style={{ ...inp, marginBottom: 10 }} placeholder="Shown on the screen" />
+                    {(() => {
+                      // A designer composition with several text items gets one
+                      // Words field per item — same contract as the sheet's
+                      // .text / .text2..textN columns. Blank = keep the
+                      // designed words; styling/position stay designer-owned.
+                      const designed = Array.isArray(zone.content?.runs) ? zone.content.runs : [];
+                      if (designed.length < 2) {
+                        return (
+                          <>
+                            <label htmlFor={`txt-${zone.key}`} style={lbl}>Text</label>
+                            <input id={`txt-${zone.key}`} value={d.text || ""} maxLength={5000}
+                              onChange={(e) => setDraft(zone.key, { text: e.target.value })}
+                              style={{ ...inp, marginBottom: 10 }} placeholder="Shown on the screen" />
+                          </>
+                        );
+                      }
+                      const setItem = (i, v) => {
+                        if (i === 1) { setDraft(zone.key, { text: v }); return; }
+                        const rt = { ...(d.run_texts || {}) };
+                        if (v) rt[String(i)] = v; else delete rt[String(i)];
+                        setDraft(zone.key, { run_texts: Object.keys(rt).length ? rt : undefined });
+                      };
+                      return designed.slice(0, 40).map((run, idx) => {
+                        const i = idx + 1;
+                        const value = i === 1 ? (d.text || "") : (d.run_texts?.[String(i)] || "");
+                        return (
+                          <div key={i} style={{ marginBottom: 8 }}>
+                            <label htmlFor={`txt-${zone.key}-${i}`} style={lbl}>
+                              Text item {i} <span style={{ fontWeight: 400 }}>(in Excel: content.{zone.key}.text{i > 1 ? i : ""})</span>
+                            </label>
+                            <input id={`txt-${zone.key}-${i}`} value={value} maxLength={2000}
+                              onChange={(e) => setItem(i, e.target.value)}
+                              style={inp} placeholder={`Designed words: ${run.text || "(empty)"}`} />
+                          </div>
+                        );
+                      });
+                    })()}
                     <p style={{ margin: "0 0 4px", fontSize: 12, color: theme.textSecondary }}>
                       Colors, size and background come from the template designer — this sets only the words.
+                      {Array.isArray(zone.content?.runs) && zone.content.runs.length >= 2 &&
+                        " Leave an item blank to keep its designed words."}
                     </p>
                   </>
                 )}
