@@ -192,6 +192,9 @@ export default function BulkImport({ open, onClose, onImported }) {
                 <>
                   One row per screen. <b>device_name</b> and <b>shop_name</b> are required. Add the <b>device_id</b> (shown on the screen)
                   if you know it and the screen auto-enrolls when it powers on; leave it blank to create a pending screen you claim on site.
+                  The <b>template</b> column comes filled in with the layout each screen is showing now (and <b>template_set_at</b> says
+                  whether that came from the screen, its group or the company default) — type another layout&rsquo;s name there to move that
+                  screen, or <b>inherited</b> to let it follow its group again.
                 </>
               ) : (
                 <>
