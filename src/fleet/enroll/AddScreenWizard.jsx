@@ -37,6 +37,8 @@ export default function AddScreenWizard({ open, onClose, onCreated, initialLocat
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [createdVia, setCreatedVia] = useState("create"); // "create" | "legacy"
+  // What the server reported it actually linked: {group, shop, playlistPendingLocation}
+  const [outcome, setOutcome] = useState(null);
 
   // Prefill from ?location= / ?group= deep links (e.g. "Add screen here").
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function AddScreenWizard({ open, onClose, onCreated, initialLocat
     setStep(1); setDeviceId(""); setName(""); setResolution("");
     resolutionTouched.current = false;
     setLocation(""); setGroup(""); setDetection(null); setDetectError(false);
-    setSubmitting(false); setSubmitError(""); setCreatedVia("create");
+    setSubmitting(false); setSubmitError(""); setCreatedVia("create"); setOutcome(null);
   };
 
   useEffect(() => { if (open) reset(); }, [open]);
@@ -120,6 +122,14 @@ export default function AddScreenWizard({ open, onClose, onCreated, initialLocat
     setSubmitting(false);
     if (!res.ok) { setSubmitError(res.message); return; }
     setCreatedVia(via);
+    // Report what the server actually linked, not what we asked for: a screen can
+    // join a group without a location, but its playlist only starts once a
+    // location exists. Claiming a clean success there would be a lie.
+    setOutcome(via === "legacy" ? null : {
+      group: res.data?.linked_to_group === true,
+      shop: res.data?.linked_to_shop === true,
+      playlistPendingLocation: res.data?.playlist_pending_location === true,
+    });
     setStep("done");
     onCreated?.();
   };
@@ -247,7 +257,20 @@ export default function AddScreenWizard({ open, onClose, onCreated, initialLocat
               { label: "Group", value: group || "Ungrouped" },
             ]}
           />
-          {group && <p className="u-muted" style={{ margin: 0 }}>The screen will automatically receive the “{group}” group’s playlist.</p>}
+          {group && location && (
+            <p className="u-muted" style={{ margin: 0 }}>
+              The screen will automatically receive the “{group}” group’s playlist.
+            </p>
+          )}
+          {group && !location && (
+            <p className="u-flex" style={{ margin: 0, color: "var(--warn)" }}>
+              <AlertTriangle size={16} aria-hidden="true" />
+              <span>
+                The screen will join “{group}”, but its playlist only starts once the screen has a
+                location. Pick one above to have it play right away.
+              </span>
+            </p>
+          )}
           {submitError && <div role="alert" className="u-danger">{submitError}</div>}
         </div>
       )}
@@ -263,6 +286,21 @@ export default function AddScreenWizard({ open, onClose, onCreated, initialLocat
             <p role="alert" className="u-flex" style={{ justifyContent: "center", color: "var(--warn)", marginTop: 10 }}>
               <AlertTriangle size={16} aria-hidden="true" />
               Enrolled through the legacy endpoint — name, resolution, location, and group were NOT saved. Open the screen to set them.
+            </p>
+          )}
+          {outcome?.playlistPendingLocation && (
+            <p role="alert" className="u-flex" style={{ justifyContent: "center", color: "var(--warn)", marginTop: 10 }}>
+              <AlertTriangle size={16} aria-hidden="true" />
+              <span>
+                It joined “{group}”, but it has no location yet, so the group’s playlist is not
+                linked. Give it a location and the playlist starts automatically.
+              </span>
+            </p>
+          )}
+          {outcome && group && !outcome.group && (
+            <p role="alert" className="u-flex" style={{ justifyContent: "center", color: "var(--warn)", marginTop: 10 }}>
+              <AlertTriangle size={16} aria-hidden="true" />
+              <span>The group “{group}” was NOT applied. Open the screen and set it there.</span>
             </p>
           )}
           <p style={{ marginTop: 14 }}>
